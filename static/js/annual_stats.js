@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const startYear = 1950;
         const endYear = 2049;
         if (!yearSelect) return;
-        yearSelect.innerHTML = `<option value="">-- ${i18nStrings.fields.select} --</option>`;
+        yearSelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
         for (let year = startYear; year <= endYear; year++) {
             const yy = String(year % 100).padStart(2, '0');
             const option = document.createElement('option');

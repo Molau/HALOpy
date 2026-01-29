@@ -52,7 +52,7 @@ class ObservationCSV:
             return 0 if slash_as_not_present else -1
         
         try:
-            return int(value)
+            return int(value_stripped)
         except ValueError:
             return default
     

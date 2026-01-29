@@ -2,14 +2,20 @@
 01,Richard,Löwenherz,07/99,1,Mühlhausen,7,10,25,O,51,10,N,Klettwitz,4,13,54,O,51,33,N
 01,Richard,Löwenherz,05/00,1,Klettwitz,4,13,54,O,51,33,N,Berlin-Lichterfelde,4,13,4,O,52,30,N
 01,Richard,Löwenherz,01/04,0,Berlin,4,0,0,O,0,0,N,Berlin,4,0,0,O,0,0,N
+01,Richard,Löwenherz,12/15,1,Berlin-Tempelhof,4,13,25,O,52,28,N,Berlin-Adlershof,4,13,32,O,52,26,N
+01,Richard,Löwenherz,09/17,1,Berlin-Tempelhof,4,13,25,O,52,28,N,Berlin-Adlershof,4,13,19,O,52,28,N
+01,Richard,Löwenherz,01/19,0,Schweiz,27,0,0,O,0,0,N,Schweiz,27,0,0,O,0,0,N
 02,Gerhard,Stemmler,01/79,1,Oelsnitz/Erzgeb.,8,12,42,O,50,42,N,Oelsnitz/Erzgeb.,8,12,42,O,50,42,N
+02,Gerhard,Stemmler,05/13,0,Oelsnitz/Erz,8,0,0,O,0,0,N,Oelsnitz/Erz,8,0,0,O,0,0,N
 03,Thomas,Groß,01/02,1,Grafrath/Mauern,11,11,10,O,48,6,N,München/Flughafen,11,11,48,O,48,21,N
 03,Thomas,Groß,08/04,1,Fürstenzell,11,13,21,O,48,32,N,Passau,11,13,28,O,48,34,N
 03,Thomas,Groß,09/08,1,Flintsbach am Inn,11,12,8,O,47,43,N,Wendelstein,11,12,1,O,47,42,N
 03,Thomas,Groß,04/10,1,Flintsbach,11,12,8,O,47,43,N,München/Flughafen,11,11,48,O,48,21,N
 03,Thomas,Groß,05/10,1,München,11,11,33,O,48,13,N,München/Flughafen,11,11,48,O,48,21,N
+03,Thomas,Groß,01/15,0,München,11,0,0,O,0,0,N,München/Flughafen,11,0,0,O,0,0,N
 04,Hartmut,Bretschneider,01/79,1,Schneeberg,8,12,39,O,50,37,N,Aue,8,12,42,O,50,35,N
 05,Steffen,Lambrecht,04/10,1,Radebeul,8,13,40,O,51,7,N,Radebeul,8,13,42,O,51,6,N
+05,Steffen,Lambrecht,05/11,0,Radebeul,8,0,0,O,0,0,N,Radebeul,8,0,0,O,0,0,N
 06,Andre,Knöfel,01/78,1,Potsdam,4,13,6,O,52,24,N,Potsdam,4,13,6,O,52,24,N
 06,Andre,Knöfel,01/88,1,Potsdam,4,13,6,O,52,24,N,Schönefeld,4,13,30,O,52,20,N
 06,Andre,Knöfel,07/90,1,Potsdam,4,13,6,O,52,24,N,Dresden,8,13,42,O,51,6,N
@@ -29,6 +35,7 @@
 09,Gerald,Berthold,03/85,1,Chemnitz,8,12,48,O,50,50,N,Chemnitz,8,12,48,O,50,50,N
 09,Gerald,Berthold,11/87,1,Chemnitz,8,12,48,O,50,50,N,Erfurt,7,11,0,O,51,0,N
 09,Gerald,Berthold,05/89,1,Chemnitz,8,12,48,O,50,50,N,Chemnitz,8,12,48,O,50,50,N
+09,Gerald,Berthold,03/12,0,Hartmannsdorf,8,0,0,O,0,0,N,Hartmannsdorf,8,0,0,O,0,0,N
 10,Jürgen,Rendtel,01/79,1,Potsdam,4,13,6,O,52,24,N,Potsdam,4,13,6,O,52,24,N
 10,Jürgen,Rendtel,01/01,0,Potsdam,4,0,0,O,0,0,N,Potsdam,4,0,0,O,0,0,N
 11,Jan,Kanarek,01/85,1,Deblin,21,21,50,O,51,35,N,Deblin,21,21,50,O,51,35,N
@@ -48,6 +55,8 @@
 15,Udo,Hennig,10/05,1,Dresden,8,13,42,O,51,6,N,Radebeul,8,13,42,O,51,6,N
 15,Udo,Hennig,12/06,1,Dresden,8,13,42,O,51,6,N,München,11,11,34,O,48,8,N
 15,Udo,Hennig,12/08,1,Dresden,8,13,42,O,51,6,N,Radebeul,8,13,37,O,51,7,N
+15,Udo,Hennig,01/11,1,Dresden,8,13,42,O,51,6,N,Essen,5,7,1,O,51,27,N
+15,Udo,Hennig,03/12,0,Radeberg,8,0,0,O,0,0,N,Essen,5,0,0,O,0,0,N
 16,Thorsten,Schröter,01/86,1,Dresden,8,13,42,O,51,6,N,Dresden,8,13,42,O,51,6,N
 16,Thorsten,Schröter,01/90,0,Dresden,8,13,42,O,51,6,N,Dresden,8,13,42,O,51,6,N
 17,Kathrin,Jentzsch,01/85,1,Coswig,8,13,40,O,51,8,N,Jena,7,11,36,O,50,54,N
@@ -64,6 +73,7 @@
 21,Kristian,Schlegel,05/93,1,Katlenburg,2,10,9,O,51,40,N,Katlenburg,2,10,9,O,51,40,N
 21,Kristian,Schlegel,11/93,0,Katlenburg,2,10,9,O,51,40,N,Katlenburg,2,10,9,O,51,40,N
 22,Günter,Röttler,01/93,1,Hagen,5,7,27,O,51,21,N,Hagen,5,7,27,O,51,21,N
+22,Günter,Röttler,03/16,0,Hagen,5,0,0,O,0,0,N,Hagen,5,0,0,O,0,0,N
 23,Helmut,Glänzer,04/93,1,Heidelberg,10,8,42,O,49,24,N,Heidelberg,10,8,42,O,49,24,N
 23,Helmut,Glänzer,05/93,1,Heidelberg,10,8,42,O,49,24,N,Fulda,6,9,42,O,50,36,N
 23,Helmut,Glänzer,07/95,0,Heidelberg,10,8,42,O,49,24,N,Fulda,6,9,42,O,50,36,N
@@ -98,6 +108,8 @@
 30,Ronny,Triemer,01/87,1,Chemnitz,8,12,48,O,50,50,N,Chemnitz,8,12,48,O,50,50,N
 30,Ronny,Triemer,05/88,0,Chemnitz,8,12,48,O,50,50,N,Chemnitz,8,12,48,O,50,50,N
 31,Jürgen,Götze,01/02,1,Adorf,8,12,54,O,50,46,N,Chemnitz-Küchwald,8,12,53,O,50,50,N
+31,Jürgen,Götze,10/14,1,Adorf,8,12,54,O,50,46,N,Aue/Erzg,8,12,43,O,50,35,N
+31,Jürgen,Götze,09/23,1,Adorf,8,12,54,O,50,46,N,NSZ Dörfel,8,12,58,O,50,35,N
 32,Martin,Hörenz,02/02,1,Pohla,8,14,13,O,51,10,N,Pohla,8,14,13,O,51,10,N
 32,Martin,Hörenz,08/02,1,Dresden,8,13,42,O,51,6,N,Pohla,8,14,13,O,51,10,N
 32,Martin,Hörenz,05/07,1,Dresden,8,13,42,O,51,6,N,Immenstaad am Bodens,10,9,21,O,47,39,N
@@ -122,6 +134,8 @@
 38,Wolfgang,Hinz,01/82,1,Chemnitz,8,12,48,O,50,50,N,Chemnitz,8,12,48,O,50,50,N
 38,Wolfgang,Hinz,01/04,1,Brannenburg,11,12,5,O,47,44,N,Chemnitz,8,12,48,O,50,50,N
 38,Wolfgang,Hinz,01/05,1,Brannenburg,11,12,5,O,47,44,N,Wendelstein,11,12,1,O,47,42,N
+38,Wolfgang,Hinz,12/12,1,Schwarzenberg,8,12,48,O,50,33,N,Schwarzenberg,8,12,48,O,50,33,N
+38,Wolfgang,Hinz,10/14,1,Schwarzenberg/Erzgeb,8,12,48,O,50,33,N,Fichtelberg/Erzgebir,8,12,57,O,50,25,N
 39,Rainer,Arlt,01/87,1,Potsdam,4,13,6,O,52,24,N,Potsdam,4,13,6,O,52,24,N
 39,Rainer,Arlt,01/90,0,Potsdam,4,13,6,O,52,24,N,Potsdam,4,13,6,O,52,24,N
 40,Olaf,Zuther,01/82,1,Groß Wokern,1,12,30,O,53,45,N,Groß Wokern,1,12,30,O,53,45,N
@@ -138,7 +152,7 @@
 43,Frank,Wächter,03/95,1,Dresden,8,13,42,O,51,6,N,Meißen,8,13,30,O,51,12,N
 43,Frank,Wächter,01/97,1,Radebeul,8,13,42,O,51,6,N,Meißen,8,13,30,O,51,12,N
 43,Frank,Wächter,01/03,0,Radebeul,8,0,0,O,0,0,N,Radebeul,8,0,0,O,0,0,N
-44,Sirko,Molau,03/88,1,Berlin,04,13,24,O,52,30,N,Hönow,04,13,35,O,52,36,N
+44,Sirko,Molau,03/88,1,Berlin,4,13,24,O,52,30,N,Hönow,4,13,35,O,52,36,N
 44,Sirko,Molau,09/89,1,Berlin,4,13,24,O,52,30,N,Rostock,1,12,6,O,54,6,N
 44,Sirko,Molau,11/89,1,Berlin,4,13,24,O,52,30,N,Hagenow,1,11,12,O,53,25,N
 44,Sirko,Molau,09/90,1,Berlin,4,13,24,O,52,30,N,Chemnitz,8,12,48,O,50,50,N
@@ -147,6 +161,7 @@
 44,Sirko,Molau,09/97,1,Hönow,4,13,35,O,52,36,N,Aachen,5,6,6,O,50,48,N
 44,Sirko,Molau,09/02,1,Hönow,4,13,35,O,52,36,N,Unterschleißheim,11,11,33,O,48,15,N
 44,Sirko,Molau,01/03,1,Seysdorf,11,11,43,O,48,33,N,München,11,11,36,O,48,6,N
+44,Sirko,Molau,01/24,1,Seysdorf,11,11,43,O,48,33,N,Ketzür,4,12,38,O,52,43,N
 45,Thomas,Voigt,11/88,1,Meißen,8,13,30,O,51,12,N,Radebeul,8,13,42,O,51,6,N
 45,Thomas,Voigt,01/92,0,Meißen,8,13,30,O,51,12,N,Radebeul,8,13,42,O,51,6,N
 45,Thomas,Voigt,04/94,1,Meißen,8,13,30,O,51,12,N,Radebeul,8,13,42,O,51,6,N
@@ -154,11 +169,17 @@
 45,Thomas,Voigt,10/99,0,Coswig,8,13,40,O,51,8,N,Radebeul,8,13,42,O,51,6,N
 45,Thomas,Voigt,02/00,1,Coswig,8,13,40,O,51,8,N,Radebeul,8,13,42,O,51,6,N
 45,Thomas,Voigt,08/00,0,Coswig,8,0,0,O,0,0,N,Coswig,8,0,0,O,0,0,N
+45,Thomas,Voigt,10/12,1,Coswig,8,13,34,O,51,8,N,Radebeul,8,13,39,O,51,6,N
+45,Thomas,Voigt,03/13,0,Coswig,8,0,0,O,0,0,N,Coswig,8,0,0,O,0,0,N
 46,Roland,Winkler,04/90,1,Markkleeberg,8,12,20,O,51,16,N,Markkleeberg,8,12,20,O,51,16,N
 46,Roland,Winkler,11/95,1,Markkleeberg,8,12,20,O,51,16,N,Langen,6,8,39,O,50,0,N
 46,Roland,Winkler,03/97,1,Markkleeberg,8,12,20,O,51,16,N,Markkleeberg,8,12,20,O,51,16,N
 46,Roland,Winkler,10/97,1,Markkleeberg,8,12,20,O,51,16,N,Lichtenhain/Mittelnd,8,14,13,O,50,56,N
 46,Roland,Winkler,03/99,1,Markkleeberg,8,12,20,O,51,16,N,Flughafen Leipzig,8,12,13,O,51,25,N
+46,Roland,Winkler,01/15,1,Schkeuditz,8,12,13,O,51,25,N,Potsdam,4,13,3,O,52,22,N
+46,Roland,Winkler,05/15,1,Potsdam,4,13,3,O,52,22,N,Markkleeberg,8,12,20,O,51,16,N
+46,Roland,Winkler,09/20,1,Markkleeberg,8,12,23,O,51,17,N,Schkeuditz,8,12,13,O,51,24,N
+46,Roland,Winkler,09/22,1,Markkleeberg,8,12,22,O,51,17,N,L-Holzhausen,8,12,57,O,51,19,N
 47,Patric,Scharff,04/90,1,Kuhfelde,3,11,30,O,52,40,N,Kuhfelde,3,11,30,O,52,40,N
 47,Patric,Scharff,08/93,1,Kuhfelde,3,11,30,O,52,40,N,Uelzen,2,10,36,O,52,55,N
 47,Patric,Scharff,08/94,0,Kuhfelde,3,11,30,O,52,40,N,Uelzen,2,10,36,O,52,55,N
@@ -183,6 +204,9 @@
 51,Claudia,Hinz,02/06,1,Brannenburg,11,12,5,O,47,44,N,Wendelstein,11,12,1,O,47,42,N
 51,Claudia,Hinz,05/07,1,Brannenburg,11,12,5,O,47,44,N,Mühldorf/Inn,11,12,30,O,48,17,N
 51,Claudia,Hinz,08/07,1,Brannenburg,11,12,5,O,47,44,N,Wendelstein,11,12,1,O,47,42,N
+51,Claudia,Hinz,10/12,1,Brannenburg,11,12,5,O,47,44,N,Zugspitze,11,10,59,O,47,25,N
+51,Claudia,Hinz,12/12,1,Schwarzenberg,8,12,48,O,50,33,N,Zugspitze,11,10,50,O,47,25,N
+51,Claudia,Hinz,12/14,1,Schwarzenberg/Erz,8,12,48,O,50,33,N,Fichtelberg/Erz,8,12,57,O,50,26,N
 52,Martin,Ramisch,05/94,1,Frankfurt/Main,6,9,42,O,50,6,N,Offenbach/Main,6,8,9,O,50,12,N
 52,Martin,Ramisch,12/95,0,Frankfurt/Main,6,9,42,O,50,6,N,Offenbach/Main,6,8,9,O,50,12,N
 52,Martin,Ramisch,03/96,1,Frankfurt/M,6,8,42,O,50,6,N,Offenbach,6,8,9,O,50,12,N
@@ -196,22 +220,26 @@
 55,Michael,Dachsel,01/10,1,Chemnitz,8,12,48,O,50,50,N,Chemnitz,8,12,48,O,50,50,N
 56,Ludger,Ihlendorf,09/95,1,Damme,2,12,51,O,52,30,N,Damme,2,12,51,O,52,30,N
 57,Dieter,Klatt,01/96,1,Oldenburg,2,8,13,O,53,9,N,Oldenburg,2,8,13,O,53,9,N
+57,Dieter,Klatt,01/20,0,Oldenburg,2,0,0,O,0,0,N,Oldenburg,2,0,0,O,0,0,N
 58,Heino,Bardenhagen,06/96,1,Helvesiek,2,9,29,O,53,13,N,Faßberg,2,10,10,O,52,54,N
 58,Heino,Bardenhagen,07/97,1,Helvesiek,2,9,29,O,53,13,N,Bergen,2,13,0,O,54,0,N
 58,Heino,Bardenhagen,01/08,1,Helvesiek,2,9,29,O,53,13,N,Nordholz,2,8,40,O,53,46,N
 58,Heino,Bardenhagen,05/10,0,Helvesiek,2,0,0,O,0,0,N,Fassberg,2,0,0,O,0,0,N
 59,Flughafen,Laage-Kronskamp,10/96,1,Laage-Kronskamp,1,12,17,O,53,9,N,Langendorf,1,12,17,O,53,3,N
 59,Flughafen,Laage-Kronskamp,04/98,1,Laage-Kronskamp,1,12,17,O,53,9,N,Laage-Kronskamp,1,12,17,O,53,9,N
+59,Flughafen,Laage-Kronskamp,06/13,0,Laage-Kronskamp,1,0,0,O,0,0,N,Laage-Kronskamp,1,0,0,O,0,0,N
 60,Mark,Vornhusen,03/98,1,Osnabrück,2,8,3,O,52,18,N,Vechta,2,8,25,O,52,45,N
 60,Mark,Vornhusen,04/99,1,Eggenfelden,11,12,47,O,48,48,N,Vechta,2,8,25,O,52,45,N
 60,Mark,Vornhusen,04/01,0,Eggenfelden,11,0,0,O,50,0,N,Eggenfelden,11,0,0,O,50,0,N
 61,Günther,Busch,11/98,1,Rothenburg,11,10,10,O,49,22,N,Crailsheim,11,10,3,O,49,8,N
 61,Günther,Busch,09/04,1,Fichtenau,10,10,10,O,49,3,N,Crailsheim,10,10,3,O,49,8,N
 61,Günther,Busch,01/06,1,Fichtenau,10,10,10,O,49,3,N,NÖ Baden-Württemb.,10,10,5,O,49,9,N
+61,Günther,Busch,11/15,1,Gotha,7,10,43,O,50,57,N,Erfurt,7,11,3,O,50,58,N
 62,Christoph,Gerber,10/98,1,Heidelberg-Wieblinge,10,8,42,O,49,24,N,München,11,11,36,O,48,6,N
 63,Wetterstation,Fichtelberg/S,11/98,1,Oberwiesenthal,8,12,57,O,50,26,N,Fichtelberg,8,12,57,O,50,26,N
 63,Wetterstation,Fichtelberg/S,02/10,0,Oberwiesenthal,8,0,0,O,0,0,N,Oberwiesenthal,8,0,0,O,0,0,N
 64,Wetterstation,Neuhaus,02/99,1,Neuhaus/Rennweg,7,11,10,O,50,25,N,Ernstthal/Rennsteig,7,11,10,O,50,25,N
+64,Wetterstation,Neuhaus,12/15,0,Neuhaus/R,7,0,0,O,0,0,N,Neuhaus/R,7,0,0,O,0,0,N
 65,Jan,Gensler,03/99,1,Ansbach,11,10,36,O,49,18,N,Leutershausen,11,10,22,O,49,18,N
 65,Jan,Gensler,04/00,0,Ansbach,11,10,35,O,49,18,N,Leutershausen,11,10,22,O,49,18,N
 66,Benjamin,Kühne,02/00,1,Koeln,5,7,1,O,50,57,N,Berg. Gladbach,5,7,1,O,50,57,N
@@ -232,19 +260,48 @@
 72,Jürgen,Krieg,09/04,1,Schwalmstadt-Treysa,6,9,11,O,50,54,N,Schwalmstadt-Treysa,6,9,11,O,50,54,N
 72,Jürgen,Krieg,01/05,1,Schwalmstadt-Treysa,6,9,11,O,50,54,N,Kassel,6,9,30,O,51,18,N
 72,Jürgen,Krieg,04/07,1,Ettlingen,10,8,23,O,48,57,N,Ettlingen,10,8,25,O,48,57,N
+72,Jürgen,Krieg,01/15,1,Waldbronn,10,8,29,O,48,55,N,Schwalmstadt,10,9,11,O,50,54,N
 73,Rene,Winter,10/03,1,Eschenbergen,7,10,46,O,51,56,N,Gotha,7,10,42,O,50,57,N
+73,Rene,Winter,08/13,0,Eschenbergen,7,0,0,O,0,0,N,Gotha,7,0,0,O,0,0,N
 74,Reinhard,Nitze,11/05,1,Egestorf,2,9,31,O,52,17,N,Lauenhagen,2,9,13,O,52,21,N
 75,Andreas,Zeiske,08/08,1,Woltersdorf,4,13,44,O,52,28,N,Berlin,4,13,20,O,52,29,N
+75,Andreas,Zeiske,07/17,0,Woltersdorf,4,0,0,O,0,0,N,Berlin,4,0,0,O,0,0,N
+76,Michael,Großmann,01/12,1,Kämpfelbach,10,8,37,O,48,57,N,Pforzheim,10,8,43,O,48,54,N
+76,Michael,Großmann,06/12,0,XXX,10,0,0,O,0,0,N,Yyy,10,0,0,O,0,0,N
+77,Kevin,Förster,03/12,1,Carlsfeld/E,8,12,34,O,50,26,N,Carlsfeld/E,8,12,34,O,50,26,N
+77,Kevin,Förster,10/14,1,Carlsfeld,8,12,35,O,50,26,N,Chemnitz,8,12,53,O,50,48,N
+77,Kevin,Förster,02/19,1,Carlsfeld,8,12,34,O,50,26,N,Chemnitz,8,12,58,O,50,50,N
+77,Kevin,Förster,03/21,0,Carlsfeld,8,0,0,O,0,0,N,Chemnitz,8,0,0,O,0,0,N
+77,Kevin,Förster,03/23,1,Chemnitz,8,12,58,O,50,50,N,Carlsfeld,8,12,35,O,50,26,N
+78,Thomas,Klein,01/15,1,Miesbach,11,11,50,O,47,48,N,München,11,11,33,O,48,8,N
+78,Thomas,Klein,09/15,1,Miesbach,11,11,50,O,47,48,N,Bad Tölz,11,11,34,O,47,46,N
+78,Thomas,Klein,10/16,1,Miesbach,11,11,50,O,47,48,N,München,11,11,33,O,48,9,N
+78,Thomas,Klein,08/18,1,Tirschenreuth,11,12,20,O,49,53,N,München,11,11,33,O,48,9,N
+78,Thomas,Klein,01/20,1,Tirschenreuth,11,12,20,O,49,53,N,Miesbach,11,11,50,O,47,48,N
+78,Thomas,Klein,01/25,1,Tirschenreuth,11,12,20,O,49,53,N,Landshut,11,12,10,O,48,31,N
+79,Ruben,Jacob,03/17,1,Burgkunstadt,11,11,15,O,50,8,N,Beiersdorf/Coburg,11,10,55,O,50,16,N
+79,Ruben,Jacob,03/19,0,Bayern,11,0,0,O,0,0,N,Bayern,11,0,0,O,0,0,N
+80,Lars,Günther,01/17,1,Rennertshofen,11,11,5,O,48,46,N,Rohr i. NB,11,11,58,O,48,46,N
+80,Lars,Günther,09/22,1,Eichstätt,11,11,12,O,48,53,N,Ingolstadt,11,11,22,O,48,46,N
+81,Florian,Lauckner,01/20,1,Bucha,7,11,31,O,50,53,N,Jena,7,11,34,O,50,54,N
+81,Florian,Lauckner,09/21,1,Leipzig,8,12,24,O,51,19,N,Jena,7,11,34,O,50,54,N
+81,Florian,Lauckner,01/24,0,Leipzig,8,12,24,O,54,19,N,Jena,7,11,34,O,50,54,N
+82,Alexander,Haußmann,01/19,1,Hörlitz,4,13,57,O,51,32,N,Dresden-Langebrück,8,13,50,O,51,8,N
+83,Rainer,Timm,01/19,1,Haar,11,11,44,O,48,6,N,München-Ost,11,11,37,O,48,8,N
+84,Ansgar,Kuhl,02/22,1,Lohne,2,8,13,O,52,40,N,Lohne,2,8,14,O,52,40,N
+89,Ina,Rendtel,10/20,1,Potsdam,4,12,59,O,52,25,N,Potsdam,4,12,59,O,52,25,N
 90,Alastair,Mc Beath,05/96,1,Morpeth/England,35,1,36,W,55,15,N,Manchester/England,35,1,36,W,55,15,N
 90,Alastair,Mc Beath,01/09,0,Morpeth,35,1,36,W,55,15,N,Manchster,35,1,36,W,55,15,N
 91,Les,Cowley,07/96,1,Chester/England,35,1,36,W,55,15,N,Cheshire/England,35,1,36,W,55,15,N
 91,Les,Cowley,02/99,1,Norfolk,35,1,0,O,52,50,N,Norfolk,35,1,0,O,52,50,N
 91,Les,Cowley,01/00,0,Norfolk,35,1,0,O,52,50,N,Norfolk,35,1,0,O,52,50,N
 92,Judith,Proctor,11/98,1,"Shepshed, Leicesters",35,1,18,W,52,46,N,"Woodhouse Eaves, Lei",35,1,13,W,52,43,N
+92,Judith,Proctor,11/10,0,Xxx,35,0,0,O,0,0,N,Yyy,35,0,0,O,0,0,N
 93,Kevin,Boyle,03/06,1,Newchapel,35,2,15,W,53,5,N,Stoke-on-Trent,35,2,15,W,53,5,N
 93,Kevin,Boyle,05/09,1,Stoke-on-Trent,35,2,15,W,53,5,N,Newchapel,35,2,15,W,53,5,N
 95,Attila,Kosa-Kiss,10/97,1,Salonta,24,21,39,O,46,48,N,Salonta,24,21,39,O,46,48,N
 95,Attila,Kosa-Kiss,10/99,0,Salonta,24,21,39,O,46,48,N,Salonta,24,21,39,O,46,48,N
 95,Attila,Kosa-Kiss,02/01,1,Salonta,24,21,39,O,46,48,N,Salonta,24,21,39,O,46,48,N
+95,Attila,Kosa-Kiss,01/19,0,Rumänien,24,0,0,O,0,0,N,Rumänien,24,0,0,O,0,0,N
 96,Péter,Kovács,11/06,1,Salgótarján,22,19,47,O,48,6,N,Pásztó,22,19,41,O,47,55,N
 96,Péter,Kovács,10/08,0,Salgotarjan,22,19,47,O,48,6,N,Paszto,22,19,41,O,47,55,N

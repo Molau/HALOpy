@@ -1923,14 +1923,14 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-6">
                                 <label class="form-label">KK - ${i18nStrings.fields.observer}</label>
                                 <select class="form-select form-select-sm" id="group-kk" ${fixedObserver ? 'disabled' : ''}>
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${observerOptions}
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">O - ${i18nStrings.fields.object}</label>
                                 <select class="form-select form-select-sm" id="group-o">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     <option value="1">1 - ${i18nStrings.object_types['1']}</option>
                                     <option value="2">2 - ${i18nStrings.object_types['2']}</option>
                                     <option value="3">3 - ${i18nStrings.object_types['3']}</option>
@@ -1941,28 +1941,28 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-4">
                                 <label class="form-label">JJ - ${i18nStrings.fields.year}</label>
                                 <select class="form-select form-select-sm" id="group-jj">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${yearOptions}
                                 </select>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">MM - ${i18nStrings.fields.month}</label>
                                 <select class="form-select form-select-sm" id="group-mm">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 12}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">TT - ${i18nStrings.fields.day}</label>
                                 <select class="form-select form-select-sm" id="group-tt">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 31}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">g - ${i18nStrings.fields.observing_area}</label>
                                 <select class="form-select form-select-sm" id="group-g">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     <option value="0">0 - ${i18nStrings.location_types['0']}</option>
                                     <option value="1">1 - ${i18nStrings.location_types['1']}</option>
                                     <option value="2">2 - ${i18nStrings.location_types['2']}</option>
@@ -1985,7 +1985,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-4">
                                 <label class="form-label">d - ${i18nStrings.fields.cirrus_density}</label>
                                 <select class="form-select form-select-sm" id="group-d">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     <option value="0">0 - ${i18nStrings.cirrus_density['0']}</option>
                                     <option value="1">1 - ${i18nStrings.cirrus_density['1']}</option>
                                     <option value="2">2 - ${i18nStrings.cirrus_density['2']}</option>
@@ -2005,7 +2005,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">N - ${i18nStrings.fields.cloud_cover}</label>
                                 <select class="form-select form-select-sm" id="group-n">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 10}, (_, i) => {
                                         const label = i18nStrings.cloud_cover[i.toString()];
                                         return `<option value="${i}">${i} - ${label}</option>`;
@@ -2015,7 +2015,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">C - ${i18nStrings.fields.cirrus_type}</label>
                                 <select class="form-select form-select-sm" id="group-C">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 8}, (_, i) => {
                                         const label = i18nStrings.cirrus_types[i.toString()];
                                         return `<option value="${i}">${i} - ${label}</option>`;
@@ -2025,7 +2025,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">c - ${i18nStrings.fields.low_clouds}</label>
                                 <select class="form-select form-select-sm" id="group-c">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 10}, (_, i) => {
                                         const label = i18nStrings.low_clouds[i.toString()];
                                         return `<option value="${i}">${i} - ${label}</option>`;
@@ -2035,7 +2035,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">EE - ${i18nStrings.fields.phenomenon}</label>
                                 <select class="form-select form-select-sm" id="group-ee">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 77}, (_, i) => {
                                         const ee = i + 1;
                                         const label = i18nStrings.halo_types[ee.toString()];
@@ -2047,7 +2047,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">H - ${i18nStrings.fields.brightness}</label>
                                 <select class="form-select form-select-sm" id="group-h">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 4}, (_, i) => {
                                         const label = i18nStrings.brightness[i.toString()];
                                         return `<option value="${i}">${i} - ${label}</option>`;
@@ -2057,7 +2057,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">F - ${i18nStrings.fields.color}</label>
                                 <select class="form-select form-select-sm" id="group-f">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 6}, (_, i) => {
                                         const label = i18nStrings.color[i.toString()];
                                         return `<option value="${i}">${i} - ${label}</option>`;
@@ -2067,7 +2067,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">V - ${i18nStrings.fields.completeness}</label>
                                 <select class="form-select form-select-sm" id="group-v">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     <option value="1">1 - ${i18nStrings.completeness['1']}</option>
                                     <option value="2">2 - ${i18nStrings.completeness['2']}</option>
                                 </select>
@@ -2075,7 +2075,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">f - ${i18nStrings.fields.weather_front}</label>
                                 <select class="form-select form-select-sm" id="group-wf">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 9}, (_, i) => {
                                         const label = i18nStrings.weather_front[i.toString()];
                                         return `<option value="${i}">${i} - ${label}</option>`;
@@ -2085,7 +2085,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">zz - ${i18nStrings.fields.precipitation}</label>
                                 <select class="form-select form-select-sm" id="group-zz">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 99}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')} h</option>`).join('')}
                                     <option value="99">99</option>
                                 </select>
@@ -2093,7 +2093,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-3">
                                 <label class="form-label">GG - ${i18nStrings.fields.region}</label>
                                 <select class="form-select form-select-sm" id="group-gg">
-                                    <option value="">-- ${i18nStrings.fields.select} --</option>
+                                    <option value="">${i18nStrings.fields.select}</option>
                                     ${[1,2,3,4,5,6,7,8,9,10,11,16,17,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39].map(gg => {
                                         const label = i18nStrings.geographic_regions[gg.toString()];
                                         return `<option value="${gg}">${String(gg).padStart(2, '0')} - ${label}</option>`;

@@ -1685,7 +1685,8 @@ class ObservationForm {
     
     populateFields(obs) {
         // Populate all fields with observation data
-        this.fields.kk.value = obs.KK || '';
+        // Convert KK to 2-digit string with leading zero to match option values
+        this.fields.kk.value = obs.KK !== undefined && obs.KK !== null && obs.KK !== '' ? String(obs.KK).padStart(2, '0') : '';
         this.fields.o.value = obs.O || '';
         // Year: CSV stores 0-99, dropdown uses 50-149 (50-99=1950-1999, 0-49=2000-2049)
         if (obs.JJ !== undefined && obs.JJ !== null && obs.JJ !== '') {
