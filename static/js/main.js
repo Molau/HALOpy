@@ -55,7 +55,6 @@ function saveHaloDataToSession() {
 
 // Load language and translations on page load
 document.addEventListener('DOMContentLoaded', async () => {
-    // Clean up any debug info from previous operations
     sessionStorage.removeItem('deleteDebug');
     sessionStorage.removeItem('loadDebug');
     
@@ -117,7 +116,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // This also syncs window.haloData with server state
     await checkAndDisplayFileInfo();
     
-    // Check for edit debug logs from previous operation
     const editLogs = sessionStorage.getItem('lastEditLogs');
     if (editLogs) {
 
@@ -526,6 +524,10 @@ async function showAddObservationDialogNumeric() {
         }
     }
     
+    // CRITICAL: Flag to prevent race conditions during async field calculations
+    let isProcessingInput = false;
+    const inputQueue = [];
+    
     // Get fixed observer setting
     let fixedObserver = '';
     try {
@@ -664,7 +666,32 @@ async function showAddObservationDialogNumeric() {
     // initial render
     renderNumericGuide(eing);
 
-    input.addEventListener('keydown', async (ev) => {
+    // Process input from queue one at a time (blocking/sequential)
+    async function processInputQueue() {
+        if (isProcessingInput || inputQueue.length === 0) return;
+        
+        isProcessingInput = true;
+        const ev = inputQueue.shift();
+        
+        await handleKeydownEvent(ev);
+        
+        isProcessingInput = false;
+        
+        // Process next item in queue if any
+        if (inputQueue.length > 0) {
+            processInputQueue();
+        }
+    }
+
+    // Queue-based keydown handler to prevent race conditions
+    input.addEventListener('keydown', (ev) => {
+        // Add to queue and process sequentially
+        inputQueue.push(ev);
+        processInputQueue();
+    });
+    
+    // Main keydown event handler (now called sequentially from queue)
+    async function handleKeydownEvent(ev) {
         // Allow navigation keys
         const navKeys = ['ArrowLeft','ArrowRight','Home','End','Tab'];
         if (navKeys.includes(ev.key)) return;
@@ -675,6 +702,27 @@ async function showAddObservationDialogNumeric() {
                 return;
             }
             if (eing.length > 0) {
+                // Smart backspace from start of remarks (position 50): jump back to last input field
+                // Only at position 50 (start of remarks), NOT for every character in remarks
+                // This must come BEFORE auto-fill handling to prevent early returns
+                if (eing.length === 50) {
+                    const ee = parseInt(eing.slice(20,22),10);
+                    if (ee === 8) {
+                        // EE 08: Jump to position 31 (start of HO input after '8')
+                        eing = eing.slice(0, 31);
+                    } else if (ee === 9 || ee === 10) {
+                        // EE 09/10: Jump to position 33 (start of HU input)
+                        eing = eing.slice(0, 33);
+                    } else {
+                        // Other halos: Jump to position 35 (start of sectors)
+                        eing = eing.slice(0, 35);
+                    }
+                    input.value = eing;
+                    renderNumericGuide(eing);
+                    ev.preventDefault();
+                    return;
+                }
+                
                 // Check if we're deleting an auto-filled character
                 // If yes, delete all consecutive auto-filled characters plus the one that triggered them
                 let currentPos = eing.length - 1;
@@ -734,7 +782,11 @@ async function showAddObservationDialogNumeric() {
         const ch = ev.key;
         // Convert to lowercase in sector field (positions 36-50 need lowercase a-h)
         const inSectorField = eing.length >= 35 && eing.length < 50;
-        let candidate = eing + (inSectorField ? ch.toLowerCase() : ch);
+        // Allow space in 8HHHH field (positions 31-34 = HHHH part, position 30 is '8') for non-observed values
+        const in8HHHHField = eing.length >= 31 && eing.length < 35;
+        // Convert space to '/' in 8HHHH field for "not observed" indication
+        const effectiveCh = (in8HHHHField && ch === ' ') ? '/' : ch;
+        let candidate = eing + (inSectorField ? effectiveCh.toLowerCase() : effectiveCh);
         
         // Auto-fill JJ and MM when user reaches position 3 (after KK + O)
         if (candidate.length === 3 && dateDefault) {
@@ -817,16 +869,21 @@ async function showAddObservationDialogNumeric() {
                                     const ee = parseInt(eing.slice(20,22),10);
 
                                     if (ee === 8) {
-                                        // EE 08: user enters 2 digits, then // auto-filled → 8??//
+                                        // EE 08: 8HOHU// ? user enters HO (Oberkante) at positions 31-32, HU (Unterkante) at 33-34, then // auto-filled
                                         eing = eing + '8';
+                                        autoFilledPositions.add(30); // '8' is auto-filled
                                     } else if (ee === 9) {
-                                        // EE 09: one slash, user enters 2 digits, one slash → 8//??  
-                                        eing = eing + '8/';
+                                        // EE 09: 8//HOHU ? // auto-filled, user enters HO (Oberkante) at 33-34, HU (Unterkante) follows
+                                        eing = eing + '8//';
+                                        autoFilledPositions.add(30); // '8'
+                                        autoFilledPositions.add(31); // '/'
+                                        autoFilledPositions.add(32); // '/'
                                     } else if (ee === 10) {
-                                        // EE 10: user enters all 4 digits → 8????
+                                        // EE 10: 8HOHUMD ? user enters all 4 digits: HO (31-32), HU (33-34), MD follows
                                         eing = eing + '8';
+                                        autoFilledPositions.add(30); // '8' is auto-filled
                                     } else {
-                                        // All other EE values: no sun pillar → 8////
+                                        // All other EE values: no sun pillar ? 8////
                                         eing = eing + '8////';
                                         // Track all 5 positions as auto-filled
                                         autoFilledPositions.add(30);
@@ -840,19 +897,24 @@ async function showAddObservationDialogNumeric() {
                                     
                                     // Auto-fill sectors after 8HHHH is complete
                                     // Sectors are only needed for incomplete (V=1) circular halos
+                                    // CRITICAL: For EE 08/09/10, don't auto-fill sectors yet - user must enter HO/HU first
                                     const v = parseInt(eing.slice(24,25),10);
                                     const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
-
                                     
-                                    if (v === 1 && circularHalos.has(ee)) {
-                                        // Incomplete circular halo: user will enter sectors (do nothing)
-
+                                    // Only auto-fill sectors if 8HHHH field is COMPLETE (5 chars = position 35)
+                                    // For EE 08/09/10: field is NOT complete yet, user needs to enter HO/HU
+                                    const is8HHHHComplete = eing.length === 35;
+                                    
+                                    if (is8HHHHComplete) {
+                                        if (v === 1 && circularHalos.has(ee)) {
+                                            // Incomplete circular halo: user will enter sectors (do nothing)
+                                        } else {
+                                            // Complete halo or non-circular: auto-fill 15 spaces
+                                            eing = eing + '               ';
+                                            input.value = eing;
+                                            renderNumericGuide(eing);
+                                        }
                                     } else {
-                                        // Complete halo or non-circular: auto-fill 15 spaces
-
-                                        eing = eing + '               ';
-                                        input.value = eing;
-                                        renderNumericGuide(eing);
                                     }
                                 }
                             }
@@ -877,30 +939,54 @@ async function showAddObservationDialogNumeric() {
         if (eing.length === 29) {
             const ee = parseInt(eing.slice(20,22),10);
             if (ee === 8) {
-                // EE 08: user enters 2 digits, then // auto-filled → 8??//
+                // EE 08: 8HOHU// ? user enters HO at positions 31-32, HU at 33-34, then // auto-filled
                 candidate = candidate + '8';
             } else if (ee === 9) {
-                // EE 09: one slash, user enters 2 digits, one slash → 8//??  
-                candidate = candidate + '8/';
+                // EE 09: 8//HOHU ? // auto-filled at 31-32, user enters HO at 33-34
+                candidate = candidate + '8//';
             } else if (ee === 10) {
-                // EE 10: user enters all 4 digits → 8????
+                // EE 10: 8HOHUMD ? user enters all 4 digits
                 candidate = candidate + '8';
             } else {
-                // All other EE values: no sun pillar → 8////
+                // All other EE values: no sun pillar ? 8////
                 candidate = candidate + '8////';
                 // Track all 5 positions as auto-filled (will be added to set in validation handler)
                 // Note: These are added in the validation result handler when eing is updated
             }
         }
         
+        // Auto-fill trailing // for EE 08 after HO input (position 32 complete)
+        if (eing.length === 32) {
+            const ee = parseInt(eing.slice(20,22),10);
+            if (ee === 8 && eing[30] === '8') {
+                // EE 08: User just entered second digit of HO
+                // Validate HO field (positions 31-32): must be both digits OR both slashes
+                const ho1 = candidate[31];
+                const ho2 = candidate[32];
+                const digit = /[0-9]/;
+                const bothDigits = digit.test(ho1) && digit.test(ho2);
+                const bothSlashes = ho1 === '/' && ho2 === '/';
+                
+                if (bothDigits || bothSlashes) {
+                    // Valid HO - auto-fill // for HU
+                    candidate = candidate + '//';
+                } else {
+                    // Invalid HO mix like "1/" or "/1" - don't auto-fill, let validation handle backtrack
+                }
+            }
+        }
+        
         // Auto-fill sectors after 8HHHH is complete (position 34 complete)
         // Sectors are only needed for incomplete (V=1) circular halos
+        // CRITICAL: For EE 09 and EE 10, 8HHHH is NOT complete at position 34 (HU validation needed at 35)
         if (eing.length === 34) {
             const v = parseInt(eing.slice(24,25),10);
             const ee = parseInt(eing.slice(20,22),10);
             const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
             
-            if (v === 1 && circularHalos.has(ee)) {
+            // For EE 09 and EE 10, skip auto-fill - HU validation happens at position 35
+            if (ee === 9 || ee === 10) {
+            } else if (v === 1 && circularHalos.has(ee)) {
                 // Incomplete circular halo: user will enter sectors (do nothing)
             } else {
                 // Complete halo or non-circular: auto-fill 15 spaces
@@ -956,17 +1042,78 @@ async function showAddObservationDialogNumeric() {
                     autoFilledPositions.add(34);
                 }
                 
+                // If we jumped from position 29 to 31 (added '8'), track position 30
+                if (oldLength === 29 && newLength === 30 && eing[30] === '8') {
+                    autoFilledPositions.add(30);
+                }
+                
+                // If we jumped from position 29 to 32 (added '8//'), track positions 30-32
+                if (oldLength === 29 && newLength === 32 && eing.slice(30, 33) === '8//') {
+                    autoFilledPositions.add(30); // '8'
+                    autoFilledPositions.add(31); // '/'
+                    autoFilledPositions.add(32); // '/'
+                }
+                
+                // EE 08: If we jumped from position 32 to 35 (user entered 1 char + auto-filled '//'), track positions 33-34
+                if (oldLength === 32 && newLength === 35) {
+                    const ee = parseInt(eing.slice(20,22),10);
+                    if (ee === 8 && eing.slice(33, 35) === '//') {
+                        autoFilledPositions.add(33); // '/'
+                        autoFilledPositions.add(34); // '/'
+                        
+                        // Now auto-fill sectors since 8HHHH is complete
+                        const v = parseInt(eing.slice(24,25),10);
+                        const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
+                        
+                        if (v === 1 && circularHalos.has(ee)) {
+                            // Incomplete circular halo: user will enter sectors (do nothing)
+                        } else {
+                            // Complete halo or non-circular: auto-fill 15 spaces
+                            eing = eing + '               ';
+                            input.value = eing;
+                            renderNumericGuide(eing);
+                        }
+                    }
+                }
+                
+                // Auto-fill sectors for EE 09/10 after successful HU validation at position 35
+                const ee = parseInt(eing.slice(20,22),10);
+                if ((ee === 9 || ee === 10) && newLength === 35 && oldLength === 34) {
+                    // User just completed HU validation at position 35
+                    const v = parseInt(eing.slice(24,25),10);
+                    const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
+                    
+                    if (v === 1 && circularHalos.has(ee)) {
+                        // Incomplete circular halo: user will enter sectors (do nothing)
+                    } else {
+                        // Complete halo or non-circular: auto-fill 15 spaces
+                        eing = eing + '               ';
+                    }
+                }
+                
+                // Auto-fill trailing // for EE 08 after user enters HOHU (position 34 complete)
+                if (ee === 8 && newLength === 34 && eing[30] === '8') {
+                    // User just completed HOHU (positions 31-34), auto-fill trailing //
+                    // But only if not already filled (check if position 30-34 is complete)
+                    if (eing.length === 34) {
+                        eing = eing; // Already complete at position 34, will get // added below
+                    }
+                }
+                
                 input.value = eing;
                 errEl.style.display = 'none';
                 renderNumericGuide(eing);
                 
                 // Auto-fill loop: keep auto-filling while next field has only one option
                 let continueFilling = true;
+                let loopCount = 0;
                 while (continueFilling) {
+                    loopCount++;
                     let nextFieldConstraints = getConstraintsForNumericInput(null, eing);
                     
                     // If it's a Promise, await it
                     if (nextFieldConstraints && typeof nextFieldConstraints.then === 'function') {nextFieldConstraints = await nextFieldConstraints;}
+                    
                     
                     // Now check if there's exactly one option
                     if (nextFieldConstraints && nextFieldConstraints.length === 1) {
@@ -1012,7 +1159,7 @@ async function showAddObservationDialogNumeric() {
         }
         // ignore invalid by preventing default
         ev.preventDefault();
-    });
+    } // End of handleKeydownEvent function
 
     document.getElementById('btn-add-obs-ok').addEventListener('click', async () => {
         try {
@@ -1051,7 +1198,7 @@ async function showAddObservationDialogNumeric() {
             modal.hide();
             
             // Show success notification
-            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Wait for modal to close, then ask if user wants to add another
             modalEl.addEventListener('hidden.bs.modal', async () => {
@@ -1118,7 +1265,7 @@ async function showAddObservationDialogMenu() {
             await triggerAutosave();
             
             // Show success notification
-            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Ask if user wants to add another observation
             const addAnother = await showAddAnotherObservationDialog();
@@ -1286,7 +1433,7 @@ function validateNumericProgress(s, observerCodes) {
         const mm = parseInt(s.slice(5,7),10);
         return mm>=1 && mm<=12 ? { ok: true } : { ok: false, backtrack: 1 };
     }
-    // 8-9 TT (01-31) – validate against month
+    // 8-9 TT (01-31) � validate against month
     if (len === 8) return { ok: digit.test(s[7]) };
     if (len === 9) {
         const mm = parseInt(s.slice(5,7),10);
@@ -1406,26 +1553,75 @@ function validateNumericProgress(s, observerCodes) {
         return { ok: true };
     }
     // 31-35 8HHHH sun pillar altitude (auto-filled based on EE)
-    // EE 08: 8??// (user enters digits at 32-33)
-    // EE 09: 8//?? (user enters digits at 33-34)  
-    // EE 10: 8???? (user enters digits at 32-35)
+    // EE 08: 8??// (user enters digits at 32-33, or '/' for not observed)
+    // EE 09: 8//?? (user enters digits at 33-34, or '/' for not observed)  
+    // EE 10: 8???? (user enters digits at 32-35, or '/' for not observed)
     // Other EE: 8///// (all auto-filled)
     if (len === 31) return { ok: s[30] === '8' };
     if (len >= 32 && len <= 35) {
         const ee = parseInt(s.slice(20,22),10);
         const char = s[len-1];
         if (ee === 8) {
-            // 8??//: positions 32-33 are digits, 34-35 are slashes
-            if (len === 32 || len === 33) return { ok: digit.test(char) };
+            // 8??//: positions 32-33 are digits or '/', 34-35 are slashes
+            if (len === 32) return { ok: digit.test(char) || char === '/' };
+            if (len === 33) {
+                // Validate HO field (positions 31-32): must be both digits OR both slashes
+                const ho1 = s[31];
+                const ho2 = s[32];
+                const bothDigits = digit.test(ho1) && digit.test(ho2);
+                const bothSlashes = ho1 === '/' && ho2 === '/';
+                if (!bothDigits && !bothSlashes) {
+                    // Invalid mix like "1/" or "/1" - backtrack 1 char to position 32, user will re-enter
+                    return { ok: false, backtrack: 1 };
+                }
+                return { ok: true };
+            }
             if (len === 34 || len === 35) return { ok: char === '/' };
         } else if (ee === 9) {
-            // 8//??:  position 32 is slash, 33-34 are digits, 35 is slash
+            // 8//HU: positions 31-32 are slashes (auto-filled), 33-34 are HU digits or '/'
             if (len === 32) return { ok: char === '/' };
-            if (len === 33 || len === 34) return { ok: digit.test(char) };
-            if (len === 35) return { ok: char === '/' };
+            if (len === 33) return { ok: digit.test(char) || char === '/' };
+            if (len === 34) return { ok: digit.test(char) || char === '/' };
+            if (len === 35) {
+                // Validate HU field (positions 33-34): must be both digits OR both slashes
+                const hu1 = s[33];
+                const hu2 = s[34];
+                const bothDigits = digit.test(hu1) && digit.test(hu2);
+                const bothSlashes = hu1 === '/' && hu2 === '/';
+                if (!bothDigits && !bothSlashes) {
+                    // Invalid mix like "1/" or "/1" - backtrack 1 char to position 34
+                    return { ok: false, backtrack: 1 };
+                }
+                return { ok: true };
+            }
         } else if (ee === 10) {
-            // 8????: positions 32-35 are all digits
-            return { ok: digit.test(char) };
+            // 8????: positions 32-35 are all digits or '/'
+            if (len === 32) return { ok: digit.test(char) || char === '/' };
+            if (len === 33) {
+                // Validate HO field (positions 31-32): must be both digits OR both slashes
+                const ho1 = s[31];
+                const ho2 = s[32];
+                const bothDigits = digit.test(ho1) && digit.test(ho2);
+                const bothSlashes = ho1 === '/' && ho2 === '/';
+                if (!bothDigits && !bothSlashes) {
+                    // Invalid mix - backtrack 1 char to position 32
+                    return { ok: false, backtrack: 1 };
+                }
+                return { ok: true };
+            }
+            if (len === 34) return { ok: digit.test(char) || char === '/' };
+            if (len === 35) {
+                // Validate HU field (positions 33-34): must be both digits OR both slashes
+                const hu1 = s[33];
+                const hu2 = s[34];
+                const bothDigits = digit.test(hu1) && digit.test(hu2);
+                const bothSlashes = hu1 === '/' && hu2 === '/';
+                if (!bothDigits && !bothSlashes) {
+                    // Invalid mix - backtrack 1 char to position 34
+                    return { ok: false, backtrack: 1 };
+                }
+                return { ok: true };
+            }
         } else {
             // 8/////: all slashes already auto-filled
             return { ok: char === '/' };
@@ -1463,7 +1659,7 @@ function validateNumericProgress(s, observerCodes) {
 function parseNumericObservation(s) {
     if (s.length < 30) return null;
     
-    // Helper function: only ' ' allowed (→ -1), '/' only for d and 8HHHH (→ -2)
+    // Helper function: only ' ' allowed (? -1), '/' only for d and 8HHHH (? -2)
     const toInt = (x, allowSlash = false) => {
         if (x === ' ' || x === '') return -1;  // Not observed/unknown
         if (x === '/') {
@@ -1516,16 +1712,16 @@ function parseNumericObservation(s) {
     // Validation rules
     // If C=0 or N=9, d values 0,1,2 are invalid
     if ((obs.C === 0 || obs.N === 9) && [0, 1, 2].includes(obs.d)) {
-        throw new Error(`Ungültiger d-Wert: ${obs.d}. Wenn C=0 oder N=9, sind nur d-Werte -1, -2, 4, 5, 6, 7 erlaubt.`);
+        throw new Error(`Ung�ltiger d-Wert: ${obs.d}. Wenn C=0 oder N=9, sind nur d-Werte -1, -2, 4, 5, 6, 7 erlaubt.`);
     }
     
     // Automatic rules
-    // C=0 → d=-2 (no cirrus)
+    // C=0 ? d=-2 (no cirrus)
     if (obs.C === 0 && obs.d !== -2) {
         obs.d = -2;
     }
     
-    // N=9 → C=-1, d=-1
+    // N=9 ? C=-1, d=-1
     if (obs.N === 9) {
         obs.C = -1;
         if (obs.d === -1) {
@@ -1545,7 +1741,7 @@ function parseNumericObservation(s) {
         obs.HU = toInt2(huPart, true);  // Slash allowed for 8HHHH
     }
     
-    // EE !=8,10 → HO = 0; EE !=9,10 → HU = 0 (not relevant)
+    // EE !=8,10 ? HO = 0; EE !=9,10 ? HU = 0 (not relevant)
     if (obs.EE !== 8 && obs.EE !== 10) {
         obs.HO = 0;
     }
@@ -1727,9 +1923,9 @@ async function switchLanguage(lang) {
 
 // Update menu text with current language
 function updateMenuText() {
-    // Update main menu titles (skip first one which is the help icon "≡")
+    // Update main menu titles (skip first one which is the help icon "=")
     const menuTitles = document.querySelectorAll('.menu-title');
-    const titles = ['≡', i18nStrings.menu_titles.file, i18nStrings.menu_titles.observations, 
+    const titles = ['=', i18nStrings.menu_titles.file, i18nStrings.menu_titles.observations, 
                     i18nStrings.menu_titles.observers, i18nStrings.menu_titles.analysis, 
                     i18nStrings.menu_titles.output, i18nStrings.menu_titles.settings];
     menuTitles.forEach((title, i) => {
@@ -2203,17 +2399,17 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-6">
                                 <div class="row g-1">
                                     <div class="col-6">
-                                        <label class="form-label">8HO (obere Lichtsäule)</label>
+                                        <label class="form-label">8HO (obere Lichts�ule)</label>
                                         <select class="form-select form-select-sm" id="group-ho">
                                             <option value="">--</option>
-                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}°</option>`).join('')}
+                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}�</option>`).join('')}
                                         </select>
                                     </div>
                                     <div class="col-6">
-                                        <label class="form-label">HU (untere Lichtsäule)</label>
+                                        <label class="form-label">HU (untere Lichts�ule)</label>
                                         <select class="form-select form-select-sm" id="group-hu">
                                             <option value="">--</option>
-                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}°</option>`).join('')}
+                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}�</option>`).join('')}
                                         </select>
                                     </div>
                                 </div>
@@ -2277,7 +2473,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
         
         // Check if at least one field was filled
         if (Object.keys(updates).length === 0) {
-            showWarningModal('Bitte füllen Sie mindestens ein Feld aus.');
+            showWarningModal('Bitte f�llen Sie mindestens ein Feld aus.');
             return;
         }
         
@@ -2346,7 +2542,7 @@ async function processBulkUpdate(filteredObs, updates) {
         } else {}
         
 
-        showMessage(`${filteredObs.length} Beobachtungen wurden erfolgreich geändert.`, 'success');
+        showMessage(`${filteredObs.length} Beobachtungen wurden erfolgreich ge�ndert.`, 'success');
         
         // Reload the page to refresh all displays
         setTimeout(() => {
@@ -2547,7 +2743,6 @@ async function applyFilterToObservations(filterState) {
     
     return allObs.filter(obs => {
         // First filter criterion
-        // DEBUG: Log filter state
         if (filterState.criterion1 === 'region' && filterState.value1 !== null) {}
         if (filterState.criterion1 === 'observer') {
             if (filterState.value1 !== null && obs.KK !== filterState.value1) return false;
@@ -2647,9 +2842,9 @@ async function showModifyConfirmDialog(obs, currentNum, totalNum, callback) {
     });
 }
 
-// Format observation for display in confirmation dialog (Menüeingabe format)
+// Format observation for display in confirmation dialog (Men�eingabe format)
 function formatObservationForDisplay(obs) {
-    // Use the Menüeingabe (menu input) format with labeled fields
+    // Use the Men�eingabe (menu input) format with labeled fields
     let html = '';
     
     // Observer
@@ -2679,7 +2874,7 @@ function formatObservationForDisplay(obs) {
         html += `<strong>${i18nStrings.fields.cirrus_density}:</strong> ${i18nStrings.cirrus_density[obs.d]}<br>`;
     }
     
-    // Duration (DD × 10 = minutes)
+    // Duration (DD � 10 = minutes)
     if (obs.DD !== null && obs.DD !== -1) {
         html += `<strong>${i18nStrings.fields.duration}:</strong> ${obs.DD * 10} min<br>`;
     }
@@ -2769,22 +2964,16 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
         try {
             const logs = [];
             
-            logs.push('[EDIT DEBUG] Original observation: ' + JSON.stringify(obs));
-            logs.push('[EDIT DEBUG] Modified observation: ' + JSON.stringify(modifiedObs));
             
             // Remove old observation from array using the stored index
             if (originalIndex >= 0 && originalIndex < window.haloData.observations.length) {
-                logs.push(`[EDIT DEBUG] Deleting observation at index ${originalIndex}`);
                 const deleted = window.haloData.observations.splice(originalIndex, 1);
-                logs.push('[EDIT DEBUG] Deleted from client array: ' + JSON.stringify(deleted));
 
             } else {
-                logs.push('[EDIT DEBUG] Could not find observation to delete at index ' + originalIndex);
                 console.warn(...logs);
             }
             
             // Add modified observation to server (which will insert at correct position)
-            logs.push('[EDIT DEBUG] POSTing modified observation to server');
             
             // First, delete the old observation from server by passing original values
             const deleteResp = await fetch('/api/observations/delete', {
@@ -2793,9 +2982,7 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
                 body: JSON.stringify(obs)  // Send original observation to identify what to delete
             });
             
-            logs.push('[EDIT DEBUG] DELETE response status: ' + deleteResp.status);
             if (deleteResp.ok) {
-                logs.push('[EDIT DEBUG] Successfully deleted old observation from server');
             }
             
             // Now POST the modified observation
@@ -2805,25 +2992,20 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
                 body: JSON.stringify(modifiedObs)
             });
             
-            logs.push('[EDIT DEBUG] POST response status: ' + resp.status + ', ok: ' + resp.ok);
             
             if (resp.status === 409) {
                 // Duplicate - this shouldn't happen in edit mode, but handle it
-                logs.push('[EDIT DEBUG] ERROR: Duplicate observation detected');
                 throw new Error(i18nStrings.observations.error_observation_exists);
             }
             
             if (!resp.ok) throw new Error('Failed to save modified observation');
             
             const addedObs = await resp.json();
-            logs.push('[EDIT DEBUG] Added observation response: ' + JSON.stringify(addedObs));
             
             // Reload observations from server to get correct sorted order
-            logs.push('[EDIT DEBUG] Reloading observations from server');
             const obsResponse = await fetch('/api/observations?limit=200000');
             if (obsResponse.ok) {
                 const data = await obsResponse.json();
-                logs.push('[EDIT DEBUG] Reloaded from server: ' + data.observations.length + ' observations');
                 window.haloData.observations = data.observations;
             }
             
@@ -2908,7 +3090,7 @@ async function showDisplayObservationsDialog() {
                     // Zahleneingaben - show compact list in modal
                     showDisplayCompactList(filterState);
                 } else {
-                    // Menüeingaben - show detail view one-by-one
+                    // Men�eingaben - show detail view one-by-one
                     showDisplaySingleObservations(filterState);
                 }
             } catch (error) {// Default to detail view on error
@@ -3375,7 +3557,7 @@ async function showStartupFileDialog() {
                             body: JSON.stringify({enabled: true, file_path: file.name})
                         });
                         // Show success message
-                        showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_changed}`);
+                        showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_changed}`);
                     }
                 };
                 fileInput.click();
@@ -3387,7 +3569,7 @@ async function showStartupFileDialog() {
                     body: JSON.stringify({enabled: false, file_path: ''})
                 });
                 // Show success message
-                showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_disabled}`);
+                showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_disabled}`);
             }
         });
 
@@ -3671,7 +3853,7 @@ async function showSelectDialog() {
             case 'SH':
                 const altitudes = [];
                 for (let i = -10; i <= 90; i++) {
-                    altitudes.push({ value: i, display: String(i) + '°' });
+                    altitudes.push({ value: i, display: String(i) + '�' });
                 }
                 return altitudes;
             
@@ -4004,7 +4186,6 @@ async function showSelectDialog() {
             filename = filename + '.csv';
         }
 
-        // Debug output - show all selected parameters
 
 
 
@@ -4183,7 +4364,7 @@ async function showSelectDialog() {
                     .replace('{filename}', filename);
                 
                 // Show success alert at top of window
-                showNotification(`<strong>✓</strong> ${message}`);
+                showNotification(`<strong>?</strong> ${message}`);
                 
                 // Auto-remove after 3 seconds and return to main
                 setTimeout(() => {
@@ -5386,13 +5567,13 @@ async function continueLoadFile() {
             }
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
+            showNotification(`<strong>?</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
         } catch (error) {
             bsModal.hide();
             setTimeout(() => {
                 loadingModal.remove();
             }, 300);
-            showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>?</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
         }
     });
     
@@ -5503,10 +5684,10 @@ async function continueMergeFile() {
             
             // Show success message with count of added observations
             // (addedCount already computed above)
-            showNotification(`<strong>✓</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
+            showNotification(`<strong>?</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
         } catch (error) {
             bsModal.hide();
-            setTimeout(() => loadingModal.remove(), 300);showNotification(`<strong>✗</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
+            setTimeout(() => loadingModal.remove(), 300);showNotification(`<strong>?</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
             document.body.appendChild(errorMsg);
             setTimeout(() => errorMsg.remove(), 5000);
         }
@@ -5568,7 +5749,7 @@ async function checkAndDisplayFileInfo() {
                 
                 // Show notification if file was auto-loaded
                 if (status.auto_loaded) {
-                    showNotification(`<strong>✓</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
+                    showNotification(`<strong>?</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
                 }
             } else {
                 // No data loaded
@@ -6272,7 +6453,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="obs-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -6289,7 +6470,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="obs-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -6324,7 +6505,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="obs-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -6341,7 +6522,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="obs-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -6517,7 +6698,7 @@ async function showAddObserverDialog(formData = null) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_added}`);
             
         } catch (e) {
             const formData = observerData;
@@ -6659,10 +6840,10 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                 <td>${aktivDisplay}</td>
                 <td>${site.HbOrt}</td>
                 <td>${site.GH.padStart(2, '0')}</td>
-                <td>${site.HLG}° ${site.HLM}' ${site.HOW} / ${site.HBG}° ${site.HBM}' ${site.HNS}</td>
+                <td>${site.HLG}� ${site.HLM}' ${site.HOW} / ${site.HBG}� ${site.HBM}' ${site.HNS}</td>
                 <td>${site.NbOrt}</td>
                 <td>${site.GN.padStart(2, '0')}</td>
-                <td>${site.NLG}° ${site.NLM}' ${site.NOW} / ${site.NBG}° ${site.NBM}' ${site.NNS}</td>
+                <td>${site.NLG}� ${site.NLM}' ${site.NOW} / ${site.NBG}� ${site.NBM}' ${site.NNS}</td>
             </tr>`;
     }).join('');
     
@@ -6744,7 +6925,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_deleted}`);
             
             // Reload page after 2 seconds if on observers page
             setTimeout(() => {
@@ -7001,7 +7182,7 @@ function showEditBaseDataDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_updated}`);
             
             // Reload the page if we're on the observers page
             setTimeout(() => {
@@ -7111,7 +7292,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="site-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -7128,7 +7309,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="site-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -7163,7 +7344,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="site-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -7180,7 +7361,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="site-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -7276,7 +7457,7 @@ async function showAddSiteDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_added}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -7402,7 +7583,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-hlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="confirm-edit-site-hlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7419,7 +7600,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-hbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="confirm-edit-site-hbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7454,7 +7635,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-nlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="confirm-edit-site-nlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7471,7 +7652,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-nbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="confirm-edit-site-nbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7645,7 +7826,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="edit-site-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -7662,7 +7843,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="edit-site-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -7697,7 +7878,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="edit-site-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -7714,7 +7895,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="edit-site-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -7844,7 +8025,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_updated}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -7974,7 +8155,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-hlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="delete-site-hlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7991,7 +8172,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-hbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="delete-site-hbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8026,7 +8207,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-nlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="delete-site-nlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8043,7 +8224,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-nbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">°</span>
+                                        <span class="input-group-text">�</span>
                                         <select class="form-select" id="delete-site-nbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8138,7 +8319,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_deleted}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
