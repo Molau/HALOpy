@@ -1219,6 +1219,35 @@ python halo.py
 
 **Note**: Deployment decision (Principle #2 - Open Question) will determine final hosting approach
 
+### Release Management
+
+**Critical**: Always create GitHub Releases for version updates to ensure the auto-update mechanism works correctly.
+
+**Release Process**:
+1. **Update version and date** in `resources/strings_de.json` and `resources/strings_en.json`:
+   - Update `app.version` to new version (e.g., "3.0.7")
+   - Update `app.version_date` to current date in format YYYY-MM-DD (e.g., "2026-01-30")
+   - **CRITICAL**: Both files must be updated in lockstep (Decision #021)
+2. Commit and push changes: `git add -A && git commit -m "vX.Y.Z - description" && git push`
+3. Create and push tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+4. Create GitHub Release: `gh release create vX.Y.Z --title "vX.Y.Z" --notes "Release notes"`
+
+**Version String Requirements**:
+- ✓ **ALWAYS** update both `app.version` and `app.version_date` before creating release
+- ✓ Version format: "X.Y.Z" (without 'v' prefix in JSON files)
+- ✓ Date format: "YYYY-MM-DD" (ISO 8601)
+- ✓ Both language files must have identical version and date
+- ✗ **NEVER** create release without updating version strings first
+- **Rationale**: Auto-update mechanism relies on version comparison; outdated version strings prevent users from seeing update prompts
+
+**Why releases are required**:
+- The auto-update mechanism checks for tagged releases on GitHub
+- Without releases, updates would download unstable `main` branch code
+- Users rely on version numbers and release notes for update decisions
+- Provides controlled, versioned distribution to end users
+
+**See**: [AUTO_UPDATE.md](../docs/AUTO_UPDATE.md) for detailed release workflow and update mechanism documentation
+
 ## Running Application
 
 **Server is currently running!**

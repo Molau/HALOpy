@@ -513,12 +513,29 @@ class ObservationForm {
     async manageFieldDependencies(triggerField) {
 
         
-        // Helper: Enable/disable specific option values
-        const setOptionStates = (opts, enabledValues) => {
+        // Helper: Enable/disable specific option values and disable field if only one option
+        const setOptionStates = (field, opts, enabledValues) => {
             opts.forEach(opt => {
                 const val = opt.value;
                 opt.disabled = !enabledValues.includes(val);
             });
+            
+            // Disable field if only one option available (user has no choice)
+            // This includes cases where only '-1' (not observed) or '' (empty) is available
+            if (enabledValues.length === 1) {
+                field.disabled = true;
+            } else {
+                // Re-enable field if more than one option
+                // But respect fixed observer setting for KK field
+                if (field.id === 'form-kk' && this.fixedObserver) {
+                    field.disabled = true;
+                } else if (field.id === 'form-gg') {
+                    // GG is special - disabled state is managed by g-trigger logic
+                    // Don't enable here
+                } else {
+                    field.disabled = false;
+                }
+            }
         };
         
         // Helper: Enable all options
@@ -545,9 +562,9 @@ class ObservationForm {
                 const cUpOpts = Array.from(this.fields.C.options);
                 const cLowOpts = Array.from(this.fields.c.options);
                 
-                setOptionStates(nOpts, ['-1']);
-                setOptionStates(cUpOpts, ['-1']);
-                setOptionStates(cLowOpts, ['-1']);
+                setOptionStates(this.fields.n, nOpts, ['-1']);
+                setOptionStates(this.fields.C, cUpOpts, ['-1']);
+                setOptionStates(this.fields.c, cLowOpts, ['-1']);
                 
                 this.fields.n.value = '-1';
                 this.fields.C.value = '-1';
@@ -559,7 +576,7 @@ class ObservationForm {
             }
             
             // Apply d constraints
-            setOptionStates(dOpts, dValid);
+            setOptionStates(this.fields.d, dOpts, dValid);
             this.fieldConstraints.d = dValid;
             
             // If current d value is not valid, set to first valid value
@@ -580,7 +597,7 @@ class ObservationForm {
             const context = { d: dValue };
             const nValid = calculateFieldConstraints('n', context);
             
-            setOptionStates(nOpts, nValid);
+            setOptionStates(this.fields.n, nOpts, nValid);
             this.fieldConstraints.n = nValid;
             
             // If current N value is not valid, set to first valid value
@@ -593,6 +610,7 @@ class ObservationForm {
         } else if (triggerField === 'n') {
             // N (Cloud Cover) → C, c (using shared constraint logic)
             const nValue = this.fields.n.value;
+            const dValue = this.fields.d.value;  // Also pass d for d=7 special case
             
             const cUpOpts = Array.from(this.fields.C.options);
             const cLowOpts = Array.from(this.fields.c.options);
@@ -600,12 +618,12 @@ class ObservationForm {
             const oldcValue = this.fields.c.value;
             
             // Use shared calculateFieldConstraints function
-            const context = { n: nValue };
+            const context = { n: nValue, d: dValue };
             const cUpValid = calculateFieldConstraints('C', context);
             const cLowValid = calculateFieldConstraints('c', context);
             
-            setOptionStates(cUpOpts, cUpValid);
-            setOptionStates(cLowOpts, cLowValid);
+            setOptionStates(this.fields.C, cUpOpts, cUpValid);
+            setOptionStates(this.fields.c, cLowOpts, cLowValid);
             
             this.fieldConstraints.C = cUpValid;
             this.fieldConstraints.c = cLowValid;
@@ -627,7 +645,6 @@ class ObservationForm {
             
             // Step 1: If MM triggered, update TT (days in month) using shared constraint logic
             if (triggerField === 'mm') {
-
                 const mmValue = this.fields.mm.value;
                 const jjValue = this.fields.jj.value;
                 
@@ -643,7 +660,7 @@ class ObservationForm {
                     ttValid = ttValid.map(v => v === '' ? '' : parseInt(v).toString());
                 }
                 
-                setOptionStates(ttOpts, ttValid);
+                setOptionStates(this.fields.tt, ttOpts, ttValid);
                 this.fieldConstraints.TT = ttValid;
                 
                 if (!ttValid.includes(oldTTValue)) {
@@ -681,7 +698,7 @@ class ObservationForm {
                 // Any of MM, JJ, KK not set: g must be -1
                 gValid = [''];
                 
-                setOptionStates(gOpts, gValid);
+                setOptionStates(this.fields.g, gOpts, gValid);
                 this.fieldConstraints.g = gValid;
 
                 
@@ -709,7 +726,7 @@ class ObservationForm {
                             gValid = [''];
                         }
                         
-                        setOptionStates(gOpts, gValid);
+                        setOptionStates(this.fields.g, gOpts, gValid);
                         this.fieldConstraints.g = gValid;
                         
                         // If current g value is not valid, set to first valid value and trigger g
@@ -726,7 +743,7 @@ class ObservationForm {
                     .catch(error => {
                         // On error, allow g to be set (fail-open)
                         gValid = ['', '0', '1', '2'];
-                        setOptionStates(gOpts, gValid);
+                        setOptionStates(this.fields.g, gOpts, gValid);
                         this.fieldConstraints.g = gValid;
                     });
             }
@@ -766,12 +783,12 @@ class ObservationForm {
                                 const gg = parseInt(data.observer.GH);  // Parse to int to remove leading zero
                                 console.log("🔍 DEBUG: Setting GG to:", gg);
                                 // GG constrained to single value (HBOrt)
-                                setOptionStates(ggOpts, [gg.toString()]);
+                                setOptionStates(this.fields.gg, ggOpts, [gg.toString()]);
                                 this.fields.gg.value = gg;
                                 this.fieldConstraints.GG = [gg.toString()];
                             } else {
                                 console.log("🔍 DEBUG: No GH found in response, clearing GG");
-                                setOptionStates(ggOpts, ['']);
+                                setOptionStates(this.fields.gg, ggOpts, ['']);
                                 this.fields.gg.value = '';
                                 this.fieldConstraints.GG = [''];
                             }
@@ -780,7 +797,7 @@ class ObservationForm {
                         console.error('Error fetching GG:', e);
                     }
                 } else {
-                    setOptionStates(ggOpts, ['']);
+                    setOptionStates(this.fields.gg, ggOpts, ['']);
                     this.fields.gg.value = '';
                     this.fieldConstraints.GG = [''];
                 }
@@ -804,11 +821,11 @@ class ObservationForm {
                             if (data.observer && data.observer.GN) {
                                 const gg = parseInt(data.observer.GN);  // Parse to int to remove leading zero
                                 // GG constrained to single value (NBOrt)
-                                setOptionStates(ggOpts, [gg.toString()]);
+                                setOptionStates(this.fields.gg, ggOpts, [gg.toString()]);
                                 this.fields.gg.value = gg;
                                 this.fieldConstraints.GG = [gg.toString()];
                             } else {
-                                setOptionStates(ggOpts, ['']);
+                                setOptionStates(this.fields.gg, ggOpts, ['']);
                                 this.fields.gg.value = '';
                                 this.fieldConstraints.GG = [''];
                             }
@@ -817,7 +834,7 @@ class ObservationForm {
                         console.error('Error fetching GG:', e);
                     }
                 } else {
-                    setOptionStates(ggOpts, ['']);
+                    setOptionStates(this.fields.gg, ggOpts, ['']);
                     this.fields.gg.value = '';
                     this.fieldConstraints.GG = [''];
                 }
@@ -831,7 +848,7 @@ class ObservationForm {
                 this.fieldConstraints.GG = null;  // All values allowed
             } else {
                 // g=-1 (not set): GG=-1 (only empty option)
-                setOptionStates(ggOpts, ['']);
+                setOptionStates(this.fields.gg, ggOpts, ['']);
                 this.fields.gg.value = '';
                 this.fieldConstraints.GG = [''];
             }
@@ -864,8 +881,8 @@ class ObservationForm {
                 
                 if (ee === 8) {
                     // EE=8 (Obere Lichtsäule): HO = -1, 1..90, HU = 0
-                    setOptionStates(hoOpts, heightValues);
-                    setOptionStates(huOpts, ['0']);
+                    setOptionStates(this.fields.ho, hoOpts, heightValues);
+                    setOptionStates(this.fields.hu, huOpts, ['0']);
                     
                     this.fieldConstraints.HO = heightValues;
                     this.fieldConstraints.HU = ['0'];
@@ -877,8 +894,8 @@ class ObservationForm {
                     this.fields.hu.value = '0';
                 } else if (ee === 9) {
                     // EE=9 (Untere Lichtsäule): HO = 0, HU = -1, 1..90
-                    setOptionStates(hoOpts, ['0']);
-                    setOptionStates(huOpts, heightValues);
+                    setOptionStates(this.fields.ho, hoOpts, ['0']);
+                    setOptionStates(this.fields.hu, huOpts, heightValues);
                     
                     this.fieldConstraints.HO = ['0'];
                     this.fieldConstraints.HU = heightValues;
@@ -889,8 +906,8 @@ class ObservationForm {
                     }
                 } else if (ee === 10) {
                     // EE=10 (both light pillars): HO = -1, 1..90, HU = -1, 1..90
-                    setOptionStates(hoOpts, heightValues);
-                    setOptionStates(huOpts, heightValues);
+                    setOptionStates(this.fields.ho, hoOpts, heightValues);
+                    setOptionStates(this.fields.hu, huOpts, heightValues);
                     
                     this.fieldConstraints.HO = heightValues;
                     this.fieldConstraints.HU = heightValues;
@@ -904,8 +921,8 @@ class ObservationForm {
                     }
                 } else {
                     // All other EE values (including -1 and circular halos): HO = 0, HU = 0
-                    setOptionStates(hoOpts, ['0']);
-                    setOptionStates(huOpts, ['0']);
+                    setOptionStates(this.fields.ho, hoOpts, ['0']);
+                    setOptionStates(this.fields.hu, huOpts, ['0']);
                     
                     this.fieldConstraints.HO = ['0'];
                     this.fieldConstraints.HU = ['0'];

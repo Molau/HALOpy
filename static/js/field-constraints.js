@@ -18,25 +18,19 @@
  * @returns {Promise<boolean>} - True if observer was active at that date
  */
 async function isObserverActive(kk, mm, jj) {
-    console.log("🔍 DEBUG: isObserverActive() called - kk=" + kk + " mm=" + mm + " jj=" + jj);
-    
     if (!kk || mm < 1 || mm > 12 || jj < 0) {
-        console.log("🔍 DEBUG: isObserverActive() → false (invalid params)");
         return false;
     }
     
     try {
         const response = await fetch(`/api/observers/${kk}/active?mm=${mm}&jj=${jj}`);
         if (!response.ok) {
-            console.log("🔍 DEBUG: isObserverActive() → false (API error: " + response.status + ")");
             return false;
         }
         
         const data = await response.json();
-        console.log("🔍 DEBUG: isObserverActive() → " + data.active + " (from API)");
         return data.active;
     } catch (error) {
-        console.error("🔍 DEBUG: isObserverActive() error:", error);
         return false;
     }
 }
@@ -63,8 +57,8 @@ function calculateFieldConstraints(fieldKey, context) {
                 // O=1-4 (Sun, Moon, Planet, Star): d can be any density
                 return ['-1', '0', '1', '2', '4', '5', '6', '7'];
             } else if (o === 5) {
-                // O=5 (Earthbound light): Only non-cirrus sources
-                return ['-1', '4', '5', '6', '7'];
+                // O=5 (Earthbound light): Only non-cirrus sources (excluding virga)
+                return ['-1', '4', '5', '6'];
             } else {
                 // O=-1 (not set): d must be -1
                 return ['-1'];
@@ -78,8 +72,11 @@ function calculateFieldConstraints(fieldKey, context) {
             if (d >= 0 && d <= 2) {
                 // d=0-2 (thin cirrus): N can be -1 or 1..9
                 return ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-            } else if (d >= 4 && d <= 7) {
-                // d=4-7 (thick cirrus/non-cirrus): N must be -1
+            } else if (d >= 4 && d <= 6) {
+                // d=4-6 (thick cirrus/non-cirrus): N must be -1
+                return ['-1'];
+            } else if (d === 7) {
+                // d=7 (virga): N must be -1
                 return ['-1'];
             } else if (d === -2) {
                 // d=-2 (observed but not present, '/'): N must be -1
@@ -90,9 +87,15 @@ function calculateFieldConstraints(fieldKey, context) {
             }
         }
         
-        // C (Cirrus Cover Upper) ← depends on N (Cloud Cover)
+        // C (Cirrus Cover Upper) ← depends on N (Cloud Cover) and d (Cirrus Density)
         case 'C': {
             const n = norm(context.n);
+            const d = norm(context.d);
+            
+            // Special case: d=7 (virga) forces C=-1
+            if (d === 7) {
+                return ['-1'];
+            }
             
             if (n === 0) {
                 // N=0 (clear sky): C must be 0
@@ -109,9 +112,15 @@ function calculateFieldConstraints(fieldKey, context) {
             }
         }
         
-        // c (Cirrus Cover Lower) ← depends on N (Cloud Cover)
+        // c (Cirrus Cover Lower) ← depends on N (Cloud Cover) and d (Cirrus Density)
         case 'c': {
             const n = norm(context.n);
+            const d = norm(context.d);
+            
+            // Special case: d=7 (virga) allows c=-1,1..9 (not 0)
+            if (d === 7) {
+                return ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+            }
             
             if (n === 0) {
                 // N=0 (clear sky): c must be -1

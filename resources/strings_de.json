@@ -1,7 +1,7 @@
 {
   "app": {
     "title": "Haloerfassungsprogramm",
-    "version": "3.0.5",
+    "version": "3.0.6",
     "version_date": "2026-01-29",
     "copyright_years": "1992-2026",
     "welcome_title": "Willkommen beim HALO Auswerteprogramm",
@@ -209,6 +209,8 @@
     "select_filter_value": "Filterwert:",
     "select_processing": "Beobachtungen werden gefiltert...",
     "select_no_filter": "Bitte wählen Sie ein Filterkriterium!",
+    "add_another_title": "Weitere Beobachtung erfassen?",
+    "add_another_message": "Möchten Sie eine weitere Beobachtung erfassen?",
     "detail_labels": {
       "observer": "Beobachter        : ",
       "date": "Datum             : ",

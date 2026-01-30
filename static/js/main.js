@@ -427,6 +427,76 @@ function handleMenuAction(action) {
             console.info(`Function "${action}" not implemented`);
     }
 }
+
+// Show dialog asking if user wants to add another observation
+// Returns: Promise<boolean> - true if user wants to add another, false otherwise
+function showAddAnotherObservationDialog() {
+    return new Promise((resolve) => {
+        const modalHtml = `
+            <div class="modal fade" id="add-another-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header py-2">
+                            <h6 class="modal-title mb-0">${i18nStrings.observations.add_another_title}</h6>
+                        </div>
+                        <div class="modal-body py-3">
+                            <p class="mb-0">${i18nStrings.observations.add_another_message}</p>
+                        </div>
+                        <div class="modal-footer py-2">
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-no">${i18nStrings.common.no}</button>
+                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-yes">${i18nStrings.common.yes}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById('add-another-modal');
+        const modal = new bootstrap.Modal(modalEl);
+        
+        let resolved = false;
+        
+        // ESC key handler
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                modal.hide();
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+        
+        // Yes button - add another
+        modalEl.querySelector('#btn-yes').addEventListener('click', () => {
+            if (!resolved) {
+                resolved = true;
+                modal.hide();
+                resolve(true);
+            }
+        });
+        
+        // No button - don't add another
+        modalEl.querySelector('#btn-no').addEventListener('click', () => {
+            if (!resolved) {
+                resolved = true;
+                modal.hide();
+                resolve(false);
+            }
+        });
+        
+        // Cleanup on modal hidden
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            document.removeEventListener('keydown', handleEsc);
+            if (!resolved) {
+                // ESC or backdrop click - treat as No
+                resolved = true;
+                resolve(false);
+            }
+            modalEl.remove();
+        });
+        
+        modal.show();
+    });
+}
+
 // Add Observation dialog entry point
 async function showAddObservationDialog() {
     try {
@@ -540,12 +610,22 @@ async function showAddObservationDialogNumeric() {
     window.addEventListener('focus', ensureNumericInputFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     modalEl.addEventListener('mousedown', ensureNumericInputFocus);
+    
+    // Restore focus when clicking anywhere in the document (handles clicks outside modal)
+    const handleDocumentClick = (e) => {
+        // Only refocus if the modal is still visible and click wasn't on a button that closes the modal
+        if (document.body.contains(input) && !e.target.closest('.btn-close, #btn-add-obs-ok, #btn-add-obs-cancel')) {
+            setTimeout(ensureNumericInputFocus, 0);
+        }
+    };
+    document.addEventListener('click', handleDocumentClick);
 
     // Cleanup listeners when modal closes
     modalEl.addEventListener('hidden.bs.modal', () => {
         window.removeEventListener('focus', ensureNumericInputFocus);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         modalEl.removeEventListener('mousedown', ensureNumericInputFocus);
+        document.removeEventListener('click', handleDocumentClick);
     });
 
     // Enter key triggers OK button
@@ -969,10 +1049,22 @@ async function showAddObservationDialogNumeric() {
             await triggerAutosave();
             
             modal.hide();
-            modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success notification
             showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            
+            // Wait for modal to close, then ask if user wants to add another
+            modalEl.addEventListener('hidden.bs.modal', async () => {
+                modalEl.remove();
+                
+                // Ask if user wants to add another observation
+                const addAnother = await showAddAnotherObservationDialog();
+                if (addAnother) {
+                    // User clicked Yes - show the add dialog again
+                    await showAddObservationDialogNumeric();
+                }
+                // If user clicked No, do nothing (stay on current page)
+            }, { once: true });
         } catch (e) {
             errEl.textContent = e.message;
             errEl.style.display = 'block';
@@ -1027,6 +1119,14 @@ async function showAddObservationDialogMenu() {
             
             // Show success notification
             showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            
+            // Ask if user wants to add another observation
+            const addAnother = await showAddAnotherObservationDialog();
+            if (addAnother) {
+                // User clicked Yes - show the add dialog again
+                await showAddObservationDialogMenu();
+            }
+            // If user clicked No, do nothing (modal already closed, stay on current page)
         } catch (e) {
             showErrorDialog(e.message);
         }
@@ -1487,7 +1587,6 @@ async function checkForUpdates() {
         } catch (fetchErr) {
             // Network error, timeout, or fetch failed - silently skip update check
             // This is common in offline/restricted network environments
-            console.debug('Update check skipped (network unavailable):', fetchErr.message);
             return;
         }
         
@@ -1501,6 +1600,7 @@ async function checkForUpdates() {
         const latest = latestTag.replace(/^v/, '');
         // Use ISO date format (YYYY-MM-DD) for consistency
         const latestDate = json.published_at ? json.published_at.split('T')[0] : '';
+        
         if (isNewerVersion(latest, i18nStrings.app.version)) {
             // Block startup until user decides
             await new Promise((resolve) => {
@@ -1509,7 +1609,7 @@ async function checkForUpdates() {
                     .replace('{latestDate}', latestDate)
                     .replace('{current}', i18nStrings.app.version)
                     .replace('{currentDate}', i18nStrings.app.version_date);
-                showConfirmDialog(title, message, async () => {
+                showConfirmDialog(i18nStrings.update.title, message, async () => {
                     try {
                         const { modal, modalEl } = showInfoModal(i18nStrings.update.title, i18nStrings.upload_download.download_progress);
                         
@@ -1530,14 +1630,14 @@ async function checkForUpdates() {
                         modalEl.remove();
                         
                         // Wait briefly for Flask to restart, then reload page
-                        const { modal: successModal, modalEl: successModalEl } = showInfoModal(title, i18nStrings.update.success);
+                        const { modal: successModal, modalEl: successModalEl } = showInfoModal(i18nStrings.update.title, i18nStrings.update.success);
                         
                         // Give Flask 2 seconds to restart, then reload
                         setTimeout(() => {
                             window.location.reload();
                         }, 2000);
                     } catch (e) {
-                        showErrorDialog(title, i18nStrings.messages.error_loading.replace('{error}', String(e)));
+                        showErrorDialog(i18nStrings.update.title, i18nStrings.messages.error_loading.replace('{error}', String(e)));
                         resolve();
                     }
                 }, () => {

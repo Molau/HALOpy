@@ -552,7 +552,7 @@ Dependencies are also applied when setting initial values for new observations.
   - d = -1, 0-2, 4-7 (all cirrus densities available)
 
 - **O = 5** (Earthbound light source):
-  - d = -1, 4-7 (only non-cirrus halo sources)
+  - d = -1, 4-6 (only non-cirrus halo sources, excluding virga)
   - N = -1 (not set)
   - C = -1 (not set)
   - c = -1 (not set)
@@ -567,8 +567,13 @@ Dependencies are also applied when setting initial values for new observations.
   - C = -1, 1-7 (not 0 - cirrus present)
   - c = -1, 0-9 (all low cloud options)
 
-- **d = 4-7** (thick cirrus or non-cirrus):
+- **d = 4-6** (thick cirrus or non-cirrus):
   - N = -1 (not set)
+
+- **d = 7** (virga - fallstreifen):
+  - N = -1 (not set)
+  - C = -1 (not set)
+  - c = -1, 1-9 (not 0 - fallstreifen enforce low cloud cover)
 
 #### 3. N (Cloud Cover) → C, c
 

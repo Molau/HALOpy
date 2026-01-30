@@ -4,6 +4,8 @@
 
 HALOpy includes an auto-update mechanism that checks for new releases on GitHub and allows users to download and install updates with a single click.
 
+**Important**: Always create a GitHub Release for each version. The update mechanism relies on tagged releases to provide controlled, versioned updates to users.
+
 ## How It Works
 
 1. **On Startup**: The application checks GitHub for the latest release
@@ -62,8 +64,8 @@ Leave `UPDATE_REPO` empty (default):
 ## Version Numbering
 
 The update system uses semantic versioning (e.g., `3.0.0`):
-- GitHub releases should be tagged as `v3.0.0` or `3.0.0`
-- Version in `resources/strings_de.json` and `strings_en.json` under `app.version`
+- GitHub releases **must** be tagged as `v3.0.0` (with 'v' prefix)
+- Version in `resources/strings_de.json` and `strings_en.json` under `app.version` (without 'v' prefix)
 
 **Example tag structure**:
 ```
@@ -72,9 +74,18 @@ v3.0.1
 v3.1.0
 ```
 
+**Why tags are required**:
+- Without tagged releases, the update mechanism would always download the latest `main` branch
+- Users would have no version control or release notes
+- Updates could not be targeted to specific stable versions
+
 ## Creating Releases
 
-1. Update version number in `resources/strings_de.json` and `strings_en.json`:
+**Always create a GitHub Release for each version!** This ensures the auto-update mechanism works correctly.
+
+### Step-by-Step Release Process
+
+1. **Update version number** in `resources/strings_de.json` and `strings_en.json`:
    ```json
    "app": {
      "version": "3.1.0",
@@ -82,15 +93,48 @@ v3.1.0
    }
    ```
 
-2. Commit changes and tag:
+2. **Commit and push changes**:
    ```bash
-   git add resources/strings_*.json
-   git commit -m "Release 3.1.0"
-   git tag v3.1.0
-   git push origin main --tags
+   git add -A
+   git commit -m "v3.1.0 - Brief description of changes"
+   git push
    ```
 
-3. Create GitHub release from tag (GitHub will automatically create ZIP)
+3. **Create and push Git tag**:
+   ```bash
+   git tag v3.1.0
+   git push origin v3.1.0
+   ```
+
+4. **Create GitHub Release** (using GitHub CLI):
+   ```bash
+   gh release create v3.1.0 --title "v3.1.0" --notes "**Release Notes**
+   
+   - Feature: Description of new feature
+   - Fixed: Bug fix description
+   - Improved: Enhancement description"
+   ```
+
+   **Or manually** via GitHub web interface:
+   - Go to https://github.com/YOUR_USERNAME/HALOpy/releases/new
+   - Select tag: `v3.1.0`
+   - Release title: `v3.1.0`
+   - Add release notes describing changes
+   - Click "Publish release"
+
+5. **Verify** the release is visible at `https://github.com/YOUR_USERNAME/HALOpy/releases`
+
+### Release Notes Template
+
+```markdown
+**Bug Fix Release** / **Feature Release** / **Maintenance Release**
+
+- Fixed: Description of bug fix
+- Added: Description of new feature
+- Improved: Description of enhancement
+- Changed: Description of breaking change
+- Removed: Description of removed feature
+```
 
 ## User Experience
 
@@ -153,4 +197,5 @@ During development, set `UPDATE_REPO` to empty string to disable update checks.
 
 ---
 
-*Last updated: 2026-01-10*
+*Last updated: 2026-01-29*
+*See also: [Architecture Guidelines](../.github/copilot-context.md) for project-wide development guidelines*
