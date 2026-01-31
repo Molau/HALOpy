@@ -125,7 +125,7 @@ class FilterDialog {
                                         <option value="halo-type">${i18nStrings.filter_dialog.halo_type}</option>
                                     </select>
                                     <div id="filter-2-input" style="display:none;" class="mt-2">
-                                        <div id="filter-2-date-selects" style="display:none;" class="d-flex gap-2">
+                                        <div id="filter-2-date-selects" style="display:none; gap:0.5rem;">
                                             <select id="filter-2-day" class="form-select" style="flex: 1; min-width: 0;"></select>
                                             <select id="filter-2-month" class="form-select" style="flex: 1; min-width: 0;"></select>
                                             <select id="filter-2-year" class="form-select" style="flex: 1; min-width: 0;"></select>
@@ -242,23 +242,29 @@ class FilterDialog {
         const filter2DateSelects = document.getElementById('filter-2-date-selects');
         const filter2SelectElem = document.getElementById('filter-2-select');
         
+        console.log("🔍 DEBUG: filter-dialog.js handleFilter2Change() - value=", value);
+        
         if (value === 'none') {
+            console.log("🔍 DEBUG: Setting all to display=none");
             filter2Input.style.display = 'none';
             filter2DateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'none';
         } else if (value === 'date') {
+            console.log("🔍 DEBUG: Setting date visible, select hidden");
             filter2Input.style.display = 'block';
             filter2DateSelects.style.display = 'flex';
             filter2SelectElem.style.display = 'none';
             this.populateDateSelects();
             setTimeout(() => document.getElementById('filter-2-day').focus(), 50);
         } else if (value === 'halo-type') {
+            console.log("🔍 DEBUG: Setting select visible, date hidden");
             filter2Input.style.display = 'block';
             filter2DateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'block';
             this.populateHaloTypeSelect();
             setTimeout(() => filter2SelectElem.focus(), 50);
         }
+        console.log("🔍 DEBUG: After - dateSelects.display=", filter2DateSelects.style.display, "select.display=", filter2SelectElem.style.display);
     }
     
     populateDateSelects() {
