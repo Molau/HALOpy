@@ -1,8 +1,8 @@
 {
   "app": {
     "title": "Haloerfassungsprogramm",
-    "version": "3.0.6",
-    "version_date": "2026-01-29",
+    "version": "3.0.7",
+    "version_date": "2026-01-31",
     "copyright_years": "1992-2026",
     "welcome_title": "Willkommen beim HALO Auswerteprogramm",
     "welcome_subtitle": "Programm zur Erfassung und Auswertung von Halobeobachtungen",
@@ -77,7 +77,6 @@
     "pagination_last": "Letzte Seite"
   },
   "messages": {
-    "not_implemented": "wird noch implementiert",
     "loading": "Daten werden geladen...",
     "loading_short": "Lade Daten...",
     "error_loading_data": "Fehler beim Laden der Daten!",
@@ -269,7 +268,7 @@
     "last_name_label": "Nachname",
     "since_month_label": "Seit (Monat)",
     "since_year_label": "Seit (Jahr)",
-    "main_site_label": "Hauptbeobachtungsort",
+    "primary_site_label": "Hauptbeobachtungsort",
     "secondary_site_label": "Nebenbeobachtungsort",
     "region_label": "Gebiet (GG)",
     "coordinates_label": "Koordinaten",
@@ -736,7 +735,6 @@
     "sectors": "Sektoren",
     "remarks": "Bemerkungen",
     "select": "--",
-    "not_specified": "keine Angabe",
     "max_15_chars": "max 15 Zeichen",
     "max_60_chars": "max 60 Zeichen",
     "not_applicable": "nicht zutreffend"

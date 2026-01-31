@@ -479,8 +479,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += '<tfoot>';
         html += '<tr>';
         html += `<td style="text-align: center; padding: 10px;">`;
-        html += `<strong>${i18nStrings.fields.primary_site}:</strong> ${data.observer_hbort}<br>`;
-        html += `<strong>${i18nStrings.fields.secondary_site}:</strong> ${data.observer_nbort}`;
+        html += `<strong>${i18nStrings.observers.primary_site_label}:</strong> ${data.observer_hbort}<br>`;
+        html += `<strong>${i18nStrings.observers.secondary_site_label}:</strong> ${data.observer_nbort}`;
         html += `</td>`;
         html += '</tr>';
         html += '</tfoot>';
@@ -532,9 +532,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 text += '```\n\n';
             }
             
-            text += `## ${i18nStrings.fields.primary_site}\n`;
+            text += `## ${i18nStrings.observers.primary_site_label}\n`;
             text += `${data.observer_hbort}\n\n`;
-            text += `## ${i18nStrings.fields.secondary_site}\n`;
+            text += `## ${i18nStrings.observers.secondary_site_label}\n`;
             text += `${data.observer_nbort}\n`;
         } else if (outputMode === 'H') {
             // HTML format - return as plain monospace text
@@ -558,8 +558,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             
             text += '─'.repeat(120) + '\n';
-            text += `${i18nStrings.fields.primary_site}: ${data.observer_hbort}\n`;
-            text += `${i18nStrings.fields.secondary_site}: ${data.observer_nbort}\n`;
+            text += `${i18nStrings.observers.primary_site_label}: ${data.observer_hbort}\n`;
+            text += `${i18nStrings.observers.secondary_site_label}: ${data.observer_nbort}\n`;
         } else {
             // Pseudografik format (original)
             text = '';
@@ -601,8 +601,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Footer
             text += '╠════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣\n';
-            let hbLine = i18nStrings.fields.primary_site + ': ' + data.observer_hbort;
-            let nbLine = i18nStrings.fields.secondary_site + ': ' + data.observer_nbort;
+            let hbLine = i18nStrings.observers.primary_site_label + ': ' + data.observer_hbort;
+            let nbLine = i18nStrings.observers.secondary_site_label + ': ' + data.observer_nbort;
             const hbPadLeft = Math.floor((122 - hbLine.length) / 2);
             hbLine = ' '.repeat(hbPadLeft) + hbLine;
             nbLine = ' '.repeat(hbPadLeft) + nbLine;

@@ -288,10 +288,10 @@ function displayObservers() {
                                     <th>${(i18nStrings.observers.name_label)}</th>
                                     <th>${(i18nStrings.observers.since_label)}</th>
                                     <th>${(i18nStrings.common.active)}</th>
-                                    <th>${(i18nStrings.fields.primary_site)}</th>
+                                    <th>${(i18nStrings.observers.primary_site_label)}</th>
                                     <th>GH</th>
                                     <th>${(i18nStrings.observers.coordinates_label)}</th>
-                                    <th>${(i18nStrings.fields.secondary_site)}</th>
+                                    <th>${(i18nStrings.observers.secondary_site_label)}</th>
                                     <th>GN</th>
                                     <th>${(i18nStrings.observers.coordinates_label)}</th>
                                 </tr>

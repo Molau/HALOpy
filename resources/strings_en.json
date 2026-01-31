@@ -1,8 +1,8 @@
 {
   "app": {
     "title": "HALO Analysis Program",
-    "version": "3.0.6",
-    "version_date": "2026-01-29",
+    "version": "3.0.7",
+    "version_date": "2026-01-31",
     "copyright_years": "1992-2026",
     "welcome_title": "Welcome to HALO Analysis Program",
     "welcome_subtitle": "Software for recording and analyzing halo observations",
@@ -61,6 +61,7 @@
     "warning": "Warning",
     "error": "Error",
     "observations": "Observations",
+    "observer": "Observer",
     "page": "Page",
     "row": "Row",
     "of": "of",
@@ -76,7 +77,6 @@
     "pagination_last": "Last Page"
   },
   "messages": {
-    "not_implemented": "not implemented yet",
     "loading": "Loading data...",
     "loading_short": "Loading data...",
     "error_loading_data": "Error loading data!",
@@ -128,7 +128,6 @@
     "all_observers": "All Observers",
     "all_halo_types": "All Halo Types",
     "date": "Date"
-
   },
   "menu_titles": {
     "file": "File",
@@ -256,8 +255,8 @@
     "table_name": "Name",
     "table_active": "Active",
     "table_since": "Since",
-    "table_primary_site": "Primary observing site",
-    "table_secondary_site": "Secondary observing site",
+    "table_primary_site": "Primary Observation Site",
+    "table_secondary_site": "Secondary Observation Site",
     "table_coordinates": "Coordinates",
     "table_region": "GG",
     "row_range_prefix": "Row",
@@ -269,7 +268,7 @@
     "last_name_label": "Last Name",
     "since_month_label": "Since (Month)",
     "since_year_label": "Since (Year)",
-    "main_site_label": "Main Observation Site",
+    "primary_site_label": "Primary Observation Site",
     "secondary_site_label": "Secondary Observation Site",
     "region_label": "Region (GG)",
     "coordinates_label": "Coordinates",
@@ -736,7 +735,6 @@
     "sectors": "Sectors",
     "remarks": "Remarks",
     "select": "--",
-    "not_specified": "not specified",
     "max_15_chars": "max 15 chars",
     "max_60_chars": "max 60 chars",
     "not_applicable": "not applicable"

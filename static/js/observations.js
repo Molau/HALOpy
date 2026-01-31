@@ -345,29 +345,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const dateSelects = document.getElementById('filter-2-date-selects');
         
-        console.log("🔍 DEBUG: observations.js handleFilter2Change() - value=", value);
-        
         if (value === 'none') {
-            console.log("🔍 DEBUG: Setting all to display=none");
             filter2Input.style.display = 'none';
             dateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'none';
         } else if (value === 'date') {
-            console.log("🔍 DEBUG: Setting date visible, select hidden");
             filter2Input.style.display = 'block';
             dateSelects.style.display = 'flex';
             filter2SelectElem.style.display = 'none';
             populateDateSelects();
             setTimeout(() => document.getElementById('filter-2-day').focus(), 50);
         } else if (value === 'halo-type') {
-            console.log("🔍 DEBUG: Setting select visible, date hidden");
             filter2Input.style.display = 'block';
             dateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'block';
             populateHaloTypeSelect();
             setTimeout(() => filter2SelectElem.focus(), 50);
         }
-        console.log("🔍 DEBUG: After - dateSelects.display=", dateSelects.style.display, "select.display=", filter2SelectElem.style.display);
     }
     
     function populateDateSelects() {

@@ -69,10 +69,10 @@ async function showAddSiteDialog(observer) {
                                 
                                 <!-- Main Observation Site -->
                                 <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.main_site_label}</h6>
+                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.main_site_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control form-control-sm" id="site-hb-ort" maxlength="20" required>
                                 </div>
                                 <div class="col-md-4">
@@ -310,7 +310,7 @@ function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                         <table class="table table-sm table-bordered">
                             <tr><td><strong>${i18nStrings.observers.since_label}:</strong></td><td>${i18nStrings.months[site.seit_month]} ${site.seit_year}</td></tr>
                             <tr><td><strong>${i18nStrings.common.active}:</strong></td><td>${site.active === 1 ? i18nStrings.common.yes : i18nStrings.common.no}</td></tr>
-                            <tr><td><strong>${i18nStrings.observers.main_site_label}:</strong></td><td>${site.HbOrt} (GG ${site.GH})</td></tr>
+                            <tr><td><strong>${i18nStrings.observers.primary_site_label}:</strong></td><td>${site.HbOrt} (GG ${site.GH})</td></tr>
                             <tr><td><strong>${i18nStrings.observers.secondary_site_label}:</strong></td><td>${site.NbOrt} (GG ${site.GN})</td></tr>
                         </table>
                     </div>
@@ -381,7 +381,7 @@ function showDeleteSiteConfirmDialog(observer, sites, currentIndex) {
                         <table class="table table-sm table-bordered">
                             <tr><td><strong>${i18nStrings.observers.since_label}:</strong></td><td>${i18nStrings.months[site.seit_month]} ${site.seit_year}</td></tr>
                             <tr><td><strong>${i18nStrings.common.active}:</strong></td><td>${site.active === 1 ? i18nStrings.common.yes : i18nStrings.common.no}</td></tr>
-                            <tr><td><strong>${i18nStrings.observers.main_site_label}:</strong></td><td>${site.HbOrt} (GG ${site.GH})</td></tr>
+                            <tr><td><strong>${i18nStrings.observers.primary_site_label}:</strong></td><td>${site.HbOrt} (GG ${site.GH})</td></tr>
                             <tr><td><strong>${i18nStrings.observers.secondary_site_label}:</strong></td><td>${site.NbOrt} (GG ${site.GN})</td></tr>
                         </table>
                         <p class="text-muted small">${i18nStrings.observers.delete_site_info}</p>

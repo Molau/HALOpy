@@ -3215,19 +3215,19 @@ async function showDisplayCompactList(filterState) {
                         </div>
                         <div class="compact-navigation mt-3 d-flex justify-content-between align-items-center">
                             <div class="d-flex gap-2">
-                                <button id="btn-first" class="btn btn-sm btn-secondary" title="${i18nStrings.observers.pagination_first}">
+                                <button id="btn-first" class="btn btn-sm btn-secondary" title="${i18nStrings.common.pagination_first}">
                                     <i class="bi bi-chevron-bar-left"></i>
                                 </button>
-                                <button id="btn-prev" class="btn btn-sm btn-secondary" title="${i18nStrings.observers.pagination_prev}">
+                                <button id="btn-prev" class="btn btn-sm btn-secondary" title="${i18nStrings.common.pagination_prev}">
                                     <i class="bi bi-chevron-left"></i>
                                 </button>
                             </div>
                             <span id="page-info" class="text-muted"></span>
                             <div class="d-flex gap-2">
-                                <button id="btn-next" class="btn btn-sm btn-secondary" title="${i18nStrings.observers.pagination_next}">
+                                <button id="btn-next" class="btn btn-sm btn-secondary" title="${i18nStrings.common.pagination_next}">
                                     <i class="bi bi-chevron-right"></i>
                                 </button>
-                                <button id="btn-last" class="btn btn-sm btn-secondary" title="${i18nStrings.observers.pagination_last}">
+                                <button id="btn-last" class="btn btn-sm btn-secondary" title="${i18nStrings.common.pagination_last}">
                                     <i class="bi bi-chevron-bar-right"></i>
                                 </button>
                             </div>
@@ -3682,7 +3682,7 @@ async function showSelectDialog() {
 
     // Build filter options (same as in Auswertung)
     const filterOptions = [
-        { value: '', text: i18nStrings.analysis_dialog.please_select },
+        { value: '', text: i18nStrings.common.please_select },
         { value: 'JJ', text: i18nStrings.analysis_dialog.param_names.JJ },
         { value: 'MM', text: i18nStrings.analysis_dialog.param_names.MM },
         { value: 'TT', text: i18nStrings.analysis_dialog.param_names.TT },
@@ -6512,10 +6512,10 @@ async function showAddObserverDialog(formData = null) {
                                 
                                 <!-- Main Observation Site -->
                                 <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.main_site_label}</h6>
+                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.main_site_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control form-control-sm" id="obs-hb-ort" maxlength="20" required>
                                 </div>
                                 <div class="col-md-4">
@@ -6944,7 +6944,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                                         <th>${i18nStrings.observers.name_label}</th>
                                         <th>${i18nStrings.observers.since_year_label}</th>
                                         <th>${i18nStrings.common.active}</th>
-                                        <th>${i18nStrings.observers.main_site_label}</th>
+                                        <th>${i18nStrings.observers.primary_site_label}</th>
                                         <th>${i18nStrings.observers.region_label}</th>
                                         <th>${i18nStrings.observers.coordinates_label}</th>
                                         <th>${i18nStrings.observers.secondary_site_label}</th>
@@ -7351,10 +7351,10 @@ async function showAddSiteDialog(observer) {
                                 
                                 <!-- Main Observation Site -->
                                 <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.main_site_label}</h6>
+                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.main_site_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control form-control-sm" id="site-hb-ort" maxlength="20" required>
                                 </div>
                                 <div class="col-md-4">
@@ -7642,10 +7642,10 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                 
                                 <!-- Main Observation Site -->
                                 <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.main_site_label}</h6>
+                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.main_site_label}</label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label}</label>
                                     <input type="text" class="form-control form-control-sm" id="confirm-edit-site-hb-ort" maxlength="20" disabled>
                                 </div>
                                 <div class="col-md-4">
@@ -7885,10 +7885,10 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                 
                                 <!-- Main Observation Site -->
                                 <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.main_site_label}</h6>
+                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.main_site_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control form-control-sm" id="edit-site-hb-ort" maxlength="20" required>
                                 </div>
                                 <div class="col-md-4">
@@ -8214,10 +8214,10 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                 
                                 <!-- Main Observation Site -->
                                 <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.main_site_label}</h6>
+                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.main_site_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control form-control-sm" id="delete-site-hb-ort" maxlength="20" disabled>
                                 </div>
                                 <div class="col-md-4">

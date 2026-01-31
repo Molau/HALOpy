@@ -108,10 +108,20 @@ class ObservationForm {
         
         if ((mode === 'edit' || mode === 'delete' || mode === 'view') && observation) {
             this.populateFields(observation);
-            // Disable all fields in edit/delete/view mode - user must click "Yes" to edit
+            // Apply field dependencies/constraints after loading observation
             setTimeout(() => {
+                // Trigger dependencies in correct order (same as add mode)
+                // O-Trigger: sets d, and cascades to N, C, c
+                this.manageFieldDependencies('o');
+                // KK/MM/JJ-Trigger: sets g, cascades to GG
+                this.manageFieldDependencies('kk');
+                this.manageFieldDependencies('mm');
+                // EE-Trigger: sets HO, HU, sectors
+                this.manageFieldDependencies('ee');
+                this.manageFieldDependencies('v');
+                
+                // THEN disable all fields in edit/delete/view mode - user must click "Yes" to edit
                 this.disableAllFields();
-                // Dependencies already applied in populateFields()
             }, 0);
         } else if (mode === 'add') {
             // Pre-fill fields for new observations
@@ -145,6 +155,18 @@ class ObservationForm {
         
         this.modal = new bootstrap.Modal(this.modalElement);
         this.modal.show();
+    }
+    
+    /**
+     * Helper method to hide the modal without aria-hidden warnings
+     * Removes focus from any focused element inside the modal before hiding
+     */
+    hideModal() {
+        // Remove focus from any element inside the modal to prevent aria-hidden warnings
+        if (document.activeElement && this.modalElement.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        this.modal.hide();
     }
     
     createModalHTML() {
@@ -1510,7 +1532,7 @@ class ObservationForm {
                     if (this.onYes) {
                         await this.onYes();
                     }
-                    this.modal.hide();
+                    this.hideModal();
                 } else {
                     // In edit mode, Yes means enable editing
                     this.isEditingMode = true;
@@ -1545,14 +1567,14 @@ class ObservationForm {
                 if (this.mode === 'delete') {
                     // In delete mode, No means skip to next
                     this.noButtonPressed = true; // Prevent cancel callback
-                    this.modal.hide();
+                    this.hideModal();
                     if (this.onNo) {
                         this.onNo();
                     }
                 } else {
                     // In edit mode, No means skip this observation
                     this.skipped = true;
-                    this.modal.hide();
+                    this.hideModal();
                     if (this.onCancel) {
                         this.onCancel();
                     }
@@ -1577,7 +1599,7 @@ class ObservationForm {
         if (nextBtn) {
             nextBtn.addEventListener('click', () => {
                 this.navigating = true;
-                this.modal.hide();
+                this.hideModal();
                 if (this.mode === 'view' && this.onYes) {
                     this.onYes(); // Next in view mode
                 } else if ((this.mode === 'edit' || this.mode === 'delete') && this.onYes) {
@@ -1599,7 +1621,7 @@ class ObservationForm {
         // OK button in view mode should close and return to main (like ESC/Cancel)
         if (okViewBtn && this.mode === 'view') {
             okViewBtn.addEventListener('click', () => {
-                this.modal.hide();
+                this.hideModal();
                 // Don't set navigating - let the hidden handler call onCancelBtn
             });
         }
@@ -1608,7 +1630,7 @@ class ObservationForm {
         if (prevBtn) {
             prevBtn.addEventListener('click', () => {
                 this.navigating = true;
-                this.modal.hide();
+                this.hideModal();
                 if (this.mode === 'view' && this.onNo) {
                     this.onNo(); // Previous in view mode
                 } else if ((this.mode === 'edit' || this.mode === 'delete') && this.onNo) {
@@ -1633,7 +1655,7 @@ class ObservationForm {
                     }
                     
                     this.saved = true;
-                    this.modal.hide();
+                    this.hideModal();
                 } catch (e) {
                     errEl.textContent = e.message;
                     errEl.style.display = 'block';
@@ -1676,24 +1698,68 @@ class ObservationForm {
     }
     
     enableAllFields() {
+        // Enable fields that are NOT constrained by dependencies
+        // This method is called when user clicks "Yes" to edit an observation
+        
+        // Helper: Check if field has active constraints
+        const isConstrained = (fieldKey) => {
+            const constraints = this.fieldConstraints[fieldKey];
+            if (fieldKey === 'sectors') {
+                // Sectors: empty array = constrained (disabled)
+                return !(Array.isArray(constraints) && constraints.length > 0);
+            } else {
+                // Other fields: check if only one option available (constrained to single value)
+                return Array.isArray(constraints) && constraints.length === 1;
+            }
+        };
+        
+        // Field key mapping (internal key → element ID)
+        const fieldKeyMap = {
+            'd': 'form-d',
+            'n': 'form-n',
+            'C': 'form-C',
+            'c': 'form-c',
+            'TT': 'form-tt',
+            'g': 'form-g',
+            'GG': 'form-gg',
+            'HO': 'form-ho',
+            'HU': 'form-hu',
+            'sectors': 'form-sectors'
+        };
+        
+        // Enable all fields EXCEPT those that are constrained
         Object.values(this.fields).forEach(field => {
-            if (field && field.id !== 'form-gg' && field.id !== 'form-kk') {
-                // Don't enable KK if fixed observer is set
+            if (!field) return;
+            
+            // Find constraint key for this field
+            const constraintKey = Object.keys(fieldKeyMap).find(key => fieldKeyMap[key] === field.id);
+            
+            // Special handling for KK (fixed observer)
+            if (field.id === 'form-kk') {
+                if (!this.fixedObserver) {
+                    field.disabled = false;
+                }
+                return;
+            }
+            
+            // Special handling for GG (depends on g value)
+            if (field.id === 'form-gg') {
+                const g = parseInt(this.fields.g.value);
+                if (g !== 0 && g !== 2) {
+                    field.disabled = false;
+                }
+                return;
+            }
+            
+            // For constrained fields, check if they should remain disabled
+            if (constraintKey && isConstrained(constraintKey)) {
+                // Field is constrained to single value or disabled - keep it disabled
+                field.disabled = true;
+            } else {
+                // Field is not constrained - enable it
                 field.disabled = false;
             }
         });
-        
-        // Only enable KK if no fixed observer
-        if (this.fields.kk && !this.fixedObserver) {
-            this.fields.kk.disabled = false;
-        }
-        
-        // GG field auto-filled based on g value
-        const g = parseInt(this.fields.g.value);
-
-        if (g !== 0 && g !== 2) {
-            this.fields.gg.disabled = false;
-        }
     }
     
     populateFields(obs) {
@@ -1731,9 +1797,8 @@ class ObservationForm {
         this.fields.sectors.value = obs.sectors || '';
         this.fields.remarks.value = obs.remarks || '';
         
-        // When loading existing observations: NO auto-fill, NO validation
-        // Display data EXACTLY as stored in file
-        // Dependencies are only applied when ADDING new observations, not when LOADING existing ones
+        // Field values are populated from observation
+        // Constraints/dependencies are applied by manageFieldDependencies() after this method returns
     }
     
     getFormData() {
