@@ -244,6 +244,8 @@ class FilterDialog {
         
         if (value === 'none') {
             filter2Input.style.display = 'none';
+            filter2DateSelects.style.display = 'none';
+            filter2SelectElem.style.display = 'none';
         } else if (value === 'date') {
             filter2Input.style.display = 'block';
             filter2DateSelects.style.display = 'flex';

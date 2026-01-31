@@ -347,19 +347,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         if (value === 'none') {
             filter2Input.style.display = 'none';
-            if (dateSelects) dateSelects.style.display = 'none';
+            dateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'none';
         } else if (value === 'date') {
             filter2Input.style.display = 'block';
-            if (dateSelects) {
-                dateSelects.style.display = 'flex';
-                populateDateSelects();
-                setTimeout(() => document.getElementById('filter-2-day').focus(), 50);
-            }
+            dateSelects.style.display = 'flex';
             filter2SelectElem.style.display = 'none';
+            populateDateSelects();
+            setTimeout(() => document.getElementById('filter-2-day').focus(), 50);
         } else if (value === 'halo-type') {
             filter2Input.style.display = 'block';
-            if (dateSelects) dateSelects.style.display = 'none';
+            dateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'block';
             populateHaloTypeSelect();
             setTimeout(() => filter2SelectElem.focus(), 50);
