@@ -13,9 +13,9 @@ async function showAddSiteDialog(observer) {
         return `<option value="${monthNum}">${monthName}</option>`;
     }).join('');
     
-    // Generate year options (1950-2049)
+    // Generate year options (YEAR_MIN-YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = 1950 + i;
+        const year = YEAR_MIN + i;
         return `<option value="${year}">${year}</option>`;
     }).join('');
     

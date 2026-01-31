@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         modal.show();
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     }
 
@@ -61,13 +61,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Observer select placeholder
         const observerPlaceholder = document.getElementById('observer-select-placeholder');
         if (observerPlaceholder) {
-            observerPlaceholder.textContent = '-- ' + i18nStrings.observers.select_prompt + ' --';
+            observerPlaceholder.textContent = '-- ' + i18nStrings.messages.select_prompt + ' --';
         }
         
         // Populate year dropdown
         if (yearSelect) {
-            yearSelect.innerHTML = '<option value="">-- ' + i18nStrings.fields.select + ' --</option>';
-            for (let year = 1950; year <= 2049; year++) {
+            yearSelect.innerHTML = '<option value="">-- ' + i18nStrings.messages.select_prompt + ' --</option>';
+            for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
                 const yy = String(year % 100).padStart(2, '0');
                 yearSelect.innerHTML += `<option value="${yy}">${year}</option>`;
             }
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Populate observer dropdown
     function populateObserverSelect() {
-        const placeholder = '-- ' + i18nStrings.observers.select_prompt + ' --';
+        const placeholder = '-- ' + i18nStrings.messages.select_prompt + ' --';
         observerSelect.innerHTML = `<option value="">${placeholder}</option>`;
 
         // Get unique observers (latest record per KK)
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Event listeners
     btnCancel.addEventListener('click', () => {
-        window.location.href = '/';
+        window.navigateInternal('/');
     });
 
     btnApply.addEventListener('click', applyFilter);
@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const escKeyHandler = (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     };
     
@@ -626,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnOk.onclick = () => {
                 const modal = bootstrap.Modal.getInstance(resultsModal);
                 if (modal) modal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             };
         }
         
@@ -636,7 +636,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 e.preventDefault();
                 const modal = bootstrap.Modal.getInstance(resultsModal);
                 if (modal) modal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
         };
         

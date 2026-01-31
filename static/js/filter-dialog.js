@@ -121,13 +121,15 @@ class FilterDialog {
                                     <label class="form-label">2. ${i18nStrings.filter_dialog.question_2}</label>
                                     <select id="filter-criterion-2" class="form-select">
                                         <option value="none">${i18nStrings.filter_dialog.no_criterion}</option>
-                                        <option value="date">${i18nStrings.common.day}</option>
-                                        <option value="month">${i18nStrings.common.month}</option>
-                                        <option value="year">${i18nStrings.common.year}</option>
+                                        <option value="date">${i18nStrings.filter_dialog.date}</option>
                                         <option value="halo-type">${i18nStrings.filter_dialog.halo_type}</option>
                                     </select>
                                     <div id="filter-2-input" style="display:none;" class="mt-2">
-                                        <input type="text" id="filter-2-value" class="form-control" placeholder="">
+                                        <div id="filter-2-date-selects" style="display:none;" class="d-flex gap-2">
+                                            <select id="filter-2-day" class="form-select" style="flex: 1; min-width: 0;"></select>
+                                            <select id="filter-2-month" class="form-select" style="flex: 1; min-width: 0;"></select>
+                                            <select id="filter-2-year" class="form-select" style="flex: 1; min-width: 0;"></select>
+                                        </div>
                                         <select id="filter-2-select" class="form-select" style="display:none;"></select>
                                     </div>
                                 </div>
@@ -206,10 +208,8 @@ class FilterDialog {
         
         const filter2Select = document.getElementById('filter-criterion-2');
         filter2Select.options[0].textContent = i18nStrings.filter_dialog.no_criterion;
-        filter2Select.options[1].textContent = i18nStrings.common.day;
-        filter2Select.options[2].textContent = i18nStrings.common.month;
-        filter2Select.options[3].textContent = i18nStrings.common.year;
-        filter2Select.options[4].textContent = i18nStrings.filter_dialog.halo_type;
+        filter2Select.options[1].textContent = i18nStrings.filter_dialog.date;
+        filter2Select.options[2].textContent = i18nStrings.filter_dialog.halo_type;
         
         document.getElementById('btn-cancel-filter').textContent = i18nStrings.common.cancel;
         const applyBtn = document.getElementById('btn-apply-filter');
@@ -239,35 +239,74 @@ class FilterDialog {
     handleFilter2Change() {
         const value = document.getElementById('filter-criterion-2').value;
         const filter2Input = document.getElementById('filter-2-input');
-        const filter2Value = document.getElementById('filter-2-value');
+        const filter2DateSelects = document.getElementById('filter-2-date-selects');
         const filter2SelectElem = document.getElementById('filter-2-select');
         
         if (value === 'none') {
             filter2Input.style.display = 'none';
         } else if (value === 'date') {
             filter2Input.style.display = 'block';
-            filter2Value.style.display = 'block';
+            filter2DateSelects.style.display = 'flex';
             filter2SelectElem.style.display = 'none';
-            filter2Value.placeholder = i18nStrings.filter_dialog.date;
-            setTimeout(() => filter2Value.focus(), 50);
-        } else if (value === 'month') {
-            filter2Input.style.display = 'block';
-            filter2Value.style.display = 'block';
-            filter2SelectElem.style.display = 'none';
-            filter2Value.placeholder = i18nStrings.filter_dialog.month;
-            setTimeout(() => filter2Value.focus(), 50);
-        } else if (value === 'year') {
-            filter2Input.style.display = 'block';
-            filter2Value.style.display = 'block';
-            filter2SelectElem.style.display = 'none';
-            filter2Value.placeholder = i18nStrings.filter_dialog.year;
-            setTimeout(() => filter2Value.focus(), 50);
+            this.populateDateSelects();
+            setTimeout(() => document.getElementById('filter-2-day').focus(), 50);
         } else if (value === 'halo-type') {
             filter2Input.style.display = 'block';
-            filter2Value.style.display = 'none';
+            filter2DateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'block';
             this.populateHaloTypeSelect();
             setTimeout(() => filter2SelectElem.focus(), 50);
+        }
+    }
+    
+    populateDateSelects() {
+        // Populate day dropdown
+        const daySelect = document.getElementById('filter-2-day');
+        daySelect.innerHTML = '';
+        
+        const dayPlaceholder = document.createElement('option');
+        dayPlaceholder.value = '';
+        dayPlaceholder.textContent = i18nStrings.fields.select;
+        daySelect.appendChild(dayPlaceholder);
+        
+        for (let day = 1; day <= 31; day++) {
+            const option = document.createElement('option');
+            option.value = String(day).padStart(2, '0');
+            option.textContent = String(day).padStart(2, '0');
+            daySelect.appendChild(option);
+        }
+        
+        // Populate month dropdown
+        const monthSelect = document.getElementById('filter-2-month');
+        monthSelect.innerHTML = '';
+        
+        const monthPlaceholder = document.createElement('option');
+        monthPlaceholder.value = '';
+        monthPlaceholder.textContent = i18nStrings.fields.select;
+        monthSelect.appendChild(monthPlaceholder);
+        
+        for (let month = 1; month <= 12; month++) {
+            const option = document.createElement('option');
+            option.value = String(month).padStart(2, '0');
+            option.textContent = `${String(month).padStart(2, '0')} - ${i18nStrings.months[String(month)]}`;
+            monthSelect.appendChild(option);
+        }
+        
+        // Populate year dropdown
+        const yearSelect = document.getElementById('filter-2-year');
+        yearSelect.innerHTML = '';
+        
+        const yearPlaceholder = document.createElement('option');
+        yearPlaceholder.value = '';
+        yearPlaceholder.textContent = i18nStrings.fields.select;
+        yearSelect.appendChild(yearPlaceholder);
+        
+        for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
+            const option = document.createElement('option');
+            const yearStr = String(year);
+            option.value = yearStr.substring(2); // 2-digit year
+            option.textContent = yearStr; // Display full 4-digit year
+            yearSelect.appendChild(option);
         }
     }
     
@@ -335,7 +374,6 @@ class FilterDialog {
         const filterCriterion1Select = document.getElementById('filter-criterion-1');
         const filterCriterion2Select = document.getElementById('filter-criterion-2');
         const filter1SelectElem = document.getElementById('filter-1-select');
-        const filter2Value = document.getElementById('filter-2-value');
         const filter2SelectElem = document.getElementById('filter-2-select');
         
         this.filterCriterion1 = filterCriterion1Select.value;
@@ -351,8 +389,13 @@ class FilterDialog {
         
         // Validate filter 2
         if (this.filterCriterion2 !== 'none') {
-            if (this.filterCriterion2 === 'date' || this.filterCriterion2 === 'month' || this.filterCriterion2 === 'year') {
-                if (!filter2Value.value.trim()) {
+            if (this.filterCriterion2 === 'date') {
+                // For date, at least one field must be selected
+                const dayValue = document.getElementById('filter-2-day').value;
+                const monthValue = document.getElementById('filter-2-month').value;
+                const yearValue = document.getElementById('filter-2-year').value;
+                
+                if (!dayValue && !monthValue && !yearValue) {
                     this.showWarning(i18nStrings.messages.filter_value_required);
                     return;
                 }
@@ -374,32 +417,16 @@ class FilterDialog {
         }
         
         if (this.filterCriterion2 === 'date') {
-            const parts = filter2Value.value.trim().split(/[\s.]+/);
-            if (parts.length === 3) {
-                this.filterValue2 = {
-                    t: parseInt(parts[0]),
-                    m: parseInt(parts[1]),
-                    j: parseInt(parts[2])
-                };
-            } else {
-                this.filterValue2 = null;
-            }
-        } else if (this.filterCriterion2 === 'month') {
-            const parts = filter2Value.value.trim().split(/[\s.]+/);
-            if (parts.length === 2) {
-                this.filterValue2 = {
-                    m: parseInt(parts[0]),
-                    j: parseInt(parts[1])
-                };
-            } else {
-                this.filterValue2 = null;
-            }
-        } else if (this.filterCriterion2 === 'year') {
-            let year = parseInt(filter2Value.value) || null;
-            if (year !== null && year >= 100) {
-                year = year % 100;
-            }
-            this.filterValue2 = year;
+            // Read all three date fields
+            const dayValue = document.getElementById('filter-2-day').value;
+            const monthValue = document.getElementById('filter-2-month').value;
+            const yearValue = document.getElementById('filter-2-year').value;
+            
+            this.filterValue2 = {
+                t: dayValue ? parseInt(dayValue) : null,
+                m: monthValue ? parseInt(monthValue) : null,
+                j: yearValue ? parseInt(yearValue) : null
+            };
         } else if (this.filterCriterion2 === 'halo-type') {
             this.filterValue2 = parseInt(filter2SelectElem.value) || null;
         } else {

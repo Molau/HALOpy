@@ -37,13 +37,13 @@
                         <div class="filter-form">
                             <!-- Combined Prompt -->
                             <p class="form-label fw-bold mb-3">
-                                {% if lang() == 'de' %}{{ g.i18n.get('monthly_report.combined_prompt') }}{% else %}{{ g.i18n.get('monthly_report.combined_prompt') }}{% endif %}
+                                {{ g.i18n.get('monthly_report.combined_prompt') }}
                             </p>
                             
                             <!-- Observer Selection -->
                             <div class="filter-group mb-3">
                                 <select id="observer-select" class="form-select">
-                                    <option value="" id="observer-select-placeholder">-- {{ g.i18n.get('observers.select_prompt') }} --</option>
+                                    <option value="" id="observer-select-placeholder">{{ g.i18n.get('messages.select_prompt') }}</option>
                                 </select>
                             </div>
 
@@ -53,7 +53,7 @@
                                 <div class="row g-2">
                                     <div class="col-6">
                                         <select id="month-select" class="form-select">
-                                            <option value="">-- {{ g.i18n.get('fields.select') }} --</option>
+                                            <option value="">-- {{ g.i18n.get('messages.select_prompt') }} --</option>
                                             <option value="1">01 - {{ g.i18n.get('months.1') }}</option>
                                             <option value="2">02 - {{ g.i18n.get('months.2') }}</option>
                                             <option value="3">03 - {{ g.i18n.get('months.3') }}</option>
@@ -70,7 +70,7 @@
                                     </div>
                                     <div class="col-6">
                                         <select id="year-select" class="form-select">
-                                            <option value="">-- {{ g.i18n.get('fields.select') }} --</option>
+                                            <option value="">-- {{ g.i18n.get('messages.select_prompt') }} --</option>
                                         </select>
                                     </div>
                                 </div>

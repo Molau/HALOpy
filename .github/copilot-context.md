@@ -28,7 +28,33 @@
 
 ## Core Principles
 
-### 0. Code Modification Policy - Decision #026
+### 0. No Automated String Replacement Across Multiple Files - Decision #027
+- **Date**: 2026-01-31
+- **Status**: ✓ Approved
+- **Core Rule**: NEVER use regex-based string replacement across multiple files without manual verification
+- **Prohibition**: Terminal commands like `Get-ChildItem | ForEach-Object { $content -replace ... }` are FORBIDDEN
+- **Requirements**:
+  1. ✗ **NEVER** use automated string replacement via terminal/scripts
+  2. ✗ **NEVER** use regex replacements that don't account for full syntax context
+  3. ✓ **ALWAYS** use `replace_string_in_file` or `multi_replace_string_in_file` tools
+  4. ✓ **ALWAYS** include complete context (before/after lines) to ensure correct matching
+  5. ✓ **ALWAYS** verify syntax correctness after replacement
+- **Rationale**:
+  - Regex cannot understand programming language syntax
+  - Automated replacements cause syntax errors (missing parentheses, quotes, etc.)
+  - Context-aware tools prevent such errors
+  - Manual verification catches edge cases
+- **Examples of FORBIDDEN patterns**:
+  - ✗ `$content -replace "window\.location\.href = '/", "window.navigateInternal('/"`
+  - ✗ Any PowerShell/bash script doing text replacement across multiple files
+  - ✗ Global search-and-replace without syntax awareness
+- **Correct approach**:
+  - ✓ Use `replace_string_in_file` with full context (3-5 lines before/after)
+  - ✓ Use `multi_replace_string_in_file` for multiple targeted replacements
+  - ✓ Read file first, understand syntax, then replace with proper context
+- **Impact**: Prevents syntax errors and broken code from blind string replacements
+
+### 1. Code Modification Policy - Decision #026
 - **Date**: 2026-01-25
 - **Status**: ✓ Approved
 - **Core Rule**: NEVER replace existing code with newly generated code without explicit approval
@@ -53,7 +79,7 @@
   - ✗ **Wrong approach**: "I'll rewrite the function" → loses previous fixes
 - **Impact**: This is a CRITICAL principle that prevents repeated debugging cycles
 
-### 1. Debug Logging Standard - Decision #024
+### 2. Debug Logging Standard - Decision #024
 - **Date**: 2026-01-24
 - **Updated**: 2026-01-27
 - **Status**: ✓ Approved
@@ -92,7 +118,7 @@
   // Each line needs to be on its own line so regex can find it
   ```
 
-### 2. Observation Record Format (HALO Key)
+### 3. Observation Record Format (HALO Key)
 - **Decision**: ✓ Preserve standardized observation record format exactly
 - **Format**: `KKOJJ MMTTg ZZZZd DDNCc EEHFV fzzGG 8HHHH Sektoren Bemerkungen`
 - **Rationale**: 

@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         modal.show();
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     }
 
@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         switch (paramCode) {
             case 'JJ':
                 const years = [];
-                for (let i = 1950; i <= 2049; i++) {
+                for (let i = YEAR_MIN; i <= YEAR_MAX; i++) {
                     years.push({ value: i, display: String(i) });
                 }
                 return years;
@@ -1543,7 +1543,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     btnCancelParam.addEventListener('click', () => {
-        window.location.href = '/';
+        window.navigateInternal('/');
     });
 
     // Store last analysis result globally for print/save functionality
@@ -1695,7 +1695,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnOk.onclick = () => {
                 const modalInstance = bootstrap.Modal.getInstance(modal);
                 if (modalInstance) modalInstance.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             };
         }
         
@@ -1725,7 +1725,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 e.preventDefault();
                 const modalInstance = bootstrap.Modal.getInstance(modal);
                 if (modalInstance) modalInstance.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
         };
         
@@ -1735,7 +1735,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 e.preventDefault();
                 const modalInstance = bootstrap.Modal.getInstance(modal);
                 if (modalInstance) modalInstance.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
         };
         
@@ -3178,7 +3178,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     });
 

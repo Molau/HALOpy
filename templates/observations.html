@@ -51,13 +51,15 @@
                                 <label class="form-label">2. {{ g.i18n.get('filter_dialog.question_2') }}</label>
                                 <select id="filter-criterion-2" class="form-select">
                                     <option value="none">{{ g.i18n.get('filter_dialog.no_criterion') }}</option>
-                                    <option value="date">{{ g.i18n.get('common.day') }}</option>
-                                    <option value="month">{{ g.i18n.get('common.month') }}</option>
-                                    <option value="year">{{ g.i18n.get('common.year') }}</option>
+                                    <option value="date">{{ g.i18n.get('filter_dialog.date') }}</option>
                                     <option value="halo-type">{{ g.i18n.get('filter_dialog.halo_type') }}</option>
                                 </select>
                                 <div id="filter-2-input" style="display:none;" class="mt-2">
-                                    <input type="text" id="filter-2-value" class="form-control" placeholder="">
+                                    <div id="filter-2-date-selects" style="display:none;" class="d-flex gap-2">
+                                        <select id="filter-2-day" class="form-select" style="flex:1;"></select>
+                                        <select id="filter-2-month" class="form-select" style="flex:1;"></select>
+                                        <select id="filter-2-year" class="form-select" style="flex:1;"></select>
+                                    </div>
                                     <select id="filter-2-select" class="form-select" style="display:none;"></select>
                                 </div>
                             </div>

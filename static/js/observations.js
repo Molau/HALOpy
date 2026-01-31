@@ -1,4 +1,4 @@
-﻿// Observations page functionality - Exact translation from H_BEOBNG.PAS zeibeobachtung()
+// Observations page functionality - Exact translation from H_BEOBNG.PAS zeibeobachtung()
 document.addEventListener('DOMContentLoaded', async function() {
     // Wait for i18nStrings to be loaded (from main.js)
     await window.waitForI18n();
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Filter state (matching Pascal auswahl, auswahl2)
     let filterCriterion1 = 'none';  // auswahl: none, observer, region
     let filterValue1 = null;
-    let filterCriterion2 = 'none';  // auswahl2: none, date, month, year, halo-type
+    let filterCriterion2 = 'none';  // auswahl2: none, date (with optional t/m/j), halo-type
     let filterValue2 = null;
     
     // Elements
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Event listeners
     btnApplyFilter.addEventListener('click', applyFilters);
     btnCancelFilter.addEventListener('click', () => {
-        window.location.href = '/';
+        window.navigateInternal('/');
     });
     
     // Enter key support for filter inputs (only if they exist)
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     
     btnExitObservations.addEventListener('click', () => {
-        window.location.href = '/';
+        window.navigateInternal('/');
     });
     
     // Pagination event listeners
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // No modals open - exit to main page
                 e.preventDefault();
                 e.stopPropagation();
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
             // If modal is open, let Bootstrap handle ESC to close it
         }
@@ -209,37 +209,25 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Filter 2 label and options
         document.querySelector('#filter-criterion-2').previousElementSibling.textContent = '2. ' + i18nStrings.filter_dialog.question_2;
-        if (filterCriterion2Select && filterCriterion2Select.options.length >= 5) {
+        if (filterCriterion2Select && filterCriterion2Select.options.length >= 3) {
             const opt = filterCriterion2Select.options;
             opt[0].textContent = i18nStrings.filter_dialog.no_criterion;
-            opt[1].textContent = i18nStrings.common.day;
-            opt[2].textContent = i18nStrings.common.month;
-            opt[3].textContent = i18nStrings.common.year;
-            opt[4].textContent = i18nStrings.filter_dialog.halo_type;
-            opt[2].textContent = i18nStrings.common.month;
-            opt[3].textContent = i18nStrings.common.year;
-            opt[4].textContent = i18nStrings.filter_dialog.halo_type;
+            opt[1].textContent = i18nStrings.filter_dialog.date;
+            opt[2].textContent = i18nStrings.filter_dialog.halo_type;
         }
         
         // Buttons
         document.getElementById('btn-cancel-filter').textContent = i18nStrings.common.cancel;
         const applyBtn = document.getElementById('btn-apply-filter');
-        applyBtn.childNodes[applyBtn.childNodes.length - 1].textContent = i18nStrings.common.apply;
+        applyBtn.childNodes[applyBtn.childNodes.length - 1].textContent = i18nStrings.common.ok;
         
         // Loading text
         const loadingText = document.querySelector('#loading-spinner p');
         if (loadingText) loadingText.textContent = i18nStrings.messages.loading;
         
-        // Update placeholders if visible
-        const criterion1 = filterCriterion1Select.value;
-
-        const criterion2 = filterCriterion2Select.value;
-        if (criterion2 === 'date' && filter2Value.placeholder) {
-            filter2Value.placeholder = i18nStrings.filter_dialog.date;
-        } else if (criterion2 === 'month' && filter2Value.placeholder) {
-            filter2Value.placeholder = i18nStrings.filter_dialog.month;
-        } else if (criterion2 === 'year' && filter2Value.placeholder) {
-            filter2Value.placeholder = i18nStrings.filter_dialog.year;
+        // Update date dropdowns if visible
+        if (filterCriterion2Select.value === 'date') {
+            populateDateSelects();
         }
         
         // Update dropdowns if populated
@@ -354,34 +342,55 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     function handleFilter2Change() {
         const value = filterCriterion2Select.value;
-
+        
+        const dateSelects = document.getElementById('filter-2-date-selects');
         
         if (value === 'none') {
             filter2Input.style.display = 'none';
+            if (dateSelects) dateSelects.style.display = 'none';
+            filter2SelectElem.style.display = 'none';
         } else if (value === 'date') {
             filter2Input.style.display = 'block';
-            filter2Value.style.display = 'block';
+            if (dateSelects) {
+                dateSelects.style.display = 'flex';
+                populateDateSelects();
+                setTimeout(() => document.getElementById('filter-2-day').focus(), 50);
+            }
             filter2SelectElem.style.display = 'none';
-            filter2Value.placeholder = i18nStrings.common.date;
-            setTimeout(() => filter2Value.focus(), 50);
-        } else if (value === 'month') {
-            filter2Input.style.display = 'block';
-            filter2Value.style.display = 'block';
-            filter2SelectElem.style.display = 'none';
-            filter2Value.placeholder = i18nStrings.common.month;
-            setTimeout(() => filter2Value.focus(), 50);
-        } else if (value === 'year') {
-            filter2Input.style.display = 'block';
-            filter2Value.style.display = 'block';
-            filter2SelectElem.style.display = 'none';
-            filter2Value.placeholder = i18nStrings.common.year;
-            setTimeout(() => filter2Value.focus(), 50);
         } else if (value === 'halo-type') {
             filter2Input.style.display = 'block';
-            filter2Value.style.display = 'none';
+            if (dateSelects) dateSelects.style.display = 'none';
             filter2SelectElem.style.display = 'block';
             populateHaloTypeSelect();
             setTimeout(() => filter2SelectElem.focus(), 50);
+        }
+    }
+    
+    function populateDateSelects() {
+        const daySelect = document.getElementById('filter-2-day');
+        const monthSelect = document.getElementById('filter-2-month');
+        const yearSelect = document.getElementById('filter-2-year');
+        
+        if (!daySelect || !monthSelect || !yearSelect || !i18nStrings) return;
+        
+        // Day dropdown (1-31)
+        daySelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
+        for (let i = 1; i <= 31; i++) {
+            daySelect.innerHTML += `<option value="${i}">${i.toString().padStart(2, '0')}</option>`;
+        }
+        
+        // Month dropdown - use i18nStrings.months["1"] to ["12"]
+        monthSelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
+        for (let i = 1; i <= 12; i++) {
+            const monthName = i18nStrings.months[i.toString()];
+            monthSelect.innerHTML += `<option value="${i}">${monthName}</option>`;
+        }
+        
+        // Year dropdown (1986-2099)
+        yearSelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
+        for (let i = 1986; i <= 2099; i++) {
+            const yy = i % 100;
+            yearSelect.innerHTML += `<option value="${yy}">${i}</option>`;
         }
     }
     
@@ -480,8 +489,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Validate filter 2
         if (filterCriterion2 !== 'none') {
-            if (filterCriterion2 === 'date' || filterCriterion2 === 'month' || filterCriterion2 === 'year') {
-                if (!filter2Value.value.trim()) {
+            if (filterCriterion2 === 'date') {
+                // At least one date field must be selected
+                const daySelect = document.getElementById('filter-2-day');
+                const monthSelect = document.getElementById('filter-2-month');
+                const yearSelect = document.getElementById('filter-2-year');
+                if ((!daySelect.value || daySelect.value === '') && 
+                    (!monthSelect.value || monthSelect.value === '') && 
+                    (!yearSelect.value || yearSelect.value === '')) {
                     showWarning(i18nStrings.messages.filter_value_required);
                     return;
                 }
@@ -506,36 +521,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         if (filterCriterion2 === 'date') {
-            // Accept both space-separated (d m y) and dot-separated (d.m.y)
-            const parts = filter2Value.value.trim().split(/[\s.]+/);
-            if (parts.length === 3) {
-                filterValue2 = {
-                    t: parseInt(parts[0]),
-                    m: parseInt(parts[1]),
-                    j: parseInt(parts[2])
-                };
-            } else {
-                filterValue2 = null;
-            }
-        } else if (filterCriterion2 === 'month') {
-            // Accept both space-separated (m y) and dot-separated (m.y)
-            const parts = filter2Value.value.trim().split(/[\s.]+/);
-            if (parts.length === 2) {
-                filterValue2 = {
-                    m: parseInt(parts[0]),
-                    j: parseInt(parts[1])
-                };
-            } else {
-                filterValue2 = null;
-            }
-        } else if (filterCriterion2 === 'year') {
-            let year = parseInt(filter2Value.value) || null;
-            // Keep as 2-digit year to match obs.JJ format in data
-            if (year !== null && year >= 100) {
-                // Convert 4-digit back to 2-digit (e.g., 1995 -> 95, 2025 -> 25)
-                year = year % 100;
-            }
-            filterValue2 = year;
+            // Read from three dropdowns
+            const daySelect = document.getElementById('filter-2-day');
+            const monthSelect = document.getElementById('filter-2-month');
+            const yearSelect = document.getElementById('filter-2-year');
+            
+            const t = daySelect.value ? parseInt(daySelect.value) : null;
+            const m = monthSelect.value ? parseInt(monthSelect.value) : null;
+            const j = yearSelect.value ? parseInt(yearSelect.value) : null;
+            
+            filterValue2 = { t, m, j };
         } else if (filterCriterion2 === 'halo-type') {
             filterValue2 = parseInt(filter2SelectElem.value) || null;
         } else {
@@ -616,15 +611,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Second filter (auswahl2)
         if (filterCriterion2 === 'date') {
-            if (filterValue2 && (obs.TT !== filterValue2.t || obs.MM !== filterValue2.m || obs.JJ !== filterValue2.j)) {
-                return false;
+            if (filterValue2) {
+                // Check each field that was specified (null means "any")
+                if (filterValue2.t !== null && obs.TT !== filterValue2.t) return false;
+                if (filterValue2.m !== null && obs.MM !== filterValue2.m) return false;
+                if (filterValue2.j !== null && obs.JJ !== filterValue2.j) return false;
             }
-        } else if (filterCriterion2 === 'month') {
-            if (filterValue2 && (obs.MM !== filterValue2.m || obs.JJ !== filterValue2.j)) {
-                return false;
-            }
-        } else if (filterCriterion2 === 'year') {
-            if (filterValue2 !== null && obs.JJ !== filterValue2) return false;
         } else if (filterCriterion2 === 'halo-type') {
             if (filterValue2 !== null && obs.EE !== filterValue2) return false;
         }
@@ -927,7 +919,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             }, 
             () => {
                 // Close button - return to main
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
         );
     }

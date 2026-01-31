@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         modal.show();
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     }
 
@@ -110,10 +110,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Populate year dropdown
     function populateYears() {
-        const startYear = 1950;
-        const endYear = 2049;
         
-        for (let year = startYear; year <= endYear; year++) {
+        for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
             const yy = String(year % 100).padStart(2, '0');
             const option = document.createElement('option');
             option.value = yy;
@@ -555,7 +553,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Event handlers
     if (btnCancel) {
         btnCancel.addEventListener('click', () => {
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     }
     
@@ -590,7 +588,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const escKeyHandler = (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     };
     
@@ -612,7 +610,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnStatsOk.onclick = () => {
                 const modal = bootstrap.Modal.getInstance(resultsModal);
                 if (modal) modal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             };
         }
         
@@ -622,7 +620,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 e.preventDefault();
                 const modal = bootstrap.Modal.getInstance(resultsModal);
                 if (modal) modal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
         };
         

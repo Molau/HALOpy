@@ -114,6 +114,7 @@
     "no_file_loaded": "Keine Datei geladen!",
     "error_loading": "Fehler beim Laden!",
     "error_loading_observers": "Fehler beim Laden der Beobachterliste",
+    "select_prompt": "Bitte auswählen",
     "select_observer": "Beobachter auswählen",
     "filter_value_required": "Bitte geben Sie einen Filterwert ein!"
   },
@@ -127,9 +128,7 @@
     "halo_type": "Haloart",
     "all_observers": "Alle Beobachter",
     "all_halo_types": "Alle Haloarten",
-    "date": "TT MM JJ (z.B. 15 06 1995)",
-    "month": "MM JJ (z.B. 06 1995)",
-    "year": "Jahr (z.B. 95 oder 1995)"
+    "date": "Datum"
   },
   "menu_titles": {
     "file": "Datei",
@@ -252,7 +251,6 @@
     "placeholder_site": "Ortsname eingeben...",
     "show_latest_only": "Nur den letzten Beobachtungsort anzeigen",
     "new_filter": "Neuer Filter",
-    "select_prompt": "Bitte auswählen...",
     "warning_select_value": "Bitte wählen Sie einen Wert aus.",
     "table_kk": "KK",
     "table_name": "Name",

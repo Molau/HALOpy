@@ -47,17 +47,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         modal.show();
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     }
 
-    // Populate year dropdown (1950-2049)
+    // Populate year dropdown (YEAR_MIN-YEAR_MAX)
     function populateYears() {
-        const startYear = 1950;
-        const endYear = 2049;
         if (!yearSelect) return;
-        yearSelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
-        for (let year = startYear; year <= endYear; year++) {
+        yearSelect.innerHTML = `<option value="">-- ${i18nStrings.messages.select_prompt} --</option>`;
+        for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
             const yy = String(year % 100).padStart(2, '0');
             const option = document.createElement('option');
             option.value = yy;
@@ -596,7 +594,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnOk.onclick = () => {
                 const resultsModal = bootstrap.Modal.getInstance(document.getElementById('results-modal'));
                 resultsModal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
             };
             
             // Focus OK button
@@ -1184,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Event Handlers
     if (btnCancel) {
         btnCancel.addEventListener('click', () => {
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     }
     
@@ -1205,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const escKeyHandler = (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     };
     

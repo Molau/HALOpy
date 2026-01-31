@@ -111,6 +111,7 @@
     "no_file_loaded": "No file loaded!",
     "error_loading": "Error loading",
     "error_loading_observers": "Error loading observer list",
+    "select_prompt": "Please select",
     "select_observer": "Select Observer",
     "no_data": "No data loaded! Please load a file first.",
     "empty_filter_result": "No observations match the filter criteria. This would create an empty file.",
@@ -126,9 +127,7 @@
     "halo_type": "Halo Type",
     "all_observers": "All Observers",
     "all_halo_types": "All Halo Types",
-    "date": "DD MM YY (e.g. 15 06 1995)",
-    "month": "MM YY (e.g. 06 1995)",
-    "year": "Year (e.g. 95 or 1995)"
+    "date": "Date"
 
   },
   "menu_titles": {
@@ -252,7 +251,6 @@
     "placeholder_site": "Enter site name...",
     "show_latest_only": "Show only the latest observation site",
     "new_filter": "New Filter",
-    "select_prompt": "Please select...",
     "warning_select_value": "Please choose a value.",
     "table_kk": "KK",
     "table_name": "Name",

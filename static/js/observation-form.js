@@ -764,8 +764,6 @@ class ObservationForm {
                 const jj = this.fields.jj.value ? parseInt(this.fields.jj.value) % 100 : null;
                 const mm = this.fields.mm.value ? parseInt(this.fields.mm.value) : null;
                 
-                console.log("🔍 DEBUG: g=0 trigger - kk=", kk, "jj=", jj, "mm=", mm);
-                
                 if (kk) {
                     // Fetch observer data
                     try {
@@ -773,21 +771,16 @@ class ObservationForm {
                         if (jj && mm) {
                             url += `&jj=${jj}&mm=${mm}`;
                         }
-                        console.log("🔍 DEBUG: Fetching GG from:", url);
                         const resp = await fetch(url);
-                        console.log("🔍 DEBUG: API response status:", resp.status, resp.ok);
                         if (resp.ok) {
                             const data = await resp.json();
-                            console.log("🔍 DEBUG: API response data:", data);
                             if (data.observer && data.observer.GH) {
                                 const gg = parseInt(data.observer.GH);  // Parse to int to remove leading zero
-                                console.log("🔍 DEBUG: Setting GG to:", gg);
                                 // GG constrained to single value (HBOrt)
                                 setOptionStates(this.fields.gg, ggOpts, [gg.toString()]);
                                 this.fields.gg.value = gg;
                                 this.fieldConstraints.GG = [gg.toString()];
                             } else {
-                                console.log("🔍 DEBUG: No GH found in response, clearing GG");
                                 setOptionStates(this.fields.gg, ggOpts, ['']);
                                 this.fields.gg.value = '';
                                 this.fieldConstraints.GG = [''];
@@ -841,6 +834,7 @@ class ObservationForm {
             } else if (g === 1) {
                 // g=1 (Auswärtsbeobachtung): GG = all available regions (manual entry)
                 enableAllOptions(ggOpts);
+                this.fields.gg.disabled = false;  // Enable field for manual entry
                 // Don't overwrite GG if editing
                 if (!this.originalObservation) {
                     this.fields.gg.value = '';
@@ -1034,7 +1028,6 @@ class ObservationForm {
                     // Sectors: ['any'] = active (can be filled) = NOT constrained (normal input)
                     // Sectors: [] = inactive (disabled) = constrained to empty
                     isConstrained = !(Array.isArray(constraints) && constraints.length > 0);
-                    if (window.DEBUG_SECTORS) console.log(`🔍 sectors: constraints=${JSON.stringify(constraints)}, isConstrained=${isConstrained}`);
                 } else if (selectEl && selectEl.options) {
                     // For SELECT elements: count total possible values
                     const totalOptions = Array.from(selectEl.options).filter(opt => opt.value !== '').length;
@@ -1666,11 +1659,14 @@ class ObservationForm {
                         window.haloData.isDirty = false;
                         sessionStorage.setItem('haloData', JSON.stringify(window.haloData));
                     }
-                    window.location.href = '/';
+                    window.navigateInternal('/');
                 }
             }
             this.modalElement.remove();
         });
+        
+        // Initial check of required fields (important for pre-filled forms in add mode)
+        checkRequired();
     }
     
     disableAllFields() {

@@ -1,5 +1,12 @@
 ﻿// HALO Web Application JavaScript
 
+// ============================================================================
+// GLOBAL CONSTANTS
+// ============================================================================
+// Year range for observer "seit" (since) dates and data ranges
+const YEAR_MIN = 1950;
+const YEAR_MAX = 2049;
+
 // Language will be loaded from server session on page load
 let currentLanguage = 'de';
 window.currentLanguage = currentLanguage;
@@ -125,8 +132,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// Flag to track internal navigation (prevents beforeunload warning for internal links)
+window.isInternalNavigation = false;
+
+// Helper function for internal navigation (sets flag to prevent beforeunload warning)
+window.navigateInternal = function(url) {
+    window.isInternalNavigation = true;
+    window.location.href = url;
+};
+
 // Warn user before closing browser tab/window if unsaved changes exist
+// Only triggers for browser close/refresh or external navigation, not internal navigation
 window.addEventListener('beforeunload', (event) => {
+    // Skip warning if this is internal navigation (same host)
+    if (window.isInternalNavigation) {
+        return;
+    }
+    
     // Check if there are unsaved changes
     if (window.haloData && window.haloData.isDirty) {
         // Modern browsers ignore custom messages for security reasons
@@ -134,6 +156,24 @@ window.addEventListener('beforeunload', (event) => {
         event.preventDefault();
         event.returnValue = ''; // Chrome requires returnValue to be set
         return ''; // Some browsers use the return value
+    }
+});
+
+// Intercept clicks on internal links to set navigation flag
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!link) return;
+    
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+    
+    // Check if it's an internal link (same origin or relative path)
+    const isInternal = href.startsWith('/') || 
+                      (link.hostname === window.location.hostname);
+    
+    if (isInternal) {
+        // Mark that we're doing internal navigation
+        window.isInternalNavigation = true;
     }
 });
 
@@ -362,7 +402,7 @@ function handleMenuAction(action) {
             
         // Analysis menu
         case 'analysis-create':
-            window.location.href = '/analysis';
+            window.navigateInternal('/analysis');
             break;
         case 'analysis-load':
             console.info('Load analysis not implemented');
@@ -396,13 +436,13 @@ function handleMenuAction(action) {
             
         // Output menu
         case 'output-monthly-report':
-            window.location.href = '/monthly-report';
+            window.navigateInternal('/monthly-report');
             break;
         case 'output-monthly-stats':
-            window.location.href = '/monthly-stats';
+            window.navigateInternal('/monthly-stats');
             break;
         case 'output-yearly-stats':
-            window.location.href = '/annual-stats';
+            window.navigateInternal('/annual-stats');
             break;
             
         // Help menu
@@ -544,15 +584,15 @@ async function showAddObservationDialogNumeric() {
     
     const modalHtml = `
         <div class="modal fade" id="add-observation-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-dialog modal-dialog-centered modal-lg" style="max-width: 900px;">
                 <div class="modal-content">
                     <div class="modal-header py-1">
                         <h6 class="modal-title mb-0">${i18nStrings.observations.add_observation}</h6>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body py-2">
-                        <div class="border rounded mb-2" style="font-family: var(--bs-font-monospace, monospace); white-space: pre; background: #f8f9fa; padding: 4px 6px; font-size: 14px; color: #000;"><div id="obs-guide-header" style="margin: 0; padding: 0; line-height: 1.4;">${i18nStrings.observations.input_pattern}</div><div id="obs-guide-entered" style="margin: 0; padding: 0; line-height: 1.4;"></div><div id="obs-guide-caret" style="color:#0d6efd; margin: 0; padding: 0; line-height: 1.4;"></div></div>
-                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" spellcheck="false" style="position: absolute; left: -9999px; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
+                        <div class="border rounded mb-2" style="font-family: var(--bs-font-monospace, monospace); white-space: pre; background: #f8f9fa; padding: 4px 6px; font-size: 14px; color: #000;"><div id="obs-guide-header" style="margin: 0; padding: 0; line-height: 1.4;">${i18nStrings.observations.input_pattern}</div><div id="obs-guide-entered" style="margin: 0; padding: 0; line-height: 1.4;"></div><div id="obs-guide-remarks" style="margin: 0; padding: 0; line-height: 1.4; display: none;"></div><div id="obs-guide-caret" style="color:#0d6efd; margin: 0; padding: 0; line-height: 1.4;"></div></div>
+                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" spellcheck="false" style="position: absolute; left: -9999px; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
                         <div id="obs-code-error" class="text-danger mt-1" style="display:none; font-size: 12px;"></div>
                     </div>
                     <div class="modal-footer py-1">
@@ -640,24 +680,53 @@ async function showAddObservationDialogNumeric() {
 
     function renderNumericGuide(s) {
         const enteredEl = document.getElementById('obs-guide-entered');
+        const remarksEl = document.getElementById('obs-guide-remarks');
         const caretEl = document.getElementById('obs-guide-caret');
-        const max = Math.min(s.length, 110);  // Extended to show sectors + remarks (50 + 60)
+        
+        // Split into main part (up to position 100) and overflow remarks (from position 100)
+        // First 50 chars = HALO key fields, next 50 chars = first part of remarks (same line)
+        const mainPart = s.substring(0, Math.min(s.length, 100));
+        const overflowPart = s.length > 100 ? s.substring(100) : '';
+        
+        // Format main part (HALO key fields up to sectors + first 50 chars of remarks)
         let formatted = '';
-        for (let i = 0; i < max; i++) {
-            formatted += s[i];
+        for (let i = 0; i < mainPart.length; i++) {
+            formatted += mainPart[i];
             // Add space after every 5 characters only up to position 34 (end of 8HHHH)
             if ((i + 1) % 5 === 0 && i < 34) formatted += ' ';
             // Add extra separator space after 8HHHH (pos 34) and after sectors (pos 49)
             if (i === 34 || i === 49) formatted += ' ';
         }
         enteredEl.textContent = formatted;
-        // caret position accounts for inserted spaces
-        const L = max;
-        let spacesBefore = L <= 34 ? Math.floor(L / 5) : Math.floor(34 / 5);
-        if (L > 34) spacesBefore += 1; // separator after 8HHHH
-        if (L > 49) spacesBefore += 1; // separator after sectors
-        const caretPos = L + spacesBefore;
-        caretEl.textContent = ' '.repeat(Math.max(caretPos, 0)) + '^';
+        
+        // Calculate indent for overflow line (should align with start of remarks = position 50)
+        // Position 50 comes after: 50 chars + spaces
+        // Spaces: 34/5 = 6 spaces up to pos 34, +1 after 8HHHH, +1 after sectors = 8 spaces total
+        const remarksIndent = 50 + 8; // 58 characters to align with start of remarks
+        
+        // Show overflow remarks on separate line if present (only if > 100 chars total)
+        if (overflowPart.length > 0) {
+            remarksEl.textContent = ' '.repeat(remarksIndent) + overflowPart;
+            remarksEl.style.display = 'block';
+        } else {
+            remarksEl.textContent = '';
+            remarksEl.style.display = 'none';
+        }
+        
+        // Position caret
+        const L = s.length;
+        if (L <= 100) {
+            // Caret in main part (first line)
+            let spacesBefore = L <= 34 ? Math.floor(L / 5) : Math.floor(34 / 5);
+            if (L > 34) spacesBefore += 1; // separator after 8HHHH
+            if (L > 49) spacesBefore += 1; // separator after sectors
+            const caretPos = L + spacesBefore;
+            caretEl.textContent = ' '.repeat(Math.max(caretPos, 0)) + '^';
+        } else {
+            // Caret in overflow line - position relative to start of overflow (position 100), plus indent
+            const overflowPos = L - 100;
+            caretEl.textContent = ' '.repeat(remarksIndent + overflowPos) + '^';
+        }
     }
 
     // Track which positions were auto-filled (to handle backspace correctly)
@@ -780,6 +849,13 @@ async function showAddObservationDialogNumeric() {
         // Only accept single character entries
         if (ev.key.length !== 1) return;
         const ch = ev.key;
+        
+        // Limit total length to 150 characters (50 HALO key + 100 remarks)
+        if (eing.length >= 150) {
+            ev.preventDefault();
+            return;
+        }
+        
         // Convert to lowercase in sector field (positions 36-50 need lowercase a-h)
         const inSectorField = eing.length >= 35 && eing.length < 50;
         // Allow space in 8HHHH field (positions 31-34 = HHHH part, position 30 is '8') for non-observed values
@@ -1198,7 +1274,7 @@ async function showAddObservationDialogNumeric() {
             modal.hide();
             
             // Show success notification
-            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Wait for modal to close, then ask if user wants to add another
             modalEl.addEventListener('hidden.bs.modal', async () => {
@@ -1265,7 +1341,7 @@ async function showAddObservationDialogMenu() {
             await triggerAutosave();
             
             // Show success notification
-            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Ask if user wants to add another observation
             const addAnother = await showAddAnotherObservationDialog();
@@ -1433,7 +1509,7 @@ function validateNumericProgress(s, observerCodes) {
         const mm = parseInt(s.slice(5,7),10);
         return mm>=1 && mm<=12 ? { ok: true } : { ok: false, backtrack: 1 };
     }
-    // 8-9 TT (01-31) � validate against month
+    // 8-9 TT (01-31) ? validate against month
     if (len === 8) return { ok: digit.test(s[7]) };
     if (len === 9) {
         const mm = parseInt(s.slice(5,7),10);
@@ -1712,7 +1788,7 @@ function parseNumericObservation(s) {
     // Validation rules
     // If C=0 or N=9, d values 0,1,2 are invalid
     if ((obs.C === 0 || obs.N === 9) && [0, 1, 2].includes(obs.d)) {
-        throw new Error(`Ung�ltiger d-Wert: ${obs.d}. Wenn C=0 oder N=9, sind nur d-Werte -1, -2, 4, 5, 6, 7 erlaubt.`);
+        throw new Error(`Ung?ltiger d-Wert: ${obs.d}. Wenn C=0 oder N=9, sind nur d-Werte -1, -2, 4, 5, 6, 7 erlaubt.`);
     }
     
     // Automatic rules
@@ -2124,7 +2200,7 @@ async function showModifySingleObservations(filterState) {
         }
         if (index >= filteredObs.length) {
             // All observations processed - return to main menu
-            window.location.href = '/';
+            window.navigateInternal('/');
             return;
         }
         
@@ -2137,7 +2213,7 @@ async function showModifySingleObservations(filterState) {
         // Show observation form directly with populated fields
         showObservationFormForEdit(obs, currentIndex + 1, filteredObs.length, () => {
             // After modification, return to main menu
-            window.location.href = '/';
+            window.navigateInternal('/');
         }, () => {
             // User chose to skip this observation - show next
             showObservationAt(currentIndex + 1);
@@ -2399,17 +2475,17 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-6">
                                 <div class="row g-1">
                                     <div class="col-6">
-                                        <label class="form-label">8HO (obere Lichts�ule)</label>
+                                        <label class="form-label">8HO (obere Lichts?ule)</label>
                                         <select class="form-select form-select-sm" id="group-ho">
                                             <option value="">--</option>
-                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}�</option>`).join('')}
+                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}?</option>`).join('')}
                                         </select>
                                     </div>
                                     <div class="col-6">
-                                        <label class="form-label">HU (untere Lichts�ule)</label>
+                                        <label class="form-label">HU (untere Lichts?ule)</label>
                                         <select class="form-select form-select-sm" id="group-hu">
                                             <option value="">--</option>
-                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}�</option>`).join('')}
+                                            ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}?</option>`).join('')}
                                         </select>
                                     </div>
                                 </div>
@@ -2473,7 +2549,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
         
         // Check if at least one field was filled
         if (Object.keys(updates).length === 0) {
-            showWarningModal('Bitte f�llen Sie mindestens ein Feld aus.');
+            showWarningModal('Bitte f?llen Sie mindestens ein Feld aus.');
             return;
         }
         
@@ -2542,7 +2618,7 @@ async function processBulkUpdate(filteredObs, updates) {
         } else {}
         
 
-        showMessage(`${filteredObs.length} Beobachtungen wurden erfolgreich ge�ndert.`, 'success');
+        showMessage(`${filteredObs.length} Beobachtungen wurden erfolgreich ge?ndert.`, 'success');
         
         // Reload the page to refresh all displays
         setTimeout(() => {
@@ -2582,7 +2658,7 @@ async function showDeleteObservationsDialog() {
         },
         () => {
             // Cancel returns to main
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     );
 }
@@ -2600,7 +2676,7 @@ async function showDeleteSingleObservations(filterState) {
 
     const showNextObservation = async () => {
         if (currentIndex >= filteredObs.length) {
-            window.location.href = '/';
+            window.navigateInternal('/');
             return;
         }
 
@@ -2650,7 +2726,7 @@ async function showDeleteSingleObservations(filterState) {
                 currentIndex += 1;
                 setTimeout(() => showNextObservation(), 1500);
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
         }, () => {
             // No -> skip to next observation
@@ -2658,7 +2734,7 @@ async function showDeleteSingleObservations(filterState) {
             showNextObservation();
         }, () => {
             // Cancel -> return to main
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     };
 
@@ -2752,8 +2828,11 @@ async function applyFilterToObservations(filterState) {
         
         // Second filter criterion
         if (filterState.criterion2 === 'date') {
-            if (filterState.value2 && (obs.TT !== filterState.value2.t || obs.MM !== filterState.value2.m || obs.JJ !== filterState.value2.j)) {
-                return false;
+            if (filterState.value2) {
+                // Only enforce fields that were selected (null means "any")
+                if (filterState.value2.t !== null && obs.TT !== filterState.value2.t) return false;
+                if (filterState.value2.m !== null && obs.MM !== filterState.value2.m) return false;
+                if (filterState.value2.j !== null && obs.JJ !== filterState.value2.j) return false;
             }
         } else if (filterState.criterion2 === 'month') {
             if (filterState.value2 && (obs.MM !== filterState.value2.m || obs.JJ !== filterState.value2.j)) {
@@ -2827,7 +2906,7 @@ async function showModifyConfirmDialog(obs, currentNum, totalNum, callback) {
             answered = true;
             modal.hide();
             callback(null);
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     };
     document.addEventListener('keydown', escHandler);
@@ -2837,14 +2916,14 @@ async function showModifyConfirmDialog(obs, currentNum, totalNum, callback) {
         document.removeEventListener('keydown', escHandler);
         if (!answered) {
             callback(null);
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     });
 }
 
-// Format observation for display in confirmation dialog (Men�eingabe format)
+// Format observation for display in confirmation dialog (Men?eingabe format)
 function formatObservationForDisplay(obs) {
-    // Use the Men�eingabe (menu input) format with labeled fields
+    // Use the Men?eingabe (menu input) format with labeled fields
     let html = '';
     
     // Observer
@@ -2874,7 +2953,7 @@ function formatObservationForDisplay(obs) {
         html += `<strong>${i18nStrings.fields.cirrus_density}:</strong> ${i18nStrings.cirrus_density[obs.d]}<br>`;
     }
     
-    // Duration (DD � 10 = minutes)
+    // Duration (DD ? 10 = minutes)
     if (obs.DD !== null && obs.DD !== -1) {
         html += `<strong>${i18nStrings.fields.duration}:</strong> ${obs.DD * 10} min<br>`;
     }
@@ -3090,7 +3169,7 @@ async function showDisplayObservationsDialog() {
                     // Zahleneingaben - show compact list in modal
                     showDisplayCompactList(filterState);
                 } else {
-                    // Men�eingaben - show detail view one-by-one
+                    // Men?eingaben - show detail view one-by-one
                     showDisplaySingleObservations(filterState);
                 }
             } catch (error) {// Default to detail view on error
@@ -3207,7 +3286,7 @@ async function showDisplayCompactList(filterState) {
             e.preventDefault();
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     };
     
@@ -3219,7 +3298,7 @@ async function showDisplayCompactList(filterState) {
     modalEl.addEventListener('hidden.bs.modal', () => {
         document.removeEventListener('keydown', keyHandler);
         modalEl.remove();
-        window.location.href = '/';
+        window.navigateInternal('/');
     });
     
     // Show modal and display first page
@@ -3398,7 +3477,7 @@ async function showDisplaySingleObservations(filterState) {
     
     const showNext = () => {
         if (currentIndex >= filteredObs.length) {
-            window.location.href = '/';
+            window.navigateInternal('/');
             return;
         }
         
@@ -3415,7 +3494,7 @@ async function showDisplaySingleObservations(filterState) {
             }
         }, () => {
             // Cancel/Close - return to main
-            window.location.href = '/';
+            window.navigateInternal('/');
         });
     };
     
@@ -3557,7 +3636,7 @@ async function showStartupFileDialog() {
                             body: JSON.stringify({enabled: true, file_path: file.name})
                         });
                         // Show success message
-                        showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_changed}`);
+                        showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_changed}`);
                     }
                 };
                 fileInput.click();
@@ -3569,7 +3648,7 @@ async function showStartupFileDialog() {
                     body: JSON.stringify({enabled: false, file_path: ''})
                 });
                 // Show success message
-                showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_disabled}`);
+                showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_disabled}`);
             }
         });
 
@@ -3823,7 +3902,7 @@ async function showSelectDialog() {
         switch (paramCode) {
             case 'JJ':
                 const years = [];
-                for (let i = 1950; i <= 2049; i++) {
+                for (let i = YEAR_MIN; i <= YEAR_MAX; i++) {
                     years.push({ value: i, display: String(i) });
                 }
                 return years;
@@ -3853,7 +3932,7 @@ async function showSelectDialog() {
             case 'SH':
                 const altitudes = [];
                 for (let i = -10; i <= 90; i++) {
-                    altitudes.push({ value: i, display: String(i) + '�' });
+                    altitudes.push({ value: i, display: String(i) + '?' });
                 }
                 return altitudes;
             
@@ -4352,7 +4431,7 @@ async function showSelectDialog() {
                 bsLoadingModal.hide();
                 loadingModal.remove();
                 modal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
                 return;
             }
             
@@ -4364,11 +4443,11 @@ async function showSelectDialog() {
                     .replace('{filename}', filename);
                 
                 // Show success alert at top of window
-                showNotification(`<strong>?</strong> ${message}`);
+                showNotification(`<strong>✓</strong> ${message}`);
                 
                 // Auto-remove after 3 seconds and return to main
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.navigateInternal('/');
                 }, 3000);
             }
             
@@ -4389,7 +4468,7 @@ async function showSelectDialog() {
                 const error = await saveResponse.json();
                 showWarningModal(error.error);
                 modal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
                 return;
             }
             
@@ -4436,7 +4515,7 @@ async function showSelectDialog() {
                             const error = await overwriteResponse.json();
                             showWarningModal(error.error);
                             modal.hide();
-                            window.location.href = '/';
+                            window.navigateInternal('/');
                             return;
                         }
                         
@@ -4476,7 +4555,7 @@ async function showSelectDialog() {
                     () => {
                         // User cancelled - hide modal and return to main
                         modal.hide();
-                        window.location.href = '/';
+                        window.navigateInternal('/');
                     },
                     {
                         cancel: i18nStrings.common.no,
@@ -4490,7 +4569,7 @@ async function showSelectDialog() {
             if (!saveResult.success) {
                 showWarningModal(saveResult.error);
                 modal.hide();
-                window.location.href = '/';
+                window.navigateInternal('/');
                 return;
             }
             
@@ -4534,7 +4613,7 @@ async function showSelectDialog() {
             bsLoadingModal.hide();
             loadingModal.remove();
             modal.hide();showWarningModal(error.message);
-            window.location.href = '/';
+            window.navigateInternal('/');
         }
     }
 
@@ -5567,13 +5646,13 @@ async function continueLoadFile() {
             }
             
             // Show success message
-            showNotification(`<strong>?</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
+            showNotification(`<strong>✓</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
         } catch (error) {
             bsModal.hide();
             setTimeout(() => {
                 loadingModal.remove();
             }, 300);
-            showNotification(`<strong>?</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
         }
     });
     
@@ -5684,10 +5763,11 @@ async function continueMergeFile() {
             
             // Show success message with count of added observations
             // (addedCount already computed above)
-            showNotification(`<strong>?</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
+            showNotification(`<strong>✓</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
         } catch (error) {
             bsModal.hide();
-            setTimeout(() => loadingModal.remove(), 300);showNotification(`<strong>?</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
+            setTimeout(() => loadingModal.remove(), 300);
+            showNotification(`<strong>✗</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
             document.body.appendChild(errorMsg);
             setTimeout(() => errorMsg.remove(), 5000);
         }
@@ -5749,7 +5829,7 @@ async function checkAndDisplayFileInfo() {
                 
                 // Show notification if file was auto-loaded
                 if (status.auto_loaded) {
-                    showNotification(`<strong>?</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
+                    showNotification(`<strong>✓</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
                 }
             } else {
                 // No data loaded
@@ -5914,9 +5994,9 @@ async function showDatumDialog() {
             monthOptions.push(`<option value="${m}" ${m === currentMonth ? 'selected' : ''}>${monthName}</option>`);
         }
         
-        // Generate year options (1950-2049)
+        // Generate year options (YEAR_MIN-YEAR_MAX)
         const yearOptions = [];
-        for (let y = 1950; y <= 2049; y++) {
+        for (let y = YEAR_MIN; y <= YEAR_MAX; y++) {
             yearOptions.push(`<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`);
         }
         
@@ -6351,9 +6431,9 @@ async function showAddObserverDialog(formData = null) {
         return `<option value="${month}">${monthName}</option>`;
     }).join('');
     
-    // Build year options (1950 to 2049)
+    // Build year options (YEAR_MIN to YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = 1950 + i;
+        const year = YEAR_MIN + i;
         const yearShort = year % 100;
         return `<option value="${yearShort}">${year}</option>`;
     }).join('');
@@ -6453,7 +6533,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="obs-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -6470,7 +6550,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="obs-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -6505,7 +6585,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="obs-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -6522,7 +6602,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="obs-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -6698,7 +6778,7 @@ async function showAddObserverDialog(formData = null) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
             
         } catch (e) {
             const formData = observerData;
@@ -6840,10 +6920,10 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                 <td>${aktivDisplay}</td>
                 <td>${site.HbOrt}</td>
                 <td>${site.GH.padStart(2, '0')}</td>
-                <td>${site.HLG}� ${site.HLM}' ${site.HOW} / ${site.HBG}� ${site.HBM}' ${site.HNS}</td>
+                <td>${site.HLG}? ${site.HLM}' ${site.HOW} / ${site.HBG}? ${site.HBM}' ${site.HNS}</td>
                 <td>${site.NbOrt}</td>
                 <td>${site.GN.padStart(2, '0')}</td>
-                <td>${site.NLG}� ${site.NLM}' ${site.NOW} / ${site.NBG}� ${site.NBM}' ${site.NNS}</td>
+                <td>${site.NLG}? ${site.NLM}' ${site.NOW} / ${site.NBG}? ${site.NBM}' ${site.NNS}</td>
             </tr>`;
     }).join('');
     
@@ -6925,7 +7005,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_deleted}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
             
             // Reload page after 2 seconds if on observers page
             setTimeout(() => {
@@ -7182,7 +7262,7 @@ function showEditBaseDataDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_updated}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
             
             // Reload the page if we're on the observers page
             setTimeout(() => {
@@ -7215,9 +7295,9 @@ async function showAddSiteDialog(observer) {
         return `<option value="${monthNum}">${monthName}</option>`;
     }).join('');
     
-    // Generate year options (1950-2049)
+    // Generate year options (YEAR_MIN-YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = 1950 + i;
+        const year = YEAR_MIN + i;
         return `<option value="${year}">${year}</option>`;
     }).join('');
     
@@ -7292,7 +7372,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="site-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -7309,7 +7389,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="site-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -7344,7 +7424,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="site-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -7361,7 +7441,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="site-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -7457,7 +7537,7 @@ async function showAddSiteDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -7505,9 +7585,9 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
         return `<option value="${monthNum}">${monthName}</option>`;
     }).join('');
     
-    // Generate year options (1950-2049)
+    // Generate year options (YEAR_MIN-YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = 1950 + i;
+        const year = YEAR_MIN + i;
         return `<option value="${year}">${year}</option>`;
     }).join('');
     
@@ -7583,7 +7663,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-hlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="confirm-edit-site-hlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7600,7 +7680,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-hbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="confirm-edit-site-hbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7635,7 +7715,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-nlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="confirm-edit-site-nlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7652,7 +7732,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-nbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="confirm-edit-site-nbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -7749,9 +7829,9 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
         return `<option value="${monthNum}">${monthName}</option>`;
     }).join('');
     
-    // Generate year options (1950-2049)
+    // Generate year options (YEAR_MIN-YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = 1950 + i;
+        const year = YEAR_MIN + i;
         return `<option value="${year}">${year}</option>`;
     }).join('');
     
@@ -7826,7 +7906,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="edit-site-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -7843,7 +7923,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="edit-site-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -7878,7 +7958,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="edit-site-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -7895,7 +7975,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="edit-site-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -8025,7 +8105,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_updated}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -8078,9 +8158,9 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
         return `<option value="${monthNum}">${monthName}</option>`;
     }).join('');
     
-    // Generate year options (1950-2049)
+    // Generate year options (YEAR_MIN-YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = 1950 + i;
+        const year = YEAR_MIN + i;
         return `<option value="${year}">${year}</option>`;
     }).join('');
     
@@ -8155,7 +8235,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-hlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="delete-site-hlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8172,7 +8252,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-hbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="delete-site-hbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8207,7 +8287,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-nlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="delete-site-nlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8224,7 +8304,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-nbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">�</span>
+                                        <span class="input-group-text">?</span>
                                         <select class="form-select" id="delete-site-nbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8319,7 +8399,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_deleted}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {

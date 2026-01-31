@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('filter-type').addEventListener('change', handleFilterTypeChange);
     document.getElementById('apply-filter').addEventListener('click', applyFilter);
     document.getElementById('cancel-filter').addEventListener('click', () => {
-        window.location.href = '/';
+        window.navigateInternal('/');
     });
     
     // Pagination event listeners
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Exit button
     document.getElementById('btn-exit-observers').addEventListener('click', () => {
-        window.location.href = '/';
+        window.navigateInternal('/');
     });
     
     // ESC key to return to main menu
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // No modals open - exit to main page
                 e.preventDefault();
                 e.stopPropagation();
-                window.location.href = '/';
+                window.navigateInternal('/');
             }
             // If modal is open, let Bootstrap handle ESC to close it
         }
@@ -81,7 +81,6 @@ async function loadDropdownData() {
 function populateDropdowns() {
     // Populate observers dropdown
     const kkSelect = document.getElementById('filter-select-kk');
-    const prompt = (i18nStrings.observers.select_prompt) ? i18nStrings.observers.select_prompt : 'Bitte auswählen...';
     kkSelect.innerHTML = `<option value="">${prompt}</option>`;
     observersList.forEach(obs => {
         // Skip observers with missing data
@@ -96,7 +95,7 @@ function populateDropdowns() {
     
     // Populate regions dropdown
     const regionSelect = document.getElementById('filter-select-region');
-    regionSelect.innerHTML = `<option value="">${prompt}</option>`;
+    regionSelect.innerHTML = `<option value="">${i18nStrings.messages.select_prompt}</option>`;
     regionsList.forEach(region => {
         const option = document.createElement('option');
         option.value = region.number;
