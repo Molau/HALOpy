@@ -201,10 +201,10 @@ class ObservationForm {
             return `<option value="${obs.KK}" ${selected}>${obs.KK} - ${obs.VName || ''} ${obs.NName || ''}</option>`;
         }).join('');
         
-        // Build year options (1950-2049)
+        // Build year options ((YEAR_MIN-YEAR_MAX)
         const yearOptions = Array.from({length: 100}, (_, i) => {
-            const year = 50 + i;
-            const displayYear = year < 50 ? 2000 + year : 1900 + year;
+            const year = (YEAR_MIN-1900) + i;
+            const displayYear = year < (YEAR_MIN-1900) ? 2000 + year : 1900 + year;
             return `<option value="${year}">${displayYear}</option>`;
         }).join('');
         
@@ -1770,7 +1770,7 @@ class ObservationForm {
         // Year: CSV stores 0-99, dropdown uses 50-149 (50-99=1950-1999, 0-49=2000-2049)
         if (obs.JJ !== undefined && obs.JJ !== null && obs.JJ !== '') {
             const jj = parseInt(obs.JJ);
-            this.fields.jj.value = jj < 50 ? jj + 100 : jj;  // 5 -> 105 (2005), 95 -> 95 (1995)
+            this.fields.jj.value = jj < (YEAR_MIN-1900) ? jj + 100 : jj;  // 5 -> 105 (2005), 95 -> 95 (1995)
         } else {
             this.fields.jj.value = '';
         }

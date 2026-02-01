@@ -4,8 +4,8 @@
 // GLOBAL CONSTANTS
 // ============================================================================
 // Year range for observer "seit" (since) dates and data ranges
-const YEAR_MIN = 1950;
-const YEAR_MAX = 2049;
+const YEAR_MIN = 1980;
+const YEAR_MAX = 2079;
 
 // Language will be loaded from server session on page load
 let currentLanguage = 'de';
@@ -2274,10 +2274,10 @@ async function showGroupModifyDialogMenu(filteredObs) {
         return `<option value="${obs.KK}">${obs.KK} - ${obs.VName} ${obs.NName}</option>`;
     }).join('');
     
-    // Build year options (1950-2049)
+    // Build year options (1980-2079)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = 50 + i; // 50-149
-        const displayYear = year < 50 ? 2000 + year : 1900 + year;
+        const year = (YEAR_MIN-1900) + i; // 50-149
+        const displayYear = year < (YEAR_MIN-1900) ? 2000 + year : 1900 + year;
         return `<option value="${year}">${displayYear}</option>`;
     }).join('');
     
@@ -3863,12 +3863,6 @@ async function showSelectDialog() {
                                 </label>
                             </div>
                         </div>
-
-                        <!-- New filename input -->
-                        <div class="mb-3">
-                            <label for="select-filename" class="form-label">${i18nStrings.observations.new_filename}:</label>
-                            <input type="text" id="select-filename" class="form-control" placeholder="${i18nStrings.messages.enter_filename_placeholder}">
-                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
@@ -4248,26 +4242,11 @@ async function showSelectDialog() {
     btnOk.addEventListener('click', () => {
         const filterType = selectFilter.value;
         const action = document.querySelector('input[name="select-action"]:checked').value;
-        let filename = document.getElementById('select-filename').value.trim();
 
         if (!filterType) {
             showWarningModal(i18nStrings.observations.select_no_filter);
             return;
         }
-
-        if (!filename) {
-            showWarningModal(i18nStrings.messages.please_enter_filename);
-            return;
-        }
-        
-        // Ensure filename has .csv extension
-        if (!filename.toLowerCase().endsWith('.csv')) {
-            filename = filename + '.csv';
-        }
-
-
-
-
 
 
         
@@ -4309,10 +4288,8 @@ async function showSelectDialog() {
 
         }
         
-
-        
         // Check if current file has unsaved changes
-        checkDirtyAndProceed(() => performSelection(filterType, action, filename, modal));
+        checkDirtyAndProceed(() => performSelection(filterType, action, modal));
     });
     
     async function checkDirtyAndProceed(callback) {
@@ -4349,7 +4326,7 @@ async function showSelectDialog() {
         }
     }
     
-    async function performSelection(filterType, action, filename, modal) {
+    async function performSelection(filterType, action, modal) {
         // Create loading modal
         const loadingModal = document.createElement('div');
         loadingModal.className = 'modal fade';
@@ -4435,194 +4412,47 @@ async function showSelectDialog() {
                 return;
             }
             
-            // Function to show selection results
-            function showSelectionResults(filename, keptCount, deletedCount) {
-                const message = i18nStrings.messages.selection_result
-                    .replace('{kept}', keptCount)
-                    .replace('{deleted}', deletedCount)
-                    .replace('{filename}', filename);
-                
-                // Show success alert at top of window
-                showNotification(`<strong>✓</strong> ${message}`);
-                
-                // Auto-remove after 3 seconds and return to main
-                setTimeout(() => {
-                    window.navigateInternal('/');
-                }, 3000);
-            }
-            
-            // Save filtered observations to new file
-            const saveResponse = await fetch('/api/observations/save', {
+            // Load filtered observations into server memory
+            const replaceResponse = await fetch('/api/observations/replace', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    filename: filename,
-                    observations: filteredObs
-                })
+                body: JSON.stringify({observations: filteredObs})
             });
             
             bsLoadingModal.hide();
             loadingModal.remove();
             
-            if (!saveResponse.ok) {
-                const error = await saveResponse.json();
-                showWarningModal(error.error);
+            if (!replaceResponse.ok) {
+                const error = await replaceResponse.json();
+                showWarningModal(error.error || 'Failed to load filtered observations');
                 modal.hide();
-                window.navigateInternal('/');
                 return;
             }
             
-            const saveResult = await saveResponse.json();
+            // Update local data
+            window.haloData.observations = filteredObs;
+            window.haloData.isDirty = true;
+            saveHaloDataToSession();
             
-            if (saveResult.exists) {
-                // File exists - ask for overwrite confirmation
-                showConfirmDialog(
-                    i18nStrings.messages.file_exists_title,
-                    i18nStrings.messages.file_exists_message,
-                    async () => {
-                        // User confirmed overwrite
-                        // Recreate loading modal
-                        const newLoadingModal = document.createElement('div');
-                        newLoadingModal.className = 'modal fade';
-                        newLoadingModal.innerHTML = `
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content">
-                                    <div class="modal-body text-center py-4">
-                                        <div class="spinner-border text-primary mb-3" role="status">
-                                            <span class="visually-hidden">${i18nStrings.messages.loading_spinner}</span>
-                                        </div>
-                                        <p class="mb-0">${i18nStrings.messages.saving}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        document.body.appendChild(newLoadingModal);
-                        const newBsLoadingModal = new bootstrap.Modal(newLoadingModal, {backdrop: 'static', keyboard: false});
-                        newBsLoadingModal.show();
-                        const overwriteResponse = await fetch('/api/observations/save', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                filename: filename,
-                                observations: filteredObs,
-                                overwrite: true
-                            })
-                        });
-                        newBsLoadingModal.hide();
-                        newLoadingModal.remove();
-                        
-                        if (!overwriteResponse.ok) {
-                            const error = await overwriteResponse.json();
-                            showWarningModal(error.error);
-                            modal.hide();
-                            window.navigateInternal('/');
-                            return;
-                        }
-                        
-                        const result = await overwriteResponse.json();
-                        
-                        // Load the filtered file into memory so we can continue working with it
-                        try {
-                            const loadResponse = await fetch(`/api/file/load/${encodeURIComponent(filename)}`);
-                            
-                            if (loadResponse.ok) {
-                                const loadResult = await loadResponse.json();
-                                
-                                // Check if file was converted from legacy format
-                                if (loadResult.converted) {
-                                    showSuccessModal(
-                                        i18nStrings.upload_download.legacy_format_converted_title,
-                                        i18nStrings.upload_download.legacy_format_converted_message
-                                    );
-                                }
-                                
-                                // Update file info display
-                                if (window.updateFileInfoDisplay) {
-                                    window.updateFileInfoDisplay(filename, loadResult.count || keptCount);
-                                }
-                                // Update haloData
-                                window.haloData = {
-                                    fileName: filename,
-                                    isLoaded: true,
-                                    isDirty: false,
-                                    observations: filteredObs
-                                };
-                            }
-                        } catch (loadError) {}
-                        
-                        showSelectionResults(filename, keptCount, deletedCount);
-                    },
-                    () => {
-                        // User cancelled - hide modal and return to main
-                        modal.hide();
-                        window.navigateInternal('/');
-                    },
-                    {
-                        cancel: i18nStrings.common.no,
-                        confirm: i18nStrings.common.yes
-                    }
-                );
-                return;
-            }
+            // Update UI
+            updateFileInfoDisplay(window.haloData.fileName, keptCount);
             
-            // Check if save was successful
-            if (!saveResult.success) {
-                showWarningModal(saveResult.error);
-                modal.hide();
-                window.navigateInternal('/');
-                return;
-            }
+            // Close modal
+            modal.hide();
             
-            const result = saveResult;
-            
-            // Load the filtered file into memory so we can continue working with it
-            try {
-                const loadResponse = await fetch(`/api/file/load/${encodeURIComponent(filename)}`, {
-                    method: 'POST'
-                });
-                
-                if (loadResponse.ok) {
-                    const loadResult = await loadResponse.json();
-                    
-                    // Check if file was converted from legacy format
-                    if (loadResult.converted) {
-                        showSuccessModal(
-                            i18nStrings.upload_download.legacy_format_converted_title,
-                            i18nStrings.upload_download.legacy_format_converted_message
-                        );
-                    }
-                    
-                    // Update file info display
-                    if (window.updateFileInfoDisplay) {
-                        window.updateFileInfoDisplay(filename, loadResult.count || keptCount);
-                    }
-                    // Update haloData
-                    window.haloData = {
-                        fileName: filename,
-                        isLoaded: true,
-                        isDirty: false,
-                        observations: filteredObs
-                    };
-                }
-            } catch (loadError) {}
-            
-            // Show selection results
-            showSelectionResults(filename, keptCount, deletedCount);
+            // Show success notification
+            const message = i18nStrings.messages.selection_result
+                .replace('{kept}', keptCount)
+                .replace('{deleted}', deletedCount);
+            showNotification(`<strong>✓</strong> ${message}`, 'success', 5000);
             
         } catch (error) {
             bsLoadingModal.hide();
             loadingModal.remove();
-            modal.hide();showWarningModal(error.message);
-            window.navigateInternal('/');
+            modal.hide();
+            showWarningModal(error.message);
         }
     }
-
-    // Handle Enter key on filename input
-    document.getElementById('select-filename').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            btnOk.click();
-        }
-    });
 
     // Handle ESC key
     modalEl.addEventListener('keydown', (e) => {
@@ -4730,20 +4560,48 @@ async function saveFile() {
             return;
         }
         
-        const response = await fetch('/api/file/save', {method: 'POST'});
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
-            window.haloData.isDirty = false;
-            // Use count from server response, not local array length
-            updateFileInfoDisplay(result.filename, result.count);
+        // Use File System Access API for native save dialog
+        try {
+            const fileHandle = await window.showSaveFilePicker({
+                suggestedName: status.filename,
+                types: [{
+                    description: 'CSV Files',
+                    accept: {'text/csv': ['.csv']}
+                }]
+            });
             
-            // Clean up autosave file
-            await fetch('/api/file/cleanup_autosave', {method: 'POST'});
+            // Get chosen filename from fileHandle
+            const newFilename = fileHandle.name;
             
-            showMessage(result.message, 'success');
-        } else {
-            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            // Get file content from server
+            const response = await fetch('/api/file/save', {method: 'POST'});
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                
+                // Write to selected file
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                
+                window.haloData.isDirty = false;
+                window.haloData.fileName = newFilename;
+                updateFileInfoDisplay(newFilename, status.count);
+                
+                // Clean up autosave file
+                await fetch('/api/file/cleanup_autosave', {method: 'POST'});
+                
+                showNotification(`<strong>✓</strong> ${newFilename} gespeichert`, 'success');
+            } else {
+                const result = await response.json();
+                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                // User cancelled the file picker
+                return;
+            }
+            throw err;
         }
     } catch (error) {
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);

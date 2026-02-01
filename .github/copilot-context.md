@@ -28,7 +28,34 @@
 
 ## Core Principles
 
-### 0. No Automated String Replacement Across Multiple Files - Decision #027
+### 0. Git Restore Safety Rule - Decision #028
+- **Date**: 2026-02-01
+- **Status**: ✓ Approved
+- **Core Rule**: NEVER use `git checkout` or `git restore` to overwrite entire working files
+- **Critical Principle**: Always preserve existing work - lost updates are unacceptable
+- **FORBIDDEN Commands**:
+  - ✗ `git checkout HEAD -- filename.ext` (overwrites entire file)
+  - ✗ `git restore filename.ext` (overwrites entire file)
+  - ✗ Any git command that replaces working file content completely
+- **REQUIRED Workflow for Git Restore**:
+  1. ✓ **Check what will be lost**: `git diff filename.ext` to see all changes
+  2. ✓ **Save to temp file**: `git show HEAD:path/to/file > temp_restored.ext`
+  3. ✓ **Extract ONLY needed parts**: Read temp file, copy specific sections
+  4. ✓ **Apply targeted fixes**: Use `replace_string_in_file` to fix specific issues
+  5. ✓ **Delete temp file**: Clean up after extraction
+- **Rationale**:
+  - Git restore of entire files causes "lost updates" - hours of work disappear
+  - Developer must manually test everything again
+  - Violates Decision #026 (Code Modification Policy)
+  - Creates frustration and wastes time
+  - Trust is broken when work is lost
+- **Examples**:
+  - ✗ **WRONG**: `git checkout HEAD -- resources/strings_de.json` → all recent changes lost
+  - ✓ **CORRECT**: `git show HEAD:resources/strings_de.json > temp_strings_de.json` → extract specific strings → apply with replace_string_in_file
+- **Exception**: Only when user explicitly requests "restore entire file from git"
+- **Impact**: CRITICAL - prevents catastrophic data loss and maintains developer trust
+
+### 1. No Automated String Replacement Across Multiple Files - Decision #027
 - **Date**: 2026-01-31
 - **Status**: ✓ Approved
 - **Core Rule**: NEVER use regex-based string replacement across multiple files without manual verification
@@ -209,11 +236,12 @@
   - ✓ **ALL help text, descriptions, explanations**
   - ✓ **ALL words used in UI logic**: conjunctions ("und"/"and"), articles, prepositions
   - ✓ **Rule of thumb**: If it's a word or text visible to users → i18n, no exceptions
-- **What CAN stay hardcoded** (ONLY technical identifiers):
+- **What CAN stay hardcoded** (ONLY technical identifiers and developer output):
   - ✓ Technical data format identifiers: `KKOJJ MMTTg`, `ZZZZd DDNCc` (field codes)
   - ✓ Pseudographic/box-drawing characters: `║`, `╔`, `═`, `├`, `─` (table structure)
   - ✓ Field position markers in technical output (when reproducing original format exactly)
-  - ✓ **Critical rule**: If it's NOT a data format identifier → it MUST be in i18n!
+  - ✓ **Console/Debug output**: `throw new Error('...')`, `console.log('...')`, `console.error('...')` (for developers, not end-users)
+  - ✓ **Critical rule**: If it's NOT a data format identifier OR developer/debug output → it MUST be in i18n!
 - **Fail Fast Rule** (Decision #015):
   - No fallbacks: `i18n?.field || 'default'` is **FORBIDDEN**
   - All i18n fields accessed directly: `i18n.field`
@@ -221,10 +249,12 @@
   - This prevents silent failures and ensures consistency
 - **Examples**:
   - ✓ **MUST be i18n**: "Tag", "Sonne", "Monatsmeldung", "Fehler beim Laden", "und", "and"
-  - ✓ **Can be hardcoded**: `║ KKOJJ MMTTg ║`, `╠═══╬═══╣`, `KKOJJ MMTTg ZZZZd DDNCc`
+  - ✓ **Can be hardcoded (technical)**: `║ KKOJJ MMTTg ║`, `╠═══╬═══╣`, `KKOJJ MMTTg ZZZZd DDNCc`
+  - ✓ **Can be hardcoded (debug)**: `throw new Error('API failed')`, `console.log('Debug: value=', x)`
   - ✗ **WRONG**: `Tag` hardcoded in JavaScript for HTML output
   - ✗ **WRONG**: `i18n.months || ['Jan', 'Feb', ...]` fallback pattern
   - ✗ **WRONG**: Hardcoded "und" or "and" instead of `i18n.common.and`
+  - ✗ **WRONG**: User-facing error message like `alert('Error loading file')` without i18n
 - **Implementation Guidelines**:
   - **Default assumption**: ALL text → i18n (unless proven to be technical identifier)
   - If it's a word humans read → i18n key

@@ -446,6 +446,35 @@ def get_observation(obs_id: int) -> Dict[str, Any]:
     return jsonify({'error': 'Not implemented yet'}), 501
 
 
+@api_blueprint.route('/observations/replace', methods=['POST'])
+def replace_observations() -> Dict[str, Any]:
+    """Replace all observations in memory with provided list.
+    
+    Used by Datei -> Selektieren to load filtered observations before save.
+    """
+    from flask import current_app, request
+    from halo.models.types import Observation
+    
+    data = request.get_json() or {}
+    observations_data = data.get('observations', [])
+    
+    # Convert observation dicts to Observation objects
+    observations = []
+    for obs_dict in observations_data:
+        obs = Observation()
+        for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
+            if field in obs_dict and obs_dict[field] is not None:
+                setattr(obs, field, obs_dict[field])
+        obs.sectors = obs_dict.get('sectors', '') or ''
+        obs.remarks = obs_dict.get('remarks', '') or ''
+        observations.append(obs)
+    
+    current_app.config['OBSERVATIONS'] = observations
+    current_app.config['DIRTY'] = True
+    
+    return jsonify({'success': True, 'count': len(observations)})
+
+
 @api_blueprint.route('/observations/save', methods=['POST'])
 def save_observations() -> Dict[str, Any]:
     """Save filtered observations to a new file.
@@ -768,17 +797,11 @@ def load_file_from_browser() -> Dict[str, Any]:
             # Use unified load logic with legacy format detection
             observations, needs_conversion = ObservationCSV.read_observations(temp_path)
             
-            # Save to data folder (convert if needed)
-            datapath = Path(__file__).parent.parent.parent.parent / 'data'
-            target_path = datapath / file.filename
-            
-            # Always save to data folder (in modern format if conversion needed)
-            ObservationCSV.write_observations(target_path, observations)
-            
-            # Store in app config
+            # Store in app config (do NOT auto-save to data folder)
+            # Converted data stays in memory only until user explicitly saves
             current_app.config['LOADED_FILE'] = file.filename
             current_app.config['OBSERVATIONS'] = observations
-            current_app.config['DIRTY'] = False
+            current_app.config['DIRTY'] = needs_conversion  # Mark as dirty if conversion needed
             
             return jsonify({
                 'success': True,
@@ -905,29 +928,65 @@ def load_file(filename: str) -> Dict[str, Any]:
 
 @api_blueprint.route('/file/save', methods=['POST'])
 def save_file() -> Dict[str, Any]:
-    """Save current observations to disk - implements 'Datei -> Speichern'"""
-    from flask import current_app
-    import os
+    """Save current observations to disk - triggers browser download"""
+    from flask import current_app, send_file
+    import io
     
     filename = current_app.config.get('LOADED_FILE')
     if not filename:
         return jsonify({'error': 'No file loaded'}), 400
     
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    filepath = os.path.join(str(datapath), filename)
     observations = current_app.config.get('OBSERVATIONS', [])
     
     try:
-        ObservationCSV.write_observations(Path(filepath), observations)
+        # Create CSV in memory
+        output = io.StringIO()
+        import csv
+        writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+        
+        for obs in observations:
+            # Format fields
+            def format_field(value):
+                if value == -1:
+                    return ''
+                elif value == -2:
+                    return '/'
+                else:
+                    return str(value)
+            
+            e_digit = str(obs.EE) if hasattr(obs, 'EE') else ''
+            ho_str = '' if obs.HO == -1 else ('//' if obs.HO == 0 else str(obs.HO))
+            hu_str = '' if obs.HU == -1 else ('//' if obs.HU == 0 else str(obs.HU))
+            ho_hu_field = f'{e_digit}{ho_str}{hu_str}' if ho_str or hu_str else '/////'
+            
+            fields = [
+                str(obs.KK), format_field(obs.O), str(obs.JJ), str(obs.MM), str(obs.TT), str(obs.g),
+                format_field(obs.ZS), format_field(obs.ZM), format_field(obs.d), format_field(obs.DD),
+                format_field(obs.N), format_field(obs.C), format_field(obs.c), str(obs.EE),
+                format_field(obs.H), format_field(obs.F), format_field(obs.V), format_field(obs.f),
+                format_field(obs.zz), str(obs.GG), ho_hu_field,
+                obs.sectors if obs.sectors else '',
+                obs.remarks if obs.remarks else ''
+            ]
+            writer.writerow(fields)
+        
+        # Convert to bytes with UTF-8 encoding
+        csv_bytes = output.getvalue().encode('utf-8')
+        output.close()
+        
+        # Create BytesIO object for send_file
+        csv_io = io.BytesIO(csv_bytes)
+        csv_io.seek(0)
         
         current_app.config['DIRTY'] = False
         
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'count': len(observations),
-            'message': f'{len(observations)} Beobachtungen gespeichert!'
-        })
+        # Return file as download
+        return send_file(
+            csv_io,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1112,6 +1171,21 @@ def file_status() -> Dict[str, Any]:
         'count': len(current_app.config.get('OBSERVATIONS', [])),
         'auto_loaded': auto_loaded
     })
+
+
+@api_blueprint.route('/file/status/update', methods=['POST'])
+def update_file_status() -> Dict[str, Any]:
+    """Update current filename in backend"""
+    from flask import current_app, request
+    
+    data = request.get_json()
+    filename = data.get('filename')
+    
+    if filename:
+        current_app.config['LOADED_FILE'] = filename
+        return jsonify({'success': True, 'filename': filename})
+    
+    return jsonify({'error': 'No filename provided'}), 400
 
 
 @api_blueprint.route('/file/autosave', methods=['POST'])
@@ -1691,8 +1765,8 @@ def _format_monthly_report_text(data: Dict[str, Any], i18n) -> str:
     # Footer
     lines.append('╠════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╣')
     
-    hb_line = i18n.get('fields.primary_site') + ': ' + data['observer_hbort']
-    nb_line = i18n.get('fields.secondary_site') + ': ' + data['observer_nbort']
+    hb_line = i18n.get('observers.table_primary_site') + ': ' + data['observer_hbort']
+    nb_line = i18n.get('observers.table_secondary_site') + ': ' + data['observer_nbort']
     hb_pad_left = (122 - len(hb_line)) // 2
     nb_pad_left = (122 - len(nb_line)) // 2
     hb_line = ' ' * hb_pad_left + hb_line
@@ -1778,9 +1852,9 @@ def _format_monthly_report_markdown(data: Dict[str, Any], i18n) -> str:
         md += '```\n\n'
     
     # Footer with observer locations
-    md += f"## {i18n.get('fields.primary_site')}\n"
+    md += f"## {i18n.get('observers.table_primary_site')}\n"
     md += f"{data['observer_hbort']}\n\n"
-    md += f"## {i18n.get('fields.secondary_site')}\n"
+    md += f"## {i18n.get('observers.table_secondary_site')}\n"
     md += f"{data['observer_nbort']}\n"
     
     return md

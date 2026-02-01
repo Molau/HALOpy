@@ -44,6 +44,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('warning-modal');
         const modal = new bootstrap.Modal(modalEl);
+        
+        // Wait for modal to be fully shown before allowing focus
+        modalEl.addEventListener('shown.bs.modal', () => {
+            modalEl.removeAttribute('aria-hidden');
+        }, { once: true });
+        
         modal.show();
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();

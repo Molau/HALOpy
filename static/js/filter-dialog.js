@@ -97,7 +97,7 @@ class FilterDialog {
         }
         
         const modalHtml = `
-            <div class="modal fade" id="filter-dialog" tabindex="-1" aria-labelledby="filterDialogLabel" aria-hidden="true">
+            <div class="modal fade" id="filter-dialog" tabindex="-1" aria-labelledby="filterDialogLabel">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         <div class="modal-header">

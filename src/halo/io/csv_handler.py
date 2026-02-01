@@ -57,30 +57,56 @@ class ObservationCSV:
             return default
     
     @staticmethod
-    def _detect_legacy_format(filepath: Path) -> bool:
+    def _detect_format_and_encoding(filepath: Path) -> Tuple[bool, str]:
         """
-        Detect if CSV file is in legacy format (from original HALO program).
-        Legacy format has spaces in the sectors field.
+        Detect if CSV file is in legacy format and determine encoding.
+        Legacy format has spaces in the sectors field and uses CP850 (DOS).
+        Modern format uses UTF-8.
         
         Args:
             filepath: Path to CSV file
             
         Returns:
-            True if legacy format detected, False for modern format
+            Tuple of (is_legacy, encoding)
         """
-        with open(filepath, 'r', encoding='latin-1') as f:
-            for line in f:
-                parts = line.rstrip(',\n').split(',')
-                if len(parts) > 21:
-                    sectors_field = parts[21]  # Don't strip - we need to detect spaces!
-                    # Legacy format: sectors field contains spaces (e.g., "a-b-c          " or "               ")
-                    # Modern format: sectors field has no extra spaces (e.g., "a-b-c" or "/////")
-                    # Check if field has leading or trailing spaces
-                    if len(sectors_field) > len(sectors_field.strip()):
-                        return True
-                    else:
-                        return False  # First valid line has no spaces = modern format
-        return False  # No valid lines found
+        # Try UTF-8 first (modern format) - read enough bytes to detect encoding issues
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                # Read first 50KB to detect encoding (should cover most files)
+                chunk = f.read(50000)
+                # Now check format in first few lines
+                lines = chunk.split('\n')
+                for line in lines[:10]:
+                    parts = line.rstrip(',').split(',')
+                    if len(parts) > 21:
+                        sectors_field = parts[21]
+                        if len(sectors_field) > len(sectors_field.strip()):
+                            return True, 'utf-8'  # Legacy format with UTF-8
+                        else:
+                            return False, 'utf-8'  # Modern format with UTF-8
+            return False, 'utf-8'  # Default to modern UTF-8
+        except UnicodeDecodeError:
+            # Not UTF-8, try CP850 (DOS encoding)
+            pass
+        
+        # Try CP850 (DOS encoding for legacy files)
+        try:
+            with open(filepath, 'r', encoding='cp850') as f:
+                # Check format in first few lines
+                for i, line in enumerate(f):
+                    if i >= 10:
+                        break
+                    parts = line.rstrip(',\n').split(',')
+                    if len(parts) > 21:
+                        sectors_field = parts[21]
+                        if len(sectors_field) > len(sectors_field.strip()):
+                            return True, 'cp850'  # Legacy format with DOS encoding
+                        else:
+                            return False, 'cp850'  # Modern format but CP850 encoding
+            return True, 'cp850'  # Default to legacy CP850
+        except Exception:
+            # Fallback to latin-1 for other encodings
+            return False, 'latin-1'
     
     @staticmethod
     def read_observations(filepath: Path) -> Tuple[List[Observation], bool]:
@@ -94,10 +120,10 @@ class ObservationCSV:
             Tuple of (observations list, needs_conversion flag)
             needs_conversion=True if file was in legacy format
         """
-        is_legacy = ObservationCSV._detect_legacy_format(filepath)
+        is_legacy, encoding = ObservationCSV._detect_format_and_encoding(filepath)
         observations = []
         
-        with open(filepath, 'r', encoding='latin-1') as f:
+        with open(filepath, 'r', encoding=encoding) as f:
             if is_legacy:
                 # Legacy format: simple comma split (spaces between fields)
                 for line in f:
@@ -199,7 +225,7 @@ class ObservationCSV:
             filepath: Path to CSV file
             observations: List of Observation objects
         """
-        with open(filepath, 'w', encoding='latin-1', newline='') as f:
+        with open(filepath, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
             
             for obs in observations:
