@@ -1,8 +1,8 @@
 {
   "app": {
     "title": "HALO Analysis Program",
-    "version": "3.0.8",
-    "version_date": "2026-02-01",
+    "version": "3.0.9",
+    "version_date": "2026-02-02",
     "copyright_years": "1992-2026",
     "welcome_title": "Welcome to HALO Analysis Program",
     "welcome_subtitle": "Software for recording and analyzing halo observations",

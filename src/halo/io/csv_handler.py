@@ -48,7 +48,8 @@ class ObservationCSV:
             return -1
         
         # Slash: either 0 (for d, 8HHHH) or -1 (for all other fields)
-        if value_stripped == '/':
+        # Also check for double slash '//' which is used in 8HHHH field
+        if value_stripped == '/' or value_stripped == '//':
             return 0 if slash_as_not_present else -1
         
         try:
@@ -243,30 +244,28 @@ class ObservationCSV:
                 d_str = '/' if obs.d == 255 else format_field(obs.d)
                 
                 # Format 8HHHH field - special handling for double slash
-                e_digit = str(obs.EE) if hasattr(obs, 'EE') else ''
+                # Format: 8HHHH where first digit is always '8', not EE
+                # -1 = not observed (spaces), 0 = not applicable (//), 1-90 = degrees
                 
-                # For HO and HU: -1→empty, 0→'//', else→number
+                # For HO and HU: -1→spaces, 0→'//', else→number with padding
                 ho_str = ''
                 if obs.HO == -1:
-                    ho_str = ''
+                    ho_str = '  '  # Not observed = spaces
                 elif obs.HO == 0:
-                    ho_str = '//'
+                    ho_str = '//'  # Not applicable
                 else:
-                    ho_str = str(obs.HO)
+                    ho_str = str(obs.HO).zfill(2)  # Pad to 2 digits
                 
                 hu_str = ''
                 if obs.HU == -1:
-                    hu_str = ''
+                    hu_str = '  '  # Not observed = spaces
                 elif obs.HU == 0:
-                    hu_str = '//'
+                    hu_str = '//'  # Not applicable
                 else:
-                    hu_str = str(obs.HU)
+                    hu_str = str(obs.HU).zfill(2)  # Pad to 2 digits
                 
-                # Combine to 8HHHH field
-                if not ho_str and not hu_str:
-                    ho_hu_field = '/////'
-                else:
-                    ho_hu_field = f'{e_digit}{ho_str or ""}{hu_str or ""}'
+                # Combine to 8HHHH field - always starts with '8'
+                ho_hu_field = f'8{ho_str}{hu_str}'
                 
                 fields = [
                     str(obs.KK),

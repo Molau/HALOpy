@@ -2936,7 +2936,7 @@ function formatObservationForDisplay(obs) {
     // Date
     const monthName = i18nStrings.months[obs.MM];
     html += `<strong>${i18nStrings.fields.year}:</strong> ${obs.JJ} `;
-    html += `<strong>${i18nStrings.fields.month}:</strong> ${monthName} `;
+    html += `<strong>${i18nStrings.fields.month}:</strong> ${String(obs.MM).padStart(2, '0')} - ${monthName} `;
     html += `<strong>${i18nStrings.fields.day}:</strong> ${obs.TT}<br>`;
     
     // Location type (observing site)

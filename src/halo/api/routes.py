@@ -1587,13 +1587,20 @@ def _kurzausgabe(obs) -> str:
     first += str(obs.TT // 10) + str(obs.TT % 10)
     first += str(obs.g)
     
-    # ZS, ZM - handle -1 (space) and 0 (/) for HO/HU
+    # ZS, ZM - handle -1 (space), 0 is a valid value for sun/moon altitude
     def fmt2(val):
-        """Format 2-digit field: -1→'  ', 0→'//' (for HO/HU), else number"""
+        """Format 2-digit field: -1→'  ', else number (0 is valid!)"""
+        if val == -1:
+            return '  '  # Not observed
+        else:
+            return str(val // 10) + str(val % 10)
+    
+    def fmt2_ho_hu(val):
+        """Format 2-digit field for HO/HU: -1→'  ', 0→'//', else number"""
         if val == -1:
             return '  '  # Not observed
         elif val == 0:
-            return '//'  # Not relevant/present (for HO/HU)
+            return '//'  # Not applicable
         else:
             return str(val // 10) + str(val % 10)
     
@@ -1647,14 +1654,14 @@ def _kurzausgabe(obs) -> str:
     
     # 8HHHH - light pillar (HO=0 or HU=0 formatted as '//')
     if obs.EE == 8:
-        ho_str = fmt2(obs.HO)
+        ho_str = fmt2_ho_hu(obs.HO)
         erg += '8' + ho_str + '//'
     elif obs.EE == 9:
-        hu_str = fmt2(obs.HU)
+        hu_str = fmt2_ho_hu(obs.HU)
         erg += '8//' + hu_str
     elif obs.EE == 10:
-        ho_str = fmt2(obs.HO)
-        hu_str = fmt2(obs.HU)
+        ho_str = fmt2_ho_hu(obs.HO)
+        hu_str = fmt2_ho_hu(obs.HU)
         erg += '8' + ho_str + hu_str
     else:
         erg += '/////'
