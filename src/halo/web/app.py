@@ -54,29 +54,54 @@ def create_app(config=None):
     # Load persisted settings from halo.cfg (CSV)
     Settings.load_into(app.config, root_path)
     
-    # Load startup file if configured
-    startup_enabled = app.config.get('STARTUP_FILE_ENABLED', False)
-    startup_file = app.config.get('STARTUP_FILE_PATH', '')
-    
-    if startup_enabled and startup_file:
-        data_path = root_path / 'data' / startup_file
+    # In cloud mode, always load all.csv at startup
+    if is_cloud_mode():
+        data_path = root_path / 'data' / 'all.csv'
         if data_path.exists():
             try:
-                # Import here to avoid circular imports
                 from halo.io.csv_handler import ObservationCSV
                 observations, needs_conversion = ObservationCSV.read_observations(data_path)
                 app.config['OBSERVATIONS'] = observations
-                app.config['LOADED_FILE'] = startup_file
-                app.config['DIRTY'] = needs_conversion  # Mark dirty if converted from legacy format
-                app.config['AUTO_LOADED'] = True  # Flag for showing notification
+                app.config['LOADED_FILE'] = 'all.csv'
+                app.config['DIRTY'] = False  # Cloud mode auto-saves, never dirty
+                app.config['AUTO_LOADED'] = True
                 # Auto-save if converted from legacy format
                 if needs_conversion:
                     ObservationCSV.write_observations(data_path, observations)
-                    app.config['DIRTY'] = False
             except Exception as e:
-                pass
+                # If all.csv doesn't exist or fails, start with empty observations
+                app.config['OBSERVATIONS'] = []
+                app.config['LOADED_FILE'] = 'all.csv'
+                app.config['DIRTY'] = False
         else:
-            pass
+            # Create empty all.csv if it doesn't exist
+            app.config['OBSERVATIONS'] = []
+            app.config['LOADED_FILE'] = 'all.csv'
+            app.config['DIRTY'] = False
+    else:
+        # Local mode: Load startup file if configured
+        startup_enabled = app.config.get('STARTUP_FILE_ENABLED', False)
+        startup_file = app.config.get('STARTUP_FILE_PATH', '')
+        
+        if startup_enabled and startup_file:
+            data_path = root_path / 'data' / startup_file
+            if data_path.exists():
+                try:
+                    # Import here to avoid circular imports
+                    from halo.io.csv_handler import ObservationCSV
+                    observations, needs_conversion = ObservationCSV.read_observations(data_path)
+                    app.config['OBSERVATIONS'] = observations
+                    app.config['LOADED_FILE'] = startup_file
+                    app.config['DIRTY'] = needs_conversion  # Mark dirty if converted from legacy format
+                    app.config['AUTO_LOADED'] = True  # Flag for showing notification
+                    # Auto-save if converted from legacy format
+                    if needs_conversion:
+                        ObservationCSV.write_observations(data_path, observations)
+                        app.config['DIRTY'] = False
+                except Exception as e:
+                    pass
+            else:
+                pass
 
     # Load observer metadata from resources/halobeo.csv
     observers_file = root_path / 'resources' / 'halobeo.csv'
@@ -89,32 +114,63 @@ def create_app(config=None):
         pass
     
     # Initialize i18n
-    from halo.resources import get_current_language, get_i18n
+    from halo.resources import get_current_language, get_i18n, set_language
+    from halo.config import is_cloud_mode
     
     @app.before_request
     def setup_language():
         """Set up language for each request."""
         # Initialize session language if not set
         if 'language' not in session:
-            # Try to detect from browser
-            browser_lang = request.accept_languages.best_match(['de', 'en'])
-            session['language'] = browser_lang or 'de'
+            # Try saved language from settings first
+            saved_lang = app.config.get('LANGUAGE', '')
+            if saved_lang in ('de', 'en'):
+                session['language'] = saved_lang
+            else:
+                # Fall back to browser detection
+                browser_lang = request.accept_languages.best_match(['de', 'en'])
+                session['language'] = browser_lang or 'de'
+        
+        # Apply language to i18n system
+        current_lang = session.get('language', 'de')
+        set_language(current_lang)
         
         # Store current language in g for easy template access
-        g.language = session.get('language', 'de')
-        g.i18n = get_i18n(g.language)
+        g.language = current_lang
+        g.i18n = get_i18n(current_lang)
+    
+    @app.before_request
+    def check_authentication():
+        """Check authentication for cloud mode."""
+        # Skip authentication for login page, API login endpoint, and static files
+        if (request.endpoint in ['login', 'api.login', 'static'] or 
+            request.path.startswith('/static/')):
+            return
+        
+        # In cloud mode, require authentication
+        if is_cloud_mode():
+            if not session.get('authenticated', False):
+                # Redirect to login page
+                from flask import redirect, url_for
+                return redirect(url_for('login'))
+            
+            # Set FIXED_OBSERVER from session for cloud mode
+            if session.get('observer_kk'):
+                app.config['FIXED_OBSERVER'] = session.get('observer_kk')
     
     @app.context_processor
     def inject_i18n():
         """Make i18n functions available in all templates."""
         from halo.resources import get_string, get_language
+        from halo.config import is_cloud_mode
         import time
         return {
             '_': get_string,  # Translation function (like gettext)
             'lang': get_language,  # Current language
             'i18n': g.i18n if hasattr(g, 'i18n') else get_i18n(),
             'static_version': int(time.time()),  # Cache-busting timestamp
-            'update_repo': app.config.get('UPDATE_REPO', '')
+            'update_repo': app.config.get('UPDATE_REPO', ''),
+            'is_cloud': is_cloud_mode()  # Cloud mode flag for templates
         }
     
     # Register API blueprints
@@ -124,6 +180,26 @@ def create_app(config=None):
     app.register_blueprint(update_blueprint)
     
     # Web routes
+    @app.route('/login')
+    def login():
+        """Login page (cloud mode only)."""
+        from halo.config import is_cloud_mode
+        if not is_cloud_mode():
+            # Redirect to main page if not in cloud mode
+            from flask import redirect, url_for
+            return redirect(url_for('index'))
+        return render_template('login.html')
+    
+    @app.route('/logout')
+    def logout():
+        """Logout current user."""
+        session.clear()
+        from flask import redirect, url_for
+        from halo.config import is_cloud_mode
+        if is_cloud_mode():
+            return redirect(url_for('login'))
+        return redirect(url_for('index'))
+    
     @app.route('/')
     def index():
         """Main page."""

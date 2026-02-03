@@ -4,7 +4,7 @@ Copyright (c) 1992-2026 Sirko Molau
 Licensed under MIT License - see LICENSE file for details.
 """
 
-from flask import Blueprint, jsonify, request, current_app, Response
+from flask import Blueprint, jsonify, request, current_app, Response, session
 from pathlib import Path
 from typing import Dict, Any
 import math
@@ -16,6 +16,180 @@ import matplotlib.pyplot as plt
 from halo.io.csv_handler import ObservationCSV
 
 api_blueprint = Blueprint('api', __name__, url_prefix='/api')
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+def _auto_save_if_cloud():
+    """
+    In cloud mode, automatically save changes to all.csv.
+    In local mode, just mark as dirty.
+    """
+    from halo.config import is_cloud_mode
+    
+    if is_cloud_mode():
+        # Auto-save in cloud mode
+        try:
+            observations = current_app.config.get('OBSERVATIONS', [])
+            root_path = Path(current_app.root_path).parent.parent
+            data_path = root_path / 'data' / 'all.csv'
+            ObservationCSV.write_observations(data_path, observations)
+            current_app.config['DIRTY'] = False
+        except Exception as e:
+            # If save fails, mark as dirty so user knows
+            current_app.config['DIRTY'] = True
+            raise e
+    else:
+        # Local mode - just mark as dirty
+        current_app.config['DIRTY'] = True
+
+
+# ============================================================================
+# Authentication API (Cloud Mode)
+# ============================================================================
+
+@api_blueprint.route('/login', methods=['POST'])
+def login() -> Dict[str, Any]:
+    """
+    Authenticate user against AWS Parameter Store.
+    
+    Request body:
+        {
+            "username": "44" or "admin",
+            "password": "password"
+        }
+    
+    Response:
+        {
+            "success": true/false,
+            "error": "error message" (if failed),
+            "observer_kk": "44" (if regular user),
+            "is_admin": true/false
+        }
+    """
+    from halo.services.auth import AuthService
+    from halo.config import is_cloud_mode
+    
+    if not is_cloud_mode():
+        return jsonify({'success': False, 'error': 'auth_not_required_local_mode'}), 400
+    
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'username_password_required'}), 400
+    
+    # Verify credentials
+    success, observer_kk = AuthService.verify_password(username, password)
+    
+    if success:
+        # Set session variables
+        session['authenticated'] = True
+        session['username'] = username
+        session['observer_kk'] = observer_kk  # None for admin, KK for regular users
+        session['is_admin'] = (observer_kk is None)
+        
+        # Set FIXED_OBSERVER in app.config for regular users
+        if observer_kk:
+            current_app.config['FIXED_OBSERVER'] = observer_kk
+        
+        return jsonify({
+            'success': True,
+            'observer_kk': observer_kk,
+            'is_admin': observer_kk is None
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'invalid_credentials'
+        }), 401
+
+
+@api_blueprint.route('/logout', methods=['POST'])
+def logout_api() -> Dict[str, Any]:
+    """Logout current user."""
+    session.clear()
+    return jsonify({'success': True})
+
+
+@api_blueprint.route('/change-password', methods=['POST'])
+def change_password() -> Dict[str, Any]:
+    """
+    Change user password in AWS Parameter Store.
+    
+    Regular user mode:
+        {
+            "current_password": "current",
+            "new_password": "new"
+        }
+    
+    Admin mode (admin setting password for any user):
+        {
+            "target_user": "44" or "admin",
+            "new_password": "new",
+            "admin_mode": true
+        }
+    
+    Response:
+        {
+            "success": true/false,
+            "error": "error message" (if failed)
+        }
+    """
+    from halo.services.auth import AuthService
+    from halo.config import is_cloud_mode
+    
+    if not is_cloud_mode():
+        return jsonify({'success': False, 'error': 'password_change_not_available_local'}), 400
+    
+    if not session.get('authenticated'):
+        return jsonify({'success': False, 'error': 'not_authenticated'}), 401
+    
+    data = request.get_json()
+    is_admin = session.get('is_admin', False)
+    admin_mode = data.get('admin_mode', False)
+    
+    if admin_mode:
+        # Admin setting password for any user
+        if not is_admin:
+            return jsonify({'success': False, 'error': 'admin_privileges_required'}), 403
+        
+        target_user = data.get('target_user', '')
+        new_password = data.get('new_password', '')
+        
+        if not target_user or not new_password:
+            return jsonify({'success': False, 'error': 'target_user_password_required'}), 400
+        
+        # Admin can set password without knowing current password
+        success, error = AuthService.change_password(target_user, '', new_password, admin_bypass=True)
+        
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': error or 'password_change_failed'}), 400
+    
+    else:
+        # Regular user changing own password
+        current_password = data.get('current_password', '')
+        new_password = data.get('new_password', '')
+        
+        if not current_password or not new_password:
+            return jsonify({'success': False, 'error': 'current_new_password_required'}), 400
+        
+        username = session.get('username')
+        if not username:
+            return jsonify({'success': False, 'error': 'session_error'}), 400
+        
+        # Change password with verification
+        success, error = AuthService.change_password(username, current_password, new_password, admin_bypass=False)
+        
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': error or 'password_change_failed'}), 400
 
 
 # ============================================================================
@@ -180,7 +354,7 @@ def set_language(lang: str) -> Dict[str, Any]:
     from halo.resources import set_language as set_lang
     
     if lang not in ['de', 'en']:
-        return jsonify({'error': 'Invalid language. Supported: de, en'}), 400
+        return jsonify({'error': 'invalid_language'}), 400
     
     # Update session
     session['language'] = lang
@@ -195,9 +369,15 @@ def set_language(lang: str) -> Dict[str, Any]:
 def get_i18n_strings(lang: str) -> Dict[str, Any]:
     """Get all i18n strings for specified language."""
     from halo.resources import I18n
+    from flask import make_response
     try:
         i18n = I18n(lang)
-        return jsonify(i18n.strings)
+        response = make_response(jsonify(i18n.strings))
+        # Prevent browser caching - always fetch fresh i18n data
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except FileNotFoundError:
         return jsonify({'error': f'Language {lang} not found'}), 404
 
@@ -387,7 +567,7 @@ def add_observation() -> Dict[str, Any]:
         for existing in observations:
             if _spaeter(obs, existing) == 0:
                 # All key fields match - this is a duplicate
-                return jsonify({'error': 'duplicate', 'message': 'Observation already exists'}), 409
+                return jsonify({'error': 'duplicate'}), 409
         
         # Find correct insertion position using spaeter() comparison
         insert_pos = len(observations)
@@ -398,7 +578,7 @@ def add_observation() -> Dict[str, Any]:
         
         observations.insert(insert_pos, obs)
         current_app.config['OBSERVATIONS'] = observations
-        current_app.config['DIRTY'] = True
+        _auto_save_if_cloud()
 
         return jsonify({'success': True, 'count': len(observations)})
     except Exception as e:
@@ -431,19 +611,12 @@ def delete_observation() -> Dict[str, Any]:
         if original_obs is not None:
             observations.pop(original_obs)
             current_app.config['OBSERVATIONS'] = observations
-            current_app.config['DIRTY'] = True
+            _auto_save_if_cloud()
             return jsonify({'success': True, 'deleted': True, 'count': len(observations)})
         else:
             return jsonify({'success': False, 'deleted': False, 'count': len(observations)})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
-
-
-@api_blueprint.route('/observations/<int:obs_id>', methods=['GET'])
-def get_observation(obs_id: int) -> Dict[str, Any]:
-    """Get single observation by ID."""
-    # TODO: Implement observation retrieval by ID
-    return jsonify({'error': 'Not implemented yet'}), 501
 
 
 @api_blueprint.route('/observations/replace', methods=['POST'])
@@ -470,7 +643,7 @@ def replace_observations() -> Dict[str, Any]:
         observations.append(obs)
     
     current_app.config['OBSERVATIONS'] = observations
-    current_app.config['DIRTY'] = True
+    _auto_save_if_cloud()
     
     return jsonify({'success': True, 'count': len(observations)})
 
@@ -490,7 +663,7 @@ def save_observations() -> Dict[str, Any]:
     overwrite = data.get('overwrite', False)
     
     if not filename:
-        return jsonify({'error': 'Filename is required'}), 400
+        return jsonify({'error': 'filename_required'}), 400
     
     # Ensure .csv extension
     if not filename.lower().endswith('.csv'):
@@ -559,7 +732,7 @@ def filter_observations() -> Dict[str, Any]:
         # Load current observations from session
         observations = current_app.config.get('OBSERVATIONS', [])
         if not observations:
-            return jsonify({'error': 'No observations loaded'}), 400
+            return jsonify({'error': 'no_observations_loaded'}), 400
         
         # Load observers for SH filtering (already loaded in app config)
         observers_list = current_app.config.get('OBSERVERS', [])
@@ -710,7 +883,7 @@ def list_files() -> Dict[str, Any]:
     
     datapath = Path(__file__).parent.parent.parent.parent / 'data'
     if not datapath.exists():
-        return jsonify({'error': 'Data directory not found'}), 404
+        return jsonify({'error': 'data_directory_not_found'}), 404
     
     try:
         files = []
@@ -740,7 +913,7 @@ def new_file() -> Dict[str, Any]:
     filename = data.get('filename', '')
     
     if not filename:
-        return jsonify({'error': 'Filename is required'}), 400
+        return jsonify({'error': 'filename_required'}), 400
     
     # Ensure .csv extension
     if not filename.lower().endswith('.csv'):
@@ -750,7 +923,7 @@ def new_file() -> Dict[str, Any]:
     filepath = os.path.join(str(datapath), filename)
     
     if os.path.exists(filepath):
-        return jsonify({'error': 'File already exists'}), 400
+        return jsonify({'error': 'file_already_exists'}), 400
     
     try:
         # Create empty CSV with header
@@ -762,8 +935,7 @@ def new_file() -> Dict[str, Any]:
         
         return jsonify({
             'success': True,
-            'filename': filename,
-            'message': 'Neue Datei erstellt!'
+            'filename': filename
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -778,14 +950,14 @@ def load_file_from_browser() -> Dict[str, Any]:
     import os
     
     if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
+        return jsonify({'error': 'no_file_provided'}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
+        return jsonify({'error': 'no_file_selected'}), 400
     
     if not file.filename.lower().endswith('.csv'):
-        return jsonify({'error': 'Only CSV files are supported'}), 400
+        return jsonify({'error': 'only_csv_supported'}), 400
     
     try:
         # Save uploaded file temporarily to detect legacy format
@@ -827,17 +999,17 @@ def merge_file() -> Dict[str, Any]:
     
     # Check if a file is already loaded
     if not current_app.config.get('LOADED_FILE'):
-        return jsonify({'error': 'No file loaded. Please load a file first.'}), 400
+        return jsonify({'error': 'no_file_loaded'}), 400
     
     if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
+        return jsonify({'error': 'no_file_provided'}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
+        return jsonify({'error': 'no_file_selected'}), 400
     
     if not file.filename.lower().endswith('.csv'):
-        return jsonify({'error': 'Only CSV files are supported'}), 400
+        return jsonify({'error': 'only_csv_supported'}), 400
     
     try:
         # Read file content directly into memory (HALO CSV is latin-1)
@@ -874,13 +1046,12 @@ def merge_file() -> Dict[str, Any]:
         current_app.config['OBSERVATIONS'] = current_observations
         # Mark as dirty only if at least one observation was added
         if added_count > 0:
-            current_app.config['DIRTY'] = True
+            _auto_save_if_cloud()
         
         return jsonify({
             'success': True,
             'added_count': added_count,
-            'total_count': len(current_observations),
-            'message': f'{added_count} neue Beobachtungen hinzugefügt!'
+            'total_count': len(current_observations)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -919,7 +1090,6 @@ def load_file(filename: str) -> Dict[str, Any]:
             'success': True,
             'filename': filename,
             'count': len(observations),
-            'message': f'{len(observations)} Beobachtungen geladen!',
             'converted': needs_conversion
         })
     except Exception as e:
@@ -1002,7 +1172,7 @@ def save_file_as() -> Dict[str, Any]:
     overwrite = data.get('overwrite', False)
     
     if not filename:
-        return jsonify({'error': 'Filename is required'}), 400
+        return jsonify({'error': 'filename_required'}), 400
     
     # Ensure .csv extension
     if not filename.lower().endswith('.csv'):
@@ -1012,7 +1182,7 @@ def save_file_as() -> Dict[str, Any]:
     filepath = os.path.join(str(datapath), filename)
     
     if os.path.exists(filepath) and not overwrite:
-        return jsonify({'exists': True, 'message': 'File exists. Overwrite?'}), 200
+        return jsonify({'exists': True}), 200
     
     observations = current_app.config.get('OBSERVATIONS', [])
     
@@ -1025,8 +1195,7 @@ def save_file_as() -> Dict[str, Any]:
         return jsonify({
             'success': True,
             'filename': filename,
-            'count': len(observations),
-            'message': f'{len(observations)} Beobachtungen gespeichert!'
+            'count': len(observations)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1034,57 +1203,136 @@ def save_file_as() -> Dict[str, Any]:
 
 @api_blueprint.route('/file/upload', methods=['POST'])
 def upload_file() -> Dict[str, Any]:
-    """Upload current file to halo.online - implements 'Datei -> Upload'"""
+    """
+    Upload observations to cloud server (all.csv).
+    
+    Request body:
+        {
+            "observerKK": "44",
+            "password": "password",
+            "observations": [...],
+            "mode": "add" or "replace"
+        }
+    
+    Modes:
+        - add: Add observations to existing all.csv
+        - replace: Delete all observations of this observer first, then add new ones
+    """
     from flask import current_app
-    import requests
+    from halo.services.auth import AuthService
+    from halo.config import is_cloud_mode
+    from halo.models.types import Observation
+    from functools import cmp_to_key
     
-    filename = current_app.config.get('LOADED_FILE')
-    if not filename:
-        return jsonify({'error': 'No file loaded'}), 400
+    # Only works in cloud mode
+    if not is_cloud_mode():
+        return jsonify({'error': 'Upload only available in cloud mode'}), 400
     
-    observations = current_app.config.get('OBSERVATIONS', [])
+    data = request.get_json()
+    observer_kk = data.get('observerKK')
+    password = data.get('password', '')
+    new_observations_data = data.get('observations', [])
+    mode = data.get('mode', 'add')  # 'add' or 'replace'
+    use_session = data.get('use_session', False)  # Use session authentication
     
-    if not observations:
-        return jsonify({'error': 'No observations to upload'}), 400
+    if not observer_kk:
+        return jsonify({'error': 'observer_kk_required'}), 400
     
-    data_to_upload = request.get_json()
-    target_url = data_to_upload.get('targetUrl', 'https://halo.online/api/upload')
+    if not new_observations_data:
+        return jsonify({'error': 'no_observations_to_upload'}), 400
+    
+    # Authenticate user
+    is_admin = False
+    if use_session:
+        # Use session authentication (cloud mode - already logged in)
+        if not session.get('authenticated', False):
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        # Check if user is admin
+        is_admin = session.get('is_admin', False)
+        
+        # Verify that session user matches requested observerKK (unless admin)
+        if not is_admin:
+            session_kk = session.get('observer_kk', '')
+            if str(session_kk) != str(observer_kk):
+                return jsonify({'error': 'Cannot upload observations for different observer'}), 403
+    else:
+        # Use password authentication (local mode)
+        if not password:
+            return jsonify({'error': 'Password required'}), 400
+        
+        auth_service = AuthService()
+        is_valid, user_info = auth_service.verify_password(observer_kk, password)
+        
+        if not is_valid:
+            return jsonify({'error': 'Invalid credentials'}), 401
+        
+        # Check if authenticated user is admin
+        is_admin = user_info.get('is_admin', False)
     
     try:
-        # Prepare data for upload
-        upload_data = {
-            'filename': filename,
-            'observations': observations,
-            'count': len(observations)
-        }
+        # Convert observation dicts to Observation objects
+        # SECURITY: Filter to only include observations matching the authenticated user's KK
+        # EXCEPTION: Admin can upload observations for any observer
+        new_observations = []
+        filtered_out_count = 0
+        for obs_dict in new_observations_data:
+            # Admin can upload all observations, regular users only their own
+            if not is_admin and str(obs_dict.get('KK')) != str(observer_kk):
+                filtered_out_count += 1
+                continue
+            
+            obs = Observation()
+            for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
+                if field in obs_dict and obs_dict[field] is not None:
+                    setattr(obs, field, obs_dict[field])
+            obs.sectors = obs_dict.get('sectors', '') or ''
+            obs.remarks = obs_dict.get('remarks', '') or ''
+            new_observations.append(obs)
         
-        # TODO: Implement actual upload to halo.online API
-        # For now, this is a placeholder that simulates successful upload
-        # Replace with actual implementation once API endpoint is defined
+        # Check if any observations remain after filtering
+        if not new_observations:
+            return jsonify({
+                'error': 'No valid observations to upload (all observations filtered out)',
+                'filtered_out': filtered_out_count
+            }), 400
         
-        # Example implementation (commented out until API is ready):
-        # response = requests.post(
-        #     target_url,
-        #     json=upload_data,
-        #     headers={'Content-Type': 'application/json'},
-        #     timeout=30
-        # )
-        # 
-        # if response.status_code == 200:
-        #     result = response.json()
-        #     return jsonify({
-        #         'success': True,
-        #         'count': len(observations),
-        #         'message': f'Successfully uploaded {len(observations)} observations'
-        #     })
-        # else:
-        #     return jsonify({'error': f'Upload failed with status {response.status_code}'}), 500
+        # Load current observations from all.csv
+        current_observations = current_app.config.get('OBSERVATIONS', [])
         
-        # Placeholder response (remove when implementing actual upload)
+        if mode == 'replace':
+            # Delete all observations of this observer
+            current_observations = [
+                obs for obs in current_observations 
+                if str(obs.KK) != str(observer_kk)
+            ]
+        
+        # Add new observations (avoiding duplicates)
+        existing_keys = set()
+        for obs in current_observations:
+            key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
+            existing_keys.add(key)
+        
+        added_count = 0
+        for obs in new_observations:
+            key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
+            if key not in existing_keys:
+                current_observations.append(obs)
+                existing_keys.add(key)
+                added_count += 1
+        
+        # Sort observations using spaeter()
+        current_observations = sorted(current_observations, key=cmp_to_key(_spaeter))
+        
+        # Update config and save
+        current_app.config['OBSERVATIONS'] = current_observations
+        _auto_save_if_cloud()
+        
         return jsonify({
             'success': True,
-            'count': len(observations),
-            'message': f'Upload von {len(observations)} Beobachtungen erfolgreich (Placeholder)'
+            'count': added_count,
+            'total_count': len(current_observations),
+            'mode': mode
         })
         
     except Exception as e:
@@ -1093,31 +1341,98 @@ def upload_file() -> Dict[str, Any]:
 
 @api_blueprint.route('/file/download', methods=['POST'])
 def download_file() -> Dict[str, Any]:
-    """Download observations from halo.online - implements 'Datei -> Download'"""
-    from flask import current_app
-    import requests
+    """Download filtered observations as CSV file - implements 'Datei -> Download'
+    
+    Supports two authentication modes:
+    1. Session-based (cloud mode): user authenticated via session
+    2. Password-based (local mode): user provides credentials
+    
+    Filters observations by user's KK unless user is admin.
+    Returns CSV content for client-side file save dialog.
+    """
+    import os
+    import io
     
     data = request.get_json()
-    filename = data.get('filename', 'downloaded')
-    source_url = data.get('sourceUrl', 'https://halo.online/api/download')
+    observer_kk = data.get('observerKK')  # KK number or "Admin"
+    password = data.get('password', '')  # Only for local mode
+    use_session = data.get('use_session', False)  # True for cloud mode
+    download_all = data.get('download_all', False)  # True to bypass KK filter
     
-    # Ensure .CSV extension
-    if not filename.endswith('.CSV') and not filename.endswith('.csv'):
-        filename += '.CSV'
+    # Validate parameters
+    if not observer_kk:
+        return jsonify({'error': 'observer_kk_missing'}), 400
     
     try:
-        # TODO: Implement actual download from halo.online API
-        # For now, this is a placeholder that simulates successful download
-        # Replace with actual implementation once API endpoint is defined
+        # Determine if user is admin and get authenticated KK
+        is_admin = False
+        authenticated_kk = None
         
-        # Example implementation (commented out until API is ready):
-        # response = requests.get(
-        #     source_url,
-        #     timeout=30
-        # )
-        # 
-        # if response.status_code == 200:
-        #     result = response.json()
+        if use_session:
+            # Cloud mode: authenticate via session
+            authenticated_kk = session.get('observer_kk')
+            is_admin = session.get('is_admin', False)
+            
+            if not authenticated_kk:
+                return jsonify({'error': 'not_authenticated'}), 401
+        else:
+            # Local mode: authenticate via password
+            if observer_kk.upper() == 'ADMIN':
+                # Admin authentication
+                from ..services.auth import auth_service
+                user_info = auth_service.verify_password('admin', password)
+                if not user_info:
+                    return jsonify({'error': 'invalid_admin_credentials'}), 401
+                is_admin = user_info.get('is_admin', False)
+                authenticated_kk = None  # Admin has no specific KK
+            else:
+                # Regular user authentication
+                from ..services.auth import auth_service
+                user_info = auth_service.verify_password(observer_kk, password)
+                if not user_info:
+                    return jsonify({'error': 'invalid_credentials'}), 401
+                authenticated_kk = int(observer_kk)
+                is_admin = user_info.get('is_admin', False)
+        
+        # Load all.csv observations
+        root_path = Path(current_app.root_path).parent.parent
+        all_csv_path = root_path / 'data' / 'all.csv'
+        
+        if not all_csv_path.exists():
+            return jsonify({'error': 'all_csv_not_found'}), 404
+        
+        all_observations, _ = ObservationCSV.read_observations(all_csv_path)
+        
+        # Filter observations by KK (unless admin or download_all requested)
+        if is_admin or download_all:
+            # Admin or user requested all observations
+            filtered_observations = all_observations
+        else:
+            # Regular user gets only their own observations
+            filtered_observations = [
+                obs for obs in all_observations
+                if str(obs.KK) == str(authenticated_kk)
+            ]
+        
+        if not filtered_observations:
+            return jsonify({'error': 'no_observations'}), 404
+        
+        # Generate CSV content
+        csv_buffer = io.StringIO()
+        ObservationCSV.write_to_buffer(filtered_observations, csv_buffer)
+        csv_content = csv_buffer.getvalue()
+        
+        # Return CSV content for client-side download
+        return jsonify({
+            'success': True,
+            'csv_content': csv_content,
+            'count': len(filtered_observations),
+            'observer_kk': authenticated_kk,
+            'is_admin': is_admin
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
         #     observations = result.get('observations', [])
         #     
         #     # Store in app config
@@ -1141,14 +1456,13 @@ def download_file() -> Dict[str, Any]:
         
         current_app.config['OBSERVATIONS'] = observations
         current_app.config['LOADED_FILE'] = filename
-        current_app.config['DIRTY'] = True
+        _auto_save_if_cloud()
         
         return jsonify({
             'success': True,
             'filename': filename,
             'count': len(observations),
-            'observations': observations,
-            'message': f'Download von {len(observations)} Beobachtungen erfolgreich (Placeholder)'
+            'observations': observations
         })
         
     except Exception as e:
@@ -1191,6 +1505,174 @@ def update_file_status() -> Dict[str, Any]:
 @api_blueprint.route('/file/autosave', methods=['POST'])
 def autosave() -> Dict[str, Any]:
     """Auto-save current observations to .$$$ temp file"""
+    from flask import current_app
+
+
+@api_blueprint.route('/observers/upload', methods=['POST'])
+def upload_observers() -> Dict[str, Any]:
+    """Upload observer data to server - replaces existing data
+    
+    Supports two authentication modes:
+    1. Session-based (cloud mode): user authenticated via session
+    2. Password-based (local mode): user provides credentials
+    
+    Admin can upload all observers, regular users only their own.
+    """
+    import csv
+    
+    data = request.get_json()
+    observer_kk = data.get('observerKK')
+    password = data.get('password', '')
+    observers = data.get('observers', [])
+    use_session = data.get('use_session', False)
+    
+    # Validate parameters
+    if not observers:
+        return jsonify({'error': 'no_observer_data_to_upload'}), 400
+    
+    try:
+        # Determine if user is admin and get authenticated KK
+        is_admin = False
+        authenticated_kk = None
+        
+        if use_session:
+            # Cloud mode: authenticate via session
+            authenticated_kk = session.get('observer_kk')
+            is_admin = session.get('is_admin', False)
+            
+            if not authenticated_kk and not is_admin:
+                return jsonify({'error': 'not_authenticated'}), 401
+        else:
+            # Local mode: authenticate via password
+            if not observer_kk:
+                return jsonify({'error': 'observer_kk_missing'}), 400
+            
+            if observer_kk.upper() == 'ADMIN':
+                # Admin authentication
+                from ..services.auth import auth_service
+                user_info = auth_service.verify_password('admin', password)
+                if not user_info:
+                    return jsonify({'error': 'invalid_admin_credentials'}), 401
+                is_admin = user_info.get('is_admin', False)
+            else:
+                # Regular user authentication
+                from ..services.auth import auth_service
+                user_info = auth_service.verify_password(observer_kk, password)
+                if not user_info:
+                    return jsonify({'error': 'invalid_credentials'}), 401
+                authenticated_kk = int(observer_kk)
+                is_admin = user_info.get('is_admin', False)
+        
+        # Validate KK matches (unless admin)
+        if not is_admin and authenticated_kk:
+            for obs_record in observers:
+                if len(obs_record) >= 1 and obs_record[0] != str(authenticated_kk):
+                    return jsonify({'error': 'observer_kk_mismatch', 'details': {'expected': authenticated_kk, 'found': obs_record[0]}}), 403
+        
+        # Load existing halobeo.csv
+        root_path = Path(current_app.root_path).parent.parent
+        halobeo_path = root_path / 'resources' / 'halobeo.csv'
+        
+        existing_observers = []
+        if halobeo_path.exists():
+            with open(halobeo_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                existing_observers = list(reader)
+        
+        # Replace mode: Remove all existing records for uploaded observers
+        uploaded_kks = set()
+        for obs_record in observers:
+            if len(obs_record) >= 1:
+                uploaded_kks.add(obs_record[0])
+        
+        # Keep only observers NOT in the upload
+        filtered_observers = [obs for obs in existing_observers if obs[0] not in uploaded_kks]
+        
+        # Add new observers
+        filtered_observers.extend(observers)
+        
+        # Write back to halobeo.csv
+        with open(halobeo_path, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(filtered_observers)
+        
+        # Update app config
+        current_app.config['OBSERVERS'] = filtered_observers
+        
+        return jsonify({
+            'success': True,
+            'count': len(observers),
+            'total_count': len(filtered_observers)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observers/download', methods=['POST'])
+def download_observers() -> Dict[str, Any]:
+    """Download complete observer data as CSV file (no KK filter)
+    
+    Returns the complete halobeo.csv so it can be used locally.
+    
+    Supports two modes:
+    1. Session-based (cloud mode): user authenticated via session
+    2. No auth (local mode): no authentication required for download
+    """
+    import csv
+    import io
+    
+    data = request.get_json()
+    use_session = data.get('use_session', False)
+    no_auth = data.get('no_auth', False)
+    
+    try:
+        # Authentication check (only for cloud mode)
+        if use_session:
+            authenticated_kk = session.get('observer_kk')
+            is_admin = session.get('is_admin', False)
+            
+            if not authenticated_kk and not is_admin:
+                return jsonify({'error': 'Nicht authentifiziert. Bitte neu anmelden.'}), 401
+        
+        # Load halobeo.csv
+        root_path = Path(current_app.root_path).parent.parent
+        halobeo_path = root_path / 'resources' / 'halobeo.csv'
+        
+        if not halobeo_path.exists():
+            return jsonify({'error': 'halobeo_csv_not_found'}), 404
+        
+        all_observers = []
+        with open(halobeo_path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            all_observers = list(reader)
+        
+        if not all_observers:
+            return jsonify({'error': 'no_observers'}), 404
+        
+        # No KK filter - return complete halobeo.csv
+        # This allows the file to be used locally
+        
+        # Generate CSV content
+        csv_buffer = io.StringIO()
+        writer = csv.writer(csv_buffer)
+        writer.writerows(all_observers)
+        csv_content = csv_buffer.getvalue()
+        
+        # Return CSV content for client-side download
+        return jsonify({
+            'success': True,
+            'csv_content': csv_content,
+            'count': len(all_observers)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/file/autosave_old', methods=['POST'])
+def autosave_old() -> Dict[str, Any]:
+    """Auto-save current observations to .$$$ temp file - OLD VERSION"""
     from flask import current_app
     import os
     
@@ -1280,7 +1762,7 @@ def restore_autosave() -> Dict[str, Any]:
         # Set original filename (without .$$$)
         original_name = os.path.splitext(temp_filename)[0] + '.CSV'
         current_app.config['LOADED_FILE'] = original_name
-        current_app.config['DIRTY'] = True  # Mark as dirty since restored from temp
+        _auto_save_if_cloud()  # Mark as dirty since restored from temp
         
         # Delete the temp file
         try:
@@ -1291,8 +1773,7 @@ def restore_autosave() -> Dict[str, Any]:
         return jsonify({
             'success': True,
             'filename': original_name,
-            'count': len(observations),
-            'message': f'Restored {len(observations)} observations from autosave'
+            'count': len(observations)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1320,10 +1801,23 @@ def cleanup_autosave() -> Dict[str, Any]:
             temp_filepath.unlink()
             return jsonify({'success': True, 'deleted': temp_filename})
         else:
-            return jsonify({'success': True, 'message': 'No autosave file to delete'})
+            return jsonify({'success': True})
     except Exception as e:
         # Don't fail if cleanup fails
         return jsonify({'success': True, 'warning': str(e)})
+
+
+@api_blueprint.route('/config', methods=['GET'])
+def get_config() -> Dict[str, Any]:
+    """Get configuration including cloud mode and admin status."""
+    from halo.config import is_cloud_mode
+    
+    return jsonify({
+        'cloud_mode': is_cloud_mode(),
+        'is_admin': session.get('is_admin', False),
+        'authenticated': session.get('authenticated', False),
+        'username': session.get('username')
+    })
 
 
 @api_blueprint.route('/config/inputmode', methods=['GET', 'POST'])
@@ -1446,8 +1940,16 @@ def datedefault() -> Dict[str, Any]:
 def fixed_observer() -> Dict[str, Any]:
     """Get or set fixed observer (fester Beobachter)"""
     from flask import current_app, request
+    from halo.config import is_cloud_mode
     
     if request.method == 'POST':
+        # In cloud mode, fixed observer cannot be changed via API
+        if is_cloud_mode():
+            return jsonify({
+                'success': False,
+                'error': 'fixed_observer_cloud_mode_locked'
+            }), 403
+        
         data = request.get_json()
         observer = data.get('observer', '')
         
@@ -1465,7 +1967,9 @@ def fixed_observer() -> Dict[str, Any]:
     else:
         observer = current_app.config.get('FIXED_OBSERVER', '')
         return jsonify({
-            'observer': observer
+            'observer': observer,
+            'cloud_mode': is_cloud_mode(),
+            'editable': not is_cloud_mode()
         })
 
 
@@ -4515,7 +5019,7 @@ def update_observer(kk: str) -> Dict[str, Any]:
             
             # Mark as dirty if any observations were updated
             if obs_updated_count > 0:
-                current_app.config['DIRTY'] = True
+                _auto_save_if_cloud()
         
         return jsonify({
             'success': True,
@@ -4851,8 +5355,7 @@ def update_observer_site(kk):
         current_app.config['OBSERVERS'] = updated_observers
         
         return jsonify({
-            'success': True,
-            'message': 'Site updated successfully'
+            'success': True
         })
     except Exception as e:
         return jsonify({'error': f'Failed to update site: {str(e)}'}), 500
@@ -4908,8 +5411,7 @@ def delete_observer_site(kk):
         current_app.config['OBSERVERS'] = new_observers
         
         return jsonify({
-            'success': True,
-            'message': 'Site deleted successfully'
+            'success': True
         })
     except Exception as e:
         return jsonify({'error': f'Failed to delete site: {str(e)}'}), 500
@@ -6286,3 +6788,32 @@ def _format_parameter_value(value, param_name, all_params, prefix):
     
     return value
 
+
+@api_blueprint.route('/language/<lang>', methods=['POST'])
+def set_language(lang: str):
+    """
+    Save language preference to settings.
+    
+    Args:
+        lang: 'de' or 'en'
+        
+    Returns:
+        JSON with success status
+    """
+    from flask import current_app, session
+    from halo.services.settings import Settings
+    from halo.resources.i18n import set_language as i18n_set_language
+    
+    # Validate language
+    if lang not in ('de', 'en'):
+        return jsonify({'success': False, 'error': 'invalid_language'}), 400
+    
+    # Set in session (immediate effect)
+    session['language'] = lang
+    i18n_set_language(lang)
+    
+    # Save to settings file (halo.cfg or halo.KK.cfg)
+    current_app.config['LANGUAGE'] = lang
+    Settings.save_from(current_app.config)
+    
+    return jsonify({'success': True, 'language': lang})

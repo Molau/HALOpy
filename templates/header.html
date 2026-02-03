@@ -31,14 +31,15 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.file') }}</a>
                     <ul class="dropdown-menu">
+                        {% if not g.is_cloud %}
                         <li><a class="dropdown-item" href="#" data-action="new-file">{{ g.i18n.get('file.new_file') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="load">{{ g.i18n.get('file.load') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="select">{{ g.i18n.get('file.select') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="merge">{{ g.i18n.get('file.merge') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="save">{{ g.i18n.get('file.save') }}</a></li>
-                        <!-- Temporarily disabled until implementation is complete -->
-                        <!-- <li><a class="dropdown-item" href="#" data-action="upload">{{ g.i18n.get('file.upload') }}</a></li> -->
-                        <!-- <li><a class="dropdown-item" href="#" data-action="download">{{ g.i18n.get('file.download') }}</a></li> -->
+                        {% endif %}
+                        <li><a class="dropdown-item" href="#" data-action="upload">{{ g.i18n.get('file.upload') }}</a></li>
+                        <li><a class="dropdown-item" href="#" data-action="download">{{ g.i18n.get('file.download') }}</a></li>
                     </ul>
                 </li>
                 <!-- Observations Menu -->
@@ -59,6 +60,9 @@
                         <li><a class="dropdown-item" href="#" data-action="observer-add">{{ g.i18n.get('common.add') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="observer-modify">{{ g.i18n.get('common.modify') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="observer-delete">{{ g.i18n.get('common.delete') }}</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="showObserverUploadDialog(); return false;">{{ g.i18n.get('observers.upload') }}</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="showObserverDownloadDialog(); return false;">{{ g.i18n.get('observers.download') }}</a></li>
                     </ul>
                 </li>
                 <!-- Analysis Menu -->
@@ -78,12 +82,18 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.settings') }}</a>
                     <ul class="dropdown-menu">
+                        {% if not g.is_cloud %}
                         <li><a class="dropdown-item" href="#" data-action="settings-fixed-observer">{{ g.i18n.get('settings.fixed_observer') }}</a></li>
+                        {% endif %}
                         <li><a class="dropdown-item" href="#" data-action="settings-active-observers">{{ g.i18n.get('settings.active_observers') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-startup-file">{{ g.i18n.get('settings.startup_file') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-datum">{{ g.i18n.get('settings.date_default') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-eingabeart">{{ g.i18n.get('settings.input_type') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-ausgabeart">{{ g.i18n.get('settings.output_type') }}</a></li>
+                        {% if g.is_cloud %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" data-action="settings-change-password">{{ g.i18n.get('settings.change_password') }}</a></li>
+                        {% endif %}
 
                     </ul>
                 </li>
@@ -91,9 +101,15 @@
                 <li class="nav-item">
                     <a class="nav-link menu-title" href="#" onclick="handleMenuAction('help-text'); return false;">{{ g.i18n.get('menu_titles.help') }}</a>
                 </li>
+                <!-- Logout Menu (cloud mode only) -->
+                {% if g.is_cloud %}
+                <li class="nav-item">
+                    <a class="nav-link menu-title" href="#" onclick="handleMenuAction('logout'); return false;">{{ g.i18n.get('menu_titles.logout') }}</a>
+                </li>
+                {% endif %}
             </ul>
             <div class="ms-auto d-flex align-items-center">
-                <small id="file-info" class="text-muted" style="display:none;">
+                <small id="file-info" class="text-muted" {% if not g.is_cloud %}style="display:none;"{% endif %}>
                     <i class="bi bi-file-earmark-text me-1"></i>
                     <span id="file-name"></span>
                     <span class="mx-2">|</span>

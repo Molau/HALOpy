@@ -294,3 +294,78 @@ class ObservationCSV:
                 ]
                 
                 writer.writerow(fields)
+    
+    @staticmethod
+    def write_to_buffer(observations: List[Observation], buffer) -> None:
+        """
+        Write observations to a string buffer in modern CSV format.
+        Same as write_observations but writes to StringIO buffer instead of file.
+        
+        Args:
+            observations: List of Observation objects
+            buffer: StringIO buffer to write to
+        """
+        writer = csv.writer(buffer, quoting=csv.QUOTE_MINIMAL)
+        
+        for obs in observations:
+            # Helper function to format field values
+            def format_field(value):
+                """Format field: -1→empty, -2→'/', else→number"""
+                if value == -1:
+                    return ''  # Not observed/unknown
+                elif value == -2:
+                    return '/'  # Observed but not present
+                else:
+                    return str(value)
+            
+            # Format fields with proper encoding of special values
+            d_str = '/' if obs.d == 255 else format_field(obs.d)
+            
+            # For HO and HU: -1→spaces, 0→'//', else→number with padding
+            ho_str = ''
+            if obs.HO == -1:
+                ho_str = '  '  # Not observed = spaces
+            elif obs.HO == 0:
+                ho_str = '//'  # Not applicable
+            else:
+                ho_str = str(obs.HO).zfill(2)  # Pad to 2 digits
+            
+            hu_str = ''
+            if obs.HU == -1:
+                hu_str = '  '  # Not observed = spaces
+            elif obs.HU == 0:
+                hu_str = '//'  # Not applicable
+            else:
+                hu_str = str(obs.HU).zfill(2)  # Pad to 2 digits
+            
+            # Combine to 8HHHH field - always starts with '8'
+            ho_hu_field = f'8{ho_str}{hu_str}'
+            
+            fields = [
+                str(obs.KK),
+                format_field(obs.O),
+                str(obs.JJ),
+                str(obs.MM),
+                str(obs.TT),
+                str(obs.g),
+                format_field(obs.ZS),
+                format_field(obs.ZM),
+                d_str,
+                format_field(obs.DD),
+                format_field(obs.N),
+                format_field(obs.C),
+                format_field(obs.c),
+                str(obs.EE),
+                format_field(obs.H),
+                format_field(obs.F),
+                format_field(obs.V),
+                format_field(obs.f),
+                format_field(obs.zz),
+                str(obs.GG),
+                ho_hu_field,
+                obs.sectors if obs.sectors else '',  # Empty if no sectors
+                obs.remarks  # csv.writer handles quoting automatically
+            ]
+            
+            writer.writerow(fields)
+

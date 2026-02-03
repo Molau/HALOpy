@@ -9,6 +9,7 @@ NO NORMALIZATION, NO LOGIC - just simple comparison.
 Checks:
 1. Missing Keys - Referenced in code but NOT defined in strings_de.json
 2. Unused Keys - Defined in strings_de.json but NOT used anywhere in code
+3. DE/EN Synchronization - Verify both language files have identical structure
 
 Output: Report of missing and unused i18n keys.
 """
@@ -142,6 +143,10 @@ def main():
     print(f"Loading i18n definitions from: {i18n_file}")
     defined_keys = load_i18n_keys(i18n_file)
     print(f"  → {len(defined_keys)} keys defined in strings_de.json")
+    
+    # Load strings_de.json data for later DE/EN sync check
+    with open(i18n_file, 'r', encoding='utf-8') as f:
+        strings_de = json.load(f)
     print()
     
     # Find most recent audit CSV
@@ -275,6 +280,46 @@ def main():
         else:
             f.write("✓ No unused keys found! All definitions are used in code.\n\n")
         
+        # DE/EN Synchronization section
+        f.write("\n")
+        f.write("=" * 80 + "\n")
+        f.write("DE/EN SYNCHRONIZATION CHECK\n")
+        f.write("=" * 80 + "\n")
+        f.write("\n")
+        
+        en_file = i18n_file.parent / 'strings_en.json'
+        if en_file.exists():
+            with open(en_file, 'r', encoding='utf-8') as en_f:
+                en_data = json.load(en_f)
+            
+            # Flatten both structures to compare ALL keys (not just top-level)
+            de_all_keys = set(flatten_dict(strings_de, leaf_only=False).keys())
+            en_all_keys = set(flatten_dict(en_data, leaf_only=False).keys())
+            
+            f.write(f"DE total keys (all levels): {len(de_all_keys)}\n")
+            f.write(f"EN total keys (all levels): {len(en_all_keys)}\n")
+            f.write("\n")
+            
+            missing_in_en = de_all_keys - en_all_keys
+            missing_in_de = en_all_keys - de_all_keys
+            
+            if missing_in_en or missing_in_de:
+                f.write("⚠ STRUCTURE MISMATCH DETECTED\n\n")
+                if missing_in_en:
+                    f.write(f"Missing in EN ({len(missing_in_en)} keys):\n")
+                    for key in sorted(missing_in_en):
+                        f.write(f"  - {key}\n")
+                    f.write("\n")
+                if missing_in_de:
+                    f.write(f"Missing in DE ({len(missing_in_de)} keys):\n")
+                    for key in sorted(missing_in_de):
+                        f.write(f"  - {key}\n")
+                    f.write("\n")
+            else:
+                f.write("✓ DE/EN SYNCHRONIZED - Both files have identical structure (all levels)\n\n")
+        else:
+            f.write(f"⚠ WARNING: strings_en.json not found at {en_file}\n\n")
+        
         f.write("\n")
         f.write("=" * 80 + "\n")
         f.write("END OF REPORT\n")
@@ -305,6 +350,46 @@ def main():
             print(f"  - {key}")
     else:
         print(f"\n✓ NO UNUSED KEYS")
+    
+    # Check DE/EN synchronization
+    print()
+    print("=" * 80)
+    print("DE/EN SYNCHRONIZATION CHECK:")
+    print("-" * 80)
+    
+    en_file = i18n_file.parent / 'strings_en.json'
+    if en_file.exists():
+        with open(en_file, 'r', encoding='utf-8') as f:
+            en_data = json.load(f)
+        
+        # Flatten both structures to compare ALL keys (not just top-level)
+        de_all_keys = set(flatten_dict(strings_de, leaf_only=False).keys())
+        en_all_keys = set(flatten_dict(en_data, leaf_only=False).keys())
+        
+        print(f"DE total keys (all levels): {len(de_all_keys)}")
+        print(f"EN total keys (all levels): {len(en_all_keys)}")
+        
+        missing_in_en = de_all_keys - en_all_keys
+        missing_in_de = en_all_keys - de_all_keys
+        
+        if missing_in_en or missing_in_de:
+            print(f"\n⚠ STRUCTURE MISMATCH DETECTED")
+            if missing_in_en:
+                print(f"\nMissing in EN ({len(missing_in_en)} keys):")
+                for key in sorted(missing_in_en)[:10]:  # Show first 10
+                    print(f"  - {key}")
+                if len(missing_in_en) > 10:
+                    print(f"  ... and {len(missing_in_en) - 10} more")
+            if missing_in_de:
+                print(f"\nMissing in DE ({len(missing_in_de)} keys):")
+                for key in sorted(missing_in_de)[:10]:  # Show first 10
+                    print(f"  - {key}")
+                if len(missing_in_de) > 10:
+                    print(f"  ... and {len(missing_in_de) - 10} more")
+        else:
+            print(f"\n✓ DE/EN SYNCHRONIZED - Both files have identical structure (all levels)")
+    else:
+        print(f"\n⚠ WARNING: strings_en.json not found at {en_file}")
     
     print()
     print("=" * 80)

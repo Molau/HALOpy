@@ -425,6 +425,10 @@ function handleMenuAction(action) {
             highlightSettingsMenu();
             showAusgabeartDialog();
             break;
+        case 'settings-change-password':
+            highlightSettingsMenu();
+            showChangePasswordDialog();
+            break;
         case 'settings-active-observers':
             highlightSettingsMenu();
             showActiveObserversDialog();
@@ -457,6 +461,11 @@ function handleMenuAction(action) {
         case 'help-text':
             highlightHelpMenu();
             showHelpDialog();
+            break;
+        
+        // Logout (cloud mode only)
+        case 'logout':
+            handleLogout();
             break;
             
         // Exit menu removed
@@ -1839,7 +1848,7 @@ function parseNumericObservation(s) {
 // Load internationalization strings
 async function loadI18n(lang) {
     try {
-        const response = await fetch(`/api/i18n/${lang}`);
+        const response = await fetch(`/api/i18n/${lang}?v=${Date.now()}`);
         i18nStrings = await response.json();
         updatePageText();
     } catch (error) {}
@@ -2549,7 +2558,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
         
         // Check if at least one field was filled
         if (Object.keys(updates).length === 0) {
-            showWarningModal('Bitte f?llen Sie mindestens ein Feld aus.');
+            showWarningModal(i18nStrings.messages.fill_at_least_one_field);
             return;
         }
         
@@ -3677,7 +3686,7 @@ async function showSelectDialog() {
     }
 
     // Load i18n data for filter options
-    const i18nResp = await fetch(`/api/i18n/${currentLanguage}`);
+    const i18nResp = await fetch(`/api/i18n/${currentLanguage}?v=${Date.now()}`);
     const i18n = await i18nResp.json();
 
     // Build filter options (same as in Auswertung)
@@ -4829,6 +4838,12 @@ async function showAuthenticationModal(onSuccess) {
     const loginBtn = document.getElementById('btn-login');
     
     // Populate observer dropdown
+    // Add admin option first
+    const adminOption = document.createElement('option');
+    adminOption.value = 'admin';
+    adminOption.textContent = 'Admin';
+    observerSelect.appendChild(adminOption);
+    
     observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
         const option = document.createElement('option');
         option.value = obs.KK;
@@ -4913,62 +4928,165 @@ async function showAuthenticationModal(onSuccess) {
 // Upload file to HALO server
 async function showUploadDialog() {
     try {
-        // Check if file is loaded
-        const statusResponse = await fetch('/api/file/status');
-        const status = await statusResponse.json();
+        // Check if we're in cloud mode
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        const isCloudMode = config.cloud_mode;
         
-        if (!status.filename) {
-            showErrorDialog(i18nStrings.messages.no_file_loaded);
-            return;
-        }
-        
-        // Get total observation count
-        const totalCount = status.count || 0;
-        
-        // Step 1: Show authentication modal
-        showAuthenticationModal(async (observerKK, password) => {
-            // Step 2: Load observers to get the observer name
-            const observersResponse = await fetch('/api/observers');
-            const observersData = await observersResponse.json();
-            const observers = observersData.observers || [];
+        if (isCloudMode) {
+            // Cloud mode: User already authenticated, just select file and upload
+            showUploadFileDialog(config.username);
+        } else {
+            // Local mode: Need file loaded first, then show auth dialog
+            const statusResponse = await fetch('/api/file/status');
+            const status = await statusResponse.json();
             
-            // Find the observer's name
-            const observer = observers.find(obs => String(obs.KK) === String(observerKK));
-            const observerName = observer ? `${observer.VName || ''} ${observer.NName || ''}`.trim() : '';
-            const observerDisplay = observerName ? `${observerKK} - ${observerName}` : observerKK;
-            
-            // Step 3: Filter observations by observer KK
-            const allObservationsResponse = await fetch('/api/observations?limit=200000');
-            const allData = await allObservationsResponse.json();
-            const allObservations = allData.observations || [];
-            
-            // Filter for this observer only - use String comparison to handle both string and number KK
-            const filteredObservations = allObservations.filter(obs => String(obs.KK) === String(observerKK));
-            const filteredCount = filteredObservations.length;
-            
-            // Check if observer has any observations
-            if (filteredCount === 0) {
-                showErrorDialog(i18nStrings.upload_download.upload_no_observations.replace('{0}', observerDisplay));
+            if (!status.filename) {
+                showErrorDialog(i18nStrings.messages.no_file_loaded);
                 return;
             }
             
-            // Prepare confirmation message
-            let confirmMessage;
-            if (filteredCount === totalCount) {
-                // All observations belong to this observer
-                confirmMessage = i18nStrings.upload_download.upload_confirm.replace('{0}', filteredCount);
-            } else {
-                // Some observations filtered out
-                confirmMessage = i18nStrings.upload_download.upload_confirm_filtered
-                    .replace('{0}', filteredCount)
-                    .replace('{1}', totalCount)
-                    .replace('{2}', observerDisplay);
-            }
+            const totalCount = status.count || 0;
             
-            // Create custom modal with radio buttons for upload mode
-            const modalHtml = `
-                <div class="modal fade" id="upload-confirm-modal" tabindex="-1">
-                    <div class="modal-dialog">
+            // Show authentication modal
+            showAuthenticationModal(async (observerKK, password) => {
+                await uploadLocalModeObservations(observerKK, password, totalCount);
+            });
+        }
+    } catch (error) {
+        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+    }
+}
+
+// Upload in cloud mode: Select file from local disk
+async function showUploadFileDialog(observerKK) {
+    // Create file input dialog
+    const modalHtml = `
+        <div class="modal fade" id="upload-file-modal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${i18nStrings.upload_download.upload_title}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">${i18nStrings.file.load}:</label>
+                            <input type="file" class="form-control" id="upload-file-input" accept=".csv">
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="upload_mode" id="upload-add" value="add" checked>
+                            <label class="form-check-label" for="upload-add">${i18nStrings.upload_download.upload_mode_add}</label>
+                        </div>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio" name="upload_mode" id="upload-replace" value="replace">
+                            <label class="form-check-label" for="upload-replace">${i18nStrings.upload_download.upload_mode_replace}</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-upload-file">${i18nStrings.upload_download.upload_title}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById('upload-file-modal');
+    const modal = new bootstrap.Modal(modalEl);
+    const fileInput = document.getElementById('upload-file-input');
+    
+    document.getElementById('btn-upload-file').addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) {
+            showErrorDialog(i18nStrings.messages.no_file_selected);
+            return;
+        }
+        
+        const uploadMode = document.querySelector('input[name="upload_mode"]:checked').value;
+        
+        // Hide modal
+        modal.hide();
+        setTimeout(() => modalEl.remove(), 300);
+        
+        // Read CSV file
+        const spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.messages.loading_file);
+        
+        try {
+            const text = await file.text();
+            const observations = parseCSVObservations(text);
+            
+            // Hide loading spinner
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+            
+            // Upload observations
+            await performUploadAuthenticated(observerKK, observations, uploadMode);
+            
+        } catch (error) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        }
+    });
+    
+    modal.show();
+}
+
+// Upload in local mode: Use loaded observations
+async function uploadLocalModeObservations(observerKK, password, totalCount) {
+    const isAdmin = observerKK === 'admin';
+    
+    // Step 2: Load observers to get the observer name
+    const observersResponse = await fetch('/api/observers');
+    const observersData = await observersResponse.json();
+    const observers = observersData.observers || [];
+    
+    // Find the observer's name (skip for admin)
+    let observerDisplay = observerKK;
+    if (!isAdmin) {
+        const observer = observers.find(obs => String(obs.KK) === String(observerKK));
+        const observerName = observer ? `${observer.VName || ''} ${observer.NName || ''}`.trim() : '';
+        observerDisplay = observerName ? `${observerKK} - ${observerName}` : observerKK;
+    } else {
+        observerDisplay = 'Admin';
+    }
+    
+    // Step 3: Filter observations by observer KK (skip filter for admin)
+    const allObservationsResponse = await fetch('/api/observations?limit=200000');
+    const allData = await allObservationsResponse.json();
+    const allObservations = allData.observations || [];
+    
+    // Filter for this observer only (admin gets all observations)
+    const filteredObservations = isAdmin 
+        ? allObservations 
+        : allObservations.filter(obs => String(obs.KK) === String(observerKK));
+    const filteredCount = filteredObservations.length;
+    
+    // Check if observer has any observations
+    if (filteredCount === 0) {
+        showErrorDialog(i18nStrings.upload_download.upload_no_observations.replace('{0}', observerDisplay));
+        return;
+    }
+    
+    // Prepare confirmation message
+    let confirmMessage;
+    if (isAdmin || filteredCount === totalCount) {
+        // All observations will be uploaded
+        confirmMessage = i18nStrings.upload_download.upload_confirm.replace('{0}', filteredCount);
+    } else {
+        // Some observations filtered out
+        confirmMessage = i18nStrings.upload_download.upload_confirm_filtered
+            .replace('{0}', filteredCount)
+            .replace('{1}', totalCount)
+            .replace('{2}', observerDisplay);
+    }
+    
+    // Create custom modal with radio buttons for upload mode
+    const modalHtml = `
+        <div class="modal fade" id="upload-confirm-modal" tabindex="-1">
+            <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title">${i18nStrings.upload_download.upload_title}</h5>
@@ -5011,14 +5129,11 @@ async function showUploadDialog() {
                 const spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
                 
                 try {
-                    // Upload to HALO server API with filtered observations
-                    const uploadUrl = 'https://halo.online/api/upload'; // Placeholder URL
-                    
+                    // Upload to server with authentication and mode
                     const response = await fetch('/api/file/upload', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            targetUrl: uploadUrl,
                             observerKK: observerKK,
                             password: password,
                             observations: filteredObservations,
@@ -5033,11 +5148,14 @@ async function showUploadDialog() {
                     setTimeout(() => spinner.modalEl.remove(), 300);
                     
                     if (response.ok && result.success) {
-                        // Success - show toast notification with filtered count
-                        const successMessage = i18nStrings.upload_download.upload_success.replace('{0}', filteredCount);
+                        // Success - show toast notification with actual added count
+                        const successMessage = i18nStrings.upload_download.upload_success.replace('{0}', result.count);
                         showNotification(successMessage, 'success');
+                        
+                        // Reload observations to show updated count
+                        await checkAndDisplayFileInfo();
                     } else {
-                        showErrorDialog(i18nStrings.common.error + ': ' + (result.error));
+                        showErrorDialog(i18nStrings.common.error + ': ' + result.error);
                     }
                 } catch (error) {
                     // Hide spinner on error
@@ -5056,83 +5174,141 @@ async function showUploadDialog() {
     }
 }
 
-// Download file from HALO server
-async function showDownloadDialog() {
-    // Show filename input dialog
-    const modalHtml = `
-        <div class="modal fade" id="download-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${i18nStrings.upload_download.download_title}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <label class="form-label">${i18nStrings.upload_download.download_filename_prompt}</label>
-                        <input type="text" class="form-control" id="download-filename" placeholder="download" value="download">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-download-confirm">${i18nStrings.common.ok}</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
+// Parse CSV text into observation objects
+function parseCSVObservations(csvText) {
+    const lines = csvText.trim().split('\n');
+    const observations = [];
     
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('download-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    const filenameInput = document.getElementById('download-filename');
-    
-    modal.show();
-    setTimeout(() => {
-        filenameInput.focus();
-        filenameInput.select(); // Select all text so first keystroke replaces it
-    }, 500);
-    
-    // Handle OK button click
-    document.getElementById('btn-download-confirm').addEventListener('click', async () => {
-        const filename = filenameInput.value.trim();
-        if (!filename) return;
+    for (const line of lines) {
+        if (!line.trim()) continue;
         
-        modal.hide();
-        await processDownload(filename);
-    });
-    
-    // Handle Enter key in input
-    filenameInput.addEventListener('keydown', async (e) => {
-        if (e.key === 'Enter') {
-            const filename = filenameInput.value.trim();
-            if (!filename) return;
-            
-            modal.hide();
-            await processDownload(filename);
+        // Parse CSV line - handle quoted fields
+        const fields = [];
+        let currentField = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                    currentField += '"';
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                fields.push(currentField);
+                currentField = '';
+            } else {
+                currentField += char;
+            }
         }
-    });
+        fields.push(currentField);
+        
+        // Convert to observation object
+        if (fields.length >= 20) {
+            const obs = {
+                KK: parseInt(fields[0]) || -1,
+                O: parseInt(fields[1]) || -1,
+                JJ: parseInt(fields[2]) || -1,
+                MM: parseInt(fields[3]) || -1,
+                TT: parseInt(fields[4]) || -1,
+                g: parseInt(fields[5]) || -1,
+                ZS: parseInt(fields[6]) || -1,
+                ZM: parseInt(fields[7]) || -1,
+                d: parseInt(fields[8]) || -1,
+                DD: parseInt(fields[9]) || -1,
+                N: parseInt(fields[10]) || -1,
+                C: parseInt(fields[11]) || -1,
+                c: parseInt(fields[12]) || -1,
+                EE: parseInt(fields[13]) || -1,
+                H: parseInt(fields[14]) || -1,
+                F: parseInt(fields[15]) || -1,
+                V: parseInt(fields[16]) || -1,
+                f: parseInt(fields[17]) || -1,
+                zz: parseInt(fields[18]) || -1,
+                GG: parseInt(fields[19]) || -1,
+                HO: fields[20] ? parseInt(fields[20]) : -1,
+                HU: fields[21] ? parseInt(fields[21]) : -1,
+                sectors: fields[22] || '',
+                remarks: fields[23] || ''
+            };
+            observations.push(obs);
+        }
+    }
     
-    // Clean up modal after hiding
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        clearMenuHighlights();
-        modalEl.remove();
-    });
+    return observations;
 }
 
-async function processDownload(filename) {
+// Perform upload with authenticated session (cloud mode)
+async function performUploadAuthenticated(observerKK, observations, uploadMode) {
+    const spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
+    
+    try {
+        const response = await fetch('/api/file/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                observerKK: observerKK,
+                password: '', // Empty password - will use session authentication
+                observations: observations,
+                mode: uploadMode,
+                use_session: true
+            })
+        });
+        
+        const result = await response.json();
+        
+        // Hide spinner
+        spinner.modal.hide();
+        setTimeout(() => spinner.modalEl.remove(), 300);
+        
+        if (response.ok && result.success) {
+            const successMessage = i18nStrings.upload_download.upload_success.replace('{0}', result.count);
+            showNotification(successMessage, 'success');
+            
+            // Reload observations to show updated count
+            await checkAndDisplayFileInfo();
+        } else {
+            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+        }
+    } catch (error) {
+        spinner.modal.hide();
+        setTimeout(() => spinner.modalEl.remove(), 300);
+        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+    }
+}
+
+// Download file from HALO server
+async function showDownloadDialog() {
+    // Detect cloud vs local mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    const isCloudMode = config.is_cloud;
+    
+    if (isCloudMode) {
+        // Cloud mode: use session authentication
+        await downloadCloudMode();
+    } else {
+        // Local mode: show authentication dialog first
+        await downloadLocalMode();
+    }
+}
+
+async function downloadCloudMode() {
+    // Cloud mode: user is already authenticated via session
+    // Show file save dialog directly
     let spinner = null;
     try {
-        // Show progress spinner
         spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
-        // Download from HALO server API
-        // TODO: Define exact API endpoint URL
-        const downloadUrl = 'https://halo.online/api/download'; // Placeholder URL
-        
+        // Download from server with session authentication
         const response = await fetch('/api/file/download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                filename: filename,
-                sourceUrl: downloadUrl
+                use_session: true,
+                observerKK: 'session'  // Will be read from session
             })
         });
         
@@ -5145,23 +5321,480 @@ async function processDownload(filename) {
         }
         
         if (response.ok && result.success) {
-            // Update global state
-            window.haloData.fileName = result.filename;
-            window.haloData.observations = result.observations || [];
-            window.haloData.isLoaded = true;
-            window.haloData.isDirty = true;
+            // Trigger file save dialog
+            const csvContent = result.csv_content;
+            const defaultFilename = `beobachtungen_${result.observer_kk || 'all'}.csv`;
+            triggerFileSaveDialog(csvContent, defaultFilename);
             
-            // Update file info display
-            updateFileInfoDisplay(result.filename, result.count);
-            
-            // Success toast
+            // Success notification
             const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
             showNotification(successMessage, 'success');
+            } else {
+                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            }
+        } catch (error) {
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        }
+    });
+}
+
+async function downloadLocalMode() {
+    // Local mode: show authentication dialog with scope selection
+    showDownloadAuthModal(async (observerKK, password, downloadAll) => {
+        let spinner = null;
+        try {
+            spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+            
+            // Download from server with password authentication
+            const response = await fetch('/api/file/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    observerKK: observerKK,
+                    password: password,
+                    use_session: false,
+                    download_all: downloadAll
+                })
+            });
+            
+            const result = await response.json();
+            
+            // Hide spinner
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            
+            if (response.ok && result.success) {
+                // Trigger file save dialog
+                const csvContent = result.csv_content;
+                const defaultFilename = result.is_admin 
+                    ? 'beobachtungen_all.csv'
+                    : `beobachtungen_${result.observer_kk}.csv`;
+                triggerFileSaveDialog(csvContent, defaultFilename);
+                
+                // Success notification
+                const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
+                showNotification(successMessage, 'success');
+            } else {
+                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            }
+        } catch (error) {
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        }
+    });
+}
+
+function triggerFileSaveDialog(csvContent, defaultFilename) {
+    // Create a Blob from CSV content
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create temporary <a> element to trigger download with save dialog
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = defaultFilename;  // Suggested filename
+    link.style.display = 'none';
+    
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+
+// ============================================================================
+// Observer Upload/Download Functions
+// ============================================================================
+
+async function showObserverUploadDialog() {
+    // Detect cloud vs local mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    const isCloudMode = config.is_cloud;
+    
+    if (isCloudMode) {
+        await uploadObserversCloudMode();
+    } else {
+        await uploadObserversLocalMode();
+    }
+}
+
+async function uploadObserversCloudMode() {
+    // Cloud mode: user is already authenticated via session
+    let spinner = null;
+    try {
+        spinner = showInfoModal(i18nStrings.observers.upload_title, i18nStrings.observers.upload_progress);
+        
+        // Load current observers from app
+        const observersResponse = await fetch('/api/observers');
+        const observersData = await observersResponse.json();
+        const allObservers = observersData.observers || [];
+        
+        if (allObservers.length === 0) {
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            showErrorDialog(i18nStrings.common.error + ': ' + i18nStrings.messages.no_observer_data_to_upload);
+            return;
+        }
+        
+        // Upload to server with session authentication
+        const response = await fetch('/api/observers/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                use_session: true,
+                observers: allObservers
+            })
+        });
+        
+        const result = await response.json();
+        
+        // Hide spinner
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+        
+        if (response.ok && result.success) {
+            showNotification(i18nStrings.observers.upload_success, 'success');
         } else {
             showErrorDialog(i18nStrings.common.error + ': ' + result.error);
         }
     } catch (error) {
-        // Hide spinner on error
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+    }
+}
+
+async function uploadObserversLocalMode() {
+    // Local mode: show authentication dialog
+    showAuthenticationModal(async (observerKK, password) => {
+        let spinner = null;
+        try {
+            spinner = showInfoModal(i18nStrings.observers.upload_title, i18nStrings.observers.upload_progress);
+            
+            // Load current observers from app
+            const observersResponse = await fetch('/api/observers');
+            const observersData = await observersResponse.json();
+            const allObservers = observersData.observers || [];
+            
+            // Determine if admin
+            const isAdmin = observerKK.toUpperCase() === 'ADMIN';
+            
+            // Filter observers by KK (unless admin)
+            let observersToUpload;
+            if (isAdmin) {
+                observersToUpload = allObservers;
+            } else {
+                observersToUpload = allObservers.filter(obs => obs[0] === observerKK);
+            }
+            
+            if (observersToUpload.length === 0) {
+                if (spinner) {
+                    spinner.modal.hide();
+                    setTimeout(() => spinner.modalEl.remove(), 300);
+                }
+                showErrorDialog(i18nStrings.common.error + ': ' + i18nStrings.messages.no_observer_data_to_upload);
+                return;
+            }
+            
+            // Upload to server
+            const response = await fetch('/api/observers/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    observerKK: observerKK,
+                    password: password,
+                    use_session: false,
+                    observers: observersToUpload
+                })
+            });
+            
+            const result = await response.json();
+            
+            // Hide spinner
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            
+            if (response.ok && result.success) {
+                showNotification(i18nStrings.observers.upload_success, 'success');
+            } else {
+                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            }
+        } catch (error) {
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        }
+    });
+}
+
+async function showObserverDownloadDialog() {
+    // Detect cloud vs local mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    const isCloudMode = config.is_cloud;
+    
+    if (isCloudMode) {
+        await downloadObserversCloudMode();
+    } else {
+        await downloadObserversLocalMode();
+    }
+}
+
+async function downloadObserversCloudMode() {
+    // Cloud mode: download complete halobeo.csv (no KK filter)
+    let spinner = null;
+    try {
+        spinner = showInfoModal(i18nStrings.observers.download_title, i18nStrings.observers.download_progress);
+        
+        // Download from server with session authentication
+        const response = await fetch('/api/observers/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                use_session: true
+            })
+        });
+        
+        const result = await response.json();
+        
+        // Hide spinner
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+        
+        if (response.ok && result.success) {
+            // Trigger file save dialog
+            const csvContent = result.csv_content;
+            const defaultFilename = 'halobeo.csv';
+            triggerFileSaveDialog(csvContent, defaultFilename);
+            
+            // Success notification
+            showNotification(i18nStrings.observers.download_success, 'success');
+        } else {
+            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+        }
+    } catch (error) {
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+    }
+}
+
+function showDownloadScopeDialog(callback) {
+    // Create scope selection dialog for cloud mode (no auth needed)
+    const modalHtml = `
+        <div class="modal fade" id="download-scope-modal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${i18nStrings.upload_download.download_title}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label fw-bold">${i18nStrings.upload_download.download_scope_label}</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="downloadScope" id="scope-own" value="own" checked>
+                            <label class="form-check-label" for="scope-own">
+                                ${i18nStrings.upload_download.download_scope_own}
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="downloadScope" id="scope-all" value="all">
+                            <label class="form-check-label" for="scope-all">
+                                ${i18nStrings.upload_download.download_scope_all}
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-download-scope-ok">${i18nStrings.common.ok}</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById('download-scope-modal');
+    const modal = new bootstrap.Modal(modalEl);
+    
+    modal.show();
+    
+    document.getElementById('btn-download-scope-ok').addEventListener('click', () => {
+        const downloadAll = document.getElementById('scope-all').checked;
+        modal.hide();
+        callback(downloadAll);
+    });
+    
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        modalEl.remove();
+    });
+}
+
+function showDownloadAuthModal(callback) {
+    // Create authentication dialog with scope selection for local mode
+    const modalHtml = `
+        <div class="modal fade" id="download-auth-modal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${i18nStrings.upload_download.download_title}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">${i18nStrings.upload_download.upload_auth_username}</label>
+                            <select class="form-select" id="download-observer-kk">
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">${i18nStrings.upload_download.upload_auth_password}</label>
+                            <input type="password" class="form-control" id="download-password" placeholder="${i18nStrings.upload_download.upload_auth_password}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">${i18nStrings.upload_download.download_scope_label}</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="downloadScope" id="download-scope-own" value="own" checked>
+                                <label class="form-check-label" for="download-scope-own">
+                                    ${i18nStrings.upload_download.download_scope_own}
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="downloadScope" id="download-scope-all" value="all">
+                                <label class="form-check-label" for="download-scope-all">
+                                    ${i18nStrings.upload_download.download_scope_all}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-download-auth-ok">${i18nStrings.common.ok}</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById('download-auth-modal');
+    const modal = new bootstrap.Modal(modalEl);
+    const observerSelect = document.getElementById('download-observer-kk');
+    const passwordInput = document.getElementById('download-password');
+    
+    // Load observers
+    fetch('/api/observers')
+        .then(response => response.json())
+        .then(data => {
+            const observers = data.observers || [];
+            const uniqueObservers = new Map();
+            observers.forEach(obs => {
+                if (obs[0] && !uniqueObservers.has(obs[0])) {
+                    const name = `${obs[2]} ${obs[1]}`.trim() || 'Unbekannt';
+                    uniqueObservers.set(obs[0], name);
+                }
+            });
+            
+            Array.from(uniqueObservers.entries())
+                .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
+                .forEach(([kk, name]) => {
+                    const option = document.createElement('option');
+                    option.value = kk;
+                    option.textContent = `${kk} - ${name}`;
+                    observerSelect.appendChild(option);
+                });
+        });
+    
+    modal.show();
+    setTimeout(() => passwordInput.focus(), 500);
+    
+    const handleOk = () => {
+        const observerKK = observerSelect.value;
+        const password = passwordInput.value;
+        const downloadAll = document.getElementById('download-scope-all').checked;
+        
+        if (!password) {
+            passwordInput.focus();
+            return;
+        }
+        
+        modal.hide();
+        callback(observerKK, password, downloadAll);
+    };
+    
+    document.getElementById('btn-download-auth-ok').addEventListener('click', handleOk);
+    passwordInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleOk();
+    });
+    
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        modalEl.remove();
+    });
+}
+
+async function downloadObserversLocalMode() {
+    // Local mode: download complete halobeo.csv (no KK filter)
+    // Note: No authentication needed for download in local mode
+    let spinner = null;
+    try {
+        spinner = showInfoModal(i18nStrings.observers.download_title, i18nStrings.observers.download_progress);
+        
+        // Download from server (no authentication for local mode download)
+        const response = await fetch('/api/observers/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                use_session: false,
+                no_auth: true  // Special flag for local mode download without auth
+            })
+        });
+        
+        const result = await response.json();
+        
+        // Hide spinner
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+        
+        if (response.ok && result.success) {
+            // Trigger file save dialog
+            const csvContent = result.csv_content;
+            const defaultFilename = 'halobeo.csv';
+            triggerFileSaveDialog(csvContent, defaultFilename);
+            
+            // Success notification
+            showNotification(i18nStrings.observers.download_success, 'success');
+        } else {
+            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+        }
+    } catch (error) {
         if (spinner) {
             spinner.modal.hide();
             setTimeout(() => spinner.modalEl.remove(), 300);
@@ -5774,6 +6407,12 @@ async function showFixedObserverDialog() {
         const config = await configResponse.json();
         const currentObserver = config.observer || '';
         
+        // Check if in cloud mode (not editable)
+        if (config.cloud_mode || !config.editable) {
+            showErrorDialog(i18nStrings.messages.fixed_observer_cloud_mode_locked);
+            return;
+        }
+        
         // Get list of observers
         const obsResponse = await fetch('/api/observers/list');
         const obsData = await obsResponse.json();
@@ -6092,6 +6731,233 @@ async function showAusgabeartDialog() {
     } catch (error) {}
 }
 
+// Show change password dialog (cloud mode only)
+async function showChangePasswordDialog() {
+    try {
+        const i18n = i18nStrings.settings;
+        
+        // Check if user is admin
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        const isAdmin = config.is_admin || false;
+        
+        let modalHtml;
+        
+        if (isAdmin) {
+            // Admin mode: Select user + password
+            const observersResponse = await fetch('/api/observers/list');
+            const observers = await observersResponse.json();
+            
+            const observerOptions = observers.map(obs => 
+                `<option value="${obs.KK}">${obs.KK} - ${obs.VName} ${obs.NName}</option>`
+            ).join('');
+            
+            modalHtml = `
+                <div class="modal fade" id="change-password-modal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${i18n.change_password_admin_title}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">${i18n.select_user_label}</label>
+                                    <select class="form-select" id="select-user">
+                                        <option value="">${i18nStrings.common.please_select}</option>
+                                        <option value="admin">${i18n.admin_user}</option>
+                                        ${observerOptions}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">${i18n.new_password_label}</label>
+                                    <input type="password" class="form-control" id="new-password" autocomplete="new-password">
+                                </div>
+                                <div class="mb-3" id="confirm-password-group">
+                                    <label class="form-label">${i18n.confirm_password_label}</label>
+                                    <input type="password" class="form-control" id="confirm-password" autocomplete="new-password">
+                                </div>
+                                <div id="password-error" class="alert alert-danger d-none"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-change-password">${i18nStrings.common.ok}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Regular user mode: Current password required
+            modalHtml = `
+                <div class="modal fade" id="change-password-modal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${i18n.change_password_title}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">${i18n.current_password_label}</label>
+                                    <input type="password" class="form-control" id="current-password" autocomplete="current-password">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">${i18n.new_password_label}</label>
+                                    <input type="password" class="form-control" id="new-password" autocomplete="new-password">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">${i18n.confirm_password_label}</label>
+                                    <input type="password" class="form-control" id="confirm-password" autocomplete="new-password">
+                                </div>
+                                <div id="password-error" class="alert alert-danger d-none"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-change-password">${i18nStrings.common.ok}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById('change-password-modal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        
+        const showError = (message) => {
+            const errorDiv = document.getElementById('password-error');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('d-none');
+        };
+        
+        if (isAdmin) {
+            // Admin mode: Show/hide confirm password based on selection
+            const selectUser = document.getElementById('select-user');
+            const confirmGroup = document.getElementById('confirm-password-group');
+            
+            selectUser.addEventListener('change', () => {
+                // Show confirm password only when admin selects themselves
+                if (selectUser.value === 'admin') {
+                    confirmGroup.style.display = 'block';
+                } else {
+                    confirmGroup.style.display = 'none';
+                }
+            });
+            
+            // Initially hide confirm password
+            confirmGroup.style.display = 'none';
+        }
+        
+        document.getElementById('btn-change-password').addEventListener('click', async () => {
+            const newPassword = document.getElementById('new-password').value;
+            
+            if (isAdmin) {
+                // Admin mode
+                const selectedUser = document.getElementById('select-user').value;
+                
+                if (!selectedUser) {
+                    showError(i18n.error_select_user);
+                    return;
+                }
+                
+                if (!newPassword) {
+                    showError(i18nStrings.messages.filter_value_required);
+                    return;
+                }
+                
+                if (newPassword.length < 4) {
+                    showError(i18n.error_password_too_short);
+                    return;
+                }
+                
+                // If admin selected, require confirmation
+                if (selectedUser === 'admin') {
+                    const confirmPassword = document.getElementById('confirm-password').value;
+                    if (newPassword !== confirmPassword) {
+                        showError(i18n.error_passwords_dont_match);
+                        return;
+                    }
+                }
+                
+                try {
+                    const response = await fetch('/api/change-password', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            target_user: selectedUser,
+                            new_password: newPassword,
+                            admin_mode: true
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        modal.hide();
+                        const userName = selectedUser === 'admin' ? i18n.admin_user : selectedUser;
+                        showNotification(i18n.success_password_set.replace('{user}', userName), 'success');
+                    } else {
+                        showError(result.error);
+                    }
+                } catch (error) {
+                    showError(i18nStrings.messages.error_loading);
+                }
+                
+            } else {
+                // Regular user mode
+                const currentPassword = document.getElementById('current-password').value;
+                const confirmPassword = document.getElementById('confirm-password').value;
+                
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                    showError(i18nStrings.messages.filter_value_required);
+                    return;
+                }
+                
+                if (newPassword.length < 4) {
+                    showError(i18n.error_password_too_short);
+                    return;
+                }
+                
+                if (newPassword !== confirmPassword) {
+                    showError(i18n.error_passwords_dont_match);
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/change-password', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            current_password: currentPassword,
+                            new_password: newPassword
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        modal.hide();
+                        showNotification(i18n.success_password_changed, 'success');
+                    } else {
+                        showError(result.error);
+                    }
+                } catch (error) {
+                    showError(i18nStrings.messages.error_loading);
+                }
+            }
+        });
+        
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            clearMenuHighlights();
+            modalEl.remove();
+        });
+        
+    } catch (error) {}
+}
+
 // Show version information dialog
 function showVersionDialog() {
     const v = i18nStrings.app.version_dialog;
@@ -6253,6 +7119,28 @@ async function showHelpDialog() {
                 </div>
             </div>`;
         
+
+// Logout handler (cloud mode only)
+async function handleLogout() {
+    try {
+        const response = await fetch('/api/logout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            // Redirect to login page
+            window.location.href = '/login';
+        } else {
+            showErrorDialog(i18nStrings.common.error);
+        }
+    } catch (error) {
+        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+    }
+}
+
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('help-modal');
         const modal = new bootstrap.Modal(modalEl);
