@@ -81,6 +81,57 @@
   - ✓ Read file first, understand syntax, then replace with proper context
 - **Impact**: Prevents syntax errors and broken code from blind string replacements
 
+### 0a. Import Organization Standard - Decision #030
+- **Date**: 2026-02-07
+- **Status**: ✓ Approved
+- **Core Rule**: ALL imports MUST be consolidated at the top of each Python file - NO inline imports within functions
+- **FORBIDDEN Pattern**: Import statements inside function bodies
+- **REQUIRED Structure**:
+  ```python
+  # Standard library imports (alphabetically sorted within group)
+  import csv
+  import io
+  import json
+  from collections import Counter
+  from datetime import datetime
+  
+  # Third-party imports (alphabetically sorted within group)
+  import matplotlib
+  import numpy as np
+  from flask import Blueprint, jsonify, request
+  
+  # Project imports (alphabetically sorted within group)
+  from halo.config import is_cloud_mode
+  from halo.io.csv_handler import ObservationCSV
+  from halo.models.types import Observation
+  from halo.services.auth import AuthService
+  ```
+- **Import Grouping** (PEP 8 Standard):
+  1. **Standard library imports** - Python built-in modules
+  2. **Third-party imports** - External packages (Flask, NumPy, etc.)
+  3. **Project imports** - Internal HALOpy modules
+  4. Blank line between each group
+- **Critical Rules**:
+  1. ✗ **NEVER** place imports inside functions: `def foo(): from flask import session`
+  2. ✗ **NEVER** use conditional imports: `if condition: import module`
+  3. ✓ **ALWAYS** import at module level (top of file)
+  4. ✓ **ALWAYS** group and sort imports within each section
+  5. ✓ **ALWAYS** use absolute imports for project modules
+- **Exception** (Very Rare):
+  - Only when circular import problems exist that cannot be resolved by refactoring
+  - Must be documented with comment explaining why inline import is necessary
+  - Should be treated as technical debt to be resolved
+- **Rationale**:
+  - **PEP 8 Compliance**: Python's official style guide requires module-level imports
+  - **Readability**: All dependencies visible at a glance
+  - **Maintainability**: Easy to audit what modules are used
+  - **Performance**: Imports executed once at module load, not on every function call
+  - **Debugging**: Import errors caught immediately at module load
+  - **IDE Support**: Better autocomplete and static analysis
+- **Impact**: CRITICAL - Enforces Python best practices and improves code quality
+- **Related**: This complements Decision #026 (Code Modification Policy) and Decision #027 (No Automated String Replacement)
+- **Enforcement**: Code reviews must check for inline imports before approval
+
 ### 1. Code Modification Policy - Decision #026
 - **Date**: 2026-01-25
 - **Status**: ✓ Approved

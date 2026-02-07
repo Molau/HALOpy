@@ -4,10 +4,21 @@ Copyright (c) 1992-2026 Sirko Molau
 Licensed under MIT License - see LICENSE file for details.
 """
 
-from flask import Flask, render_template, session, request, g
+# Standard library imports
+import time
 from pathlib import Path
-from halo.services.settings import Settings
+
+# Third-party imports
+from flask import Flask, render_template, session, request, g, redirect, url_for
+
+# Project imports
+from halo.api import api_blueprint
+from halo.api.update import update_blueprint
 from halo.config import is_cloud_mode
+from halo.io.observers import load_observers
+from halo.resources import get_current_language, get_i18n, set_language, get_string, get_language
+from halo.services.settings import Settings
+import halo.io.observations_file as obs_file
 
 
 def create_app(config=None):
@@ -55,79 +66,27 @@ def create_app(config=None):
     # Load persisted settings from halo.cfg (CSV)
     Settings.load_into(app.config, root_path)
     
-    # In cloud mode, always load all.csv at startup
-    if is_cloud_mode():
-        data_path = root_path / 'data' / 'all.csv'
-        if data_path.exists():
-            try:
-                # OLD CODE - TO BE REMOVED AFTER TESTING
-                # from halo.io.csv_handler import ObservationCSV
-                # observations, needs_conversion = ObservationCSV.read_observations(data_path)
-                # app.config['OBSERVATIONS'] = observations
-                # app.config['LOADED_FILE'] = 'all.csv'
-                # app.config['DIRTY'] = False  # Cloud mode auto-saves, never dirty
-                # app.config['AUTO_LOADED'] = True
-                # # Auto-save if converted from legacy format
-                # if needs_conversion:
-                #     ObservationCSV.write_observations(data_path, observations)
-                
-                # NEW CODE - Using io.observations_file
-                import halo.io.observations_file as obs_file
-                observations = obs_file.open_file('all.csv')
-                app.config['OBSERVATIONS'] = observations
-                app.config['LOADED_FILE'] = 'all.csv'
-                app.config['DIRTY'] = False  # Cloud mode auto-saves, never dirty
-                app.config['AUTO_LOADED'] = True
-            except Exception as e:
-                # If all.csv doesn't exist or fails, start with empty observations
-                app.config['OBSERVATIONS'] = []
-                app.config['LOADED_FILE'] = 'all.csv'
-                app.config['DIRTY'] = False
-        else:
-            # Create empty all.csv if it doesn't exist
-            app.config['OBSERVATIONS'] = []
-            app.config['LOADED_FILE'] = 'all.csv'
-            app.config['DIRTY'] = False
-    else:
+    # Observation loading at startup
+    # - Cloud mode: Observations loaded on-demand from database (no startup load)
+    # - Local mode: Optional auto-load from configured startup file
+    
+    if not is_cloud_mode():
         # Local mode: Load startup file if configured
         startup_enabled = app.config.get('STARTUP_FILE_ENABLED', False)
         startup_file = app.config.get('STARTUP_FILE_PATH', '')
         
         if startup_enabled and startup_file:
-            data_path = root_path / 'data' / startup_file
-            if data_path.exists():
-                try:
-                    # OLD CODE - TO BE REMOVED AFTER TESTING
-                    # # Import here to avoid circular imports
-                    # from halo.io.csv_handler import ObservationCSV
-                    # observations, needs_conversion = ObservationCSV.read_observations(data_path)
-                    # app.config['OBSERVATIONS'] = observations
-                    # app.config['LOADED_FILE'] = startup_file
-                    # app.config['DIRTY'] = needs_conversion  # Mark dirty if converted from legacy format
-                    # app.config['AUTO_LOADED'] = True  # Flag for showing notification
-                    # # Auto-save if converted from legacy format
-                    # if needs_conversion:
-                    #     ObservationCSV.write_observations(data_path, observations)
-                    #     app.config['DIRTY'] = False
-                    
-                    # NEW CODE - Using io.observations_file
-                    import halo.io.observations_file as obs_file
-                    observations = obs_file.open_file(startup_file)
-                    app.config['OBSERVATIONS'] = observations
-                    app.config['LOADED_FILE'] = startup_file
-                    app.config['DIRTY'] = False  # open_file() handles conversion internally
-                    app.config['AUTO_LOADED'] = True  # Flag for showing notification
-                except Exception as e:
-                    pass
-            else:
+            try:
+                observations = obs_file.open_file(startup_file)
+                app.config['OBSERVATIONS'] = observations
+                app.config['LOADED_FILE'] = startup_file
+                app.config['DIRTY'] = False
+                app.config['AUTO_LOADED'] = True  # Flag for showing notification
+            except Exception as e:
                 pass
-
-    # Load observer metadata from resources/halobeo.csv
-    from halo.io.observers import load_observers
-    app.config['OBSERVERS'] = load_observers()
     
-    # Initialize i18n
-    from halo.resources import get_current_language, get_i18n, set_language
+    # Load observer metadata from resources/halobeo.csv
+    app.config['OBSERVERS'] = load_observers()
     
     @app.before_request
     def setup_language():
@@ -163,7 +122,6 @@ def create_app(config=None):
         if is_cloud_mode():
             if not session.get('authenticated', False):
                 # Redirect to login page
-                from flask import redirect, url_for
                 return redirect(url_for('login'))
             
             # Set FIXED_OBSERVER from session for cloud mode
@@ -173,8 +131,6 @@ def create_app(config=None):
     @app.context_processor
     def inject_i18n():
         """Make i18n functions available in all templates."""
-        from halo.resources import get_string, get_language
-        import time
         return {
             '_': get_string,  # Translation function (like gettext)
             'lang': get_language,  # Current language
@@ -185,8 +141,6 @@ def create_app(config=None):
         }
     
     # Register API blueprints
-    from halo.api import api_blueprint
-    from halo.api.update import update_blueprint
     app.register_blueprint(api_blueprint)
     app.register_blueprint(update_blueprint)
     
@@ -196,7 +150,6 @@ def create_app(config=None):
         """Login page (cloud mode only)."""
         if not is_cloud_mode():
             # Redirect to main page if not in cloud mode
-            from flask import redirect, url_for
             return redirect(url_for('index'))
         return render_template('login.html')
     
@@ -204,7 +157,6 @@ def create_app(config=None):
     def logout():
         """Logout current user."""
         session.clear()
-        from flask import redirect, url_for
         if is_cloud_mode():
             return redirect(url_for('login'))
         return redirect(url_for('index'))

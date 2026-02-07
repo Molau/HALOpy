@@ -15,8 +15,11 @@ def _has_aws_parameter_store_access():
         bool: True if Parameter Store is accessible, False otherwise
     """
     try:
-        import boto3
-        from botocore.exceptions import BotoCoreError, ClientError
+        # NOTE: Inline import required here (Decision #030 exception)
+        # boto3 is an OPTIONAL dependency only needed for cloud deployment.
+        # Importing at module level would break local installations without boto3.
+        import boto3  # type: ignore
+        from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
         
         # Try to access Parameter Store with a quick test
         ssm = boto3.client('ssm')
@@ -24,7 +27,7 @@ def _has_aws_parameter_store_access():
         ssm.get_parameter(Name='/halopy/passwords/admin', WithDecryption=True)
         return True
     except ImportError:
-        # boto3 not available
+        # boto3 not available (local installation)
         return False
     except Exception:
         # Any other error (no AWS credentials, Parameter Store not accessible, etc.)

@@ -1,6 +1,10 @@
+# Standard library imports
+import base64
 import csv
 from pathlib import Path
 from typing import Dict, Any
+
+# Project imports
 from halo.config import is_cloud_mode
 
 
@@ -142,7 +146,6 @@ class Settings:
     @staticmethod
     def obfuscate(text: str) -> str:
         """Simple obfuscation using base64 and character shift."""
-        import base64
         # Shift characters by 13 (simple ROT13-like)
         shifted = ''.join(chr(ord(c) + 13) for c in text)
         # Base64 encode
@@ -152,7 +155,6 @@ class Settings:
     @staticmethod
     def deobfuscate(text: str) -> str:
         """Reverse the obfuscation."""
-        import base64
         try:
             # Base64 decode
             decoded = base64.b64decode(text.encode('utf-8')).decode('utf-8')

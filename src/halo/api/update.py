@@ -4,14 +4,18 @@ Copyright (c) 1992-2026 Sirko Molau
 Licensed under MIT License - see LICENSE file for details.
 """
 
+# Standard library imports
 import os
-import sys
 import shutil
-import zipfile
+import subprocess
+import sys
 import tempfile
-from flask import Blueprint, jsonify, request, current_app
+import zipfile
 from pathlib import Path
 from urllib.request import urlopen
+
+# Third-party imports
+from flask import Blueprint, jsonify, request, current_app
 
 update_blueprint = Blueprint('update', __name__, url_prefix='/api')
 
@@ -85,7 +89,6 @@ def restart_server(root_path: Path) -> None:
         shutil.which(python_exec)
         os.spawnl(os.P_NOWAIT, python_exec, python_exec, str(halo_py))
     except Exception:
-        import subprocess
         python_exec = sys.executable
         halo_py = root_path / 'halo.py'
         subprocess.Popen([python_exec, str(halo_py)])

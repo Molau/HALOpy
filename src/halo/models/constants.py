@@ -3,8 +3,46 @@ Constants and configuration values
 Translated from H_TYPES.PAS
 """
 
+# Standard library imports
+import logging
+import math
+import sys
+
 # API Configuration
 DEFAULT_OBSERVATION_LIMIT = 200000  # Default maximum observations returned by API
+
+# Geographic regions (available region numbers in HALO system)
+# Germany: 1-11, International: 16-17, 19-39
+# Region 12 (Deutschland gesamt) is not used for observations
+GEOGRAPHIC_REGIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+
+# Circular halo types (complete rings around sun/moon)
+# These halos need sector specification when incomplete (V=1)
+CIRCULAR_HALOS = {1, 7, 12, 31, 32, 33, 34, 35, 36, 40}
+
+# Light pillar height values (degrees above/below horizon)
+# -1 = not observed, 0 = observed but not measured, 1-90 = measured height in degrees
+# Used for HO (Obere Lichtsäule) and HU (Untere Lichtsäule) fields (EE=8,9,10)
+PILLAR_HEIGHT_VALUES = ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 
+                        '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', 
+                        '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
+                        '31', '32', '33', '34', '35', '36', '37', '38', '39', '40',
+                        '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
+                        '51', '52', '53', '54', '55', '56', '57', '58', '59', '60',
+                        '61', '62', '63', '64', '65', '66', '67', '68', '69', '70',
+                        '71', '72', '73', '74', '75', '76', '77', '78', '79', '80',
+                        '81', '82', '83', '84', '85', '86', '87', '88', '89', '90']
+
+# All possible pillar height values including 0 (observed but not measured)
+ALL_PILLAR_HEIGHT_VALUES = ['0', '-1', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 
+                            '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', 
+                            '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
+                            '31', '32', '33', '34', '35', '36', '37', '38', '39', '40',
+                            '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
+                            '51', '52', '53', '54', '55', '56', '57', '58', '59', '60',
+                            '61', '62', '63', '64', '65', '66', '67', '68', '69', '70',
+                            '71', '72', '73', '74', '75', '76', '77', '78', '79', '80',
+                            '81', '82', '83', '84', '85', '86', '87', '88', '89', '90']
 
 # Mapping of combined halo types to their individual components
 # Combined type splits into (left, right) for statistics
@@ -78,10 +116,6 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
     Returns:
         Dict with 'real' and 'relative' activity per day (1-31) and 'active_count'
     """
-    import math
-    import sys
-    import logging
-    
     logger = logging.getLogger(__name__)
     
     # Initialize activity arrays
@@ -219,8 +253,6 @@ def calculate_daylight_factor(day, month, latitude):
     Returns:
         Daylight correction factor (Pascal: Pi/2 / ArcCos(-Tan(delta)*Tan(phi)))
     """
-    import math
-    
     # Pascal: dd:=-81; FOR lauf:=1 TO mo-1 DO dd:=dd+Tage[lauf];
     # Calculate day offset from start of year (starting at -81 for seasonal alignment)
     dd = -81

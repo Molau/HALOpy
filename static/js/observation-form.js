@@ -466,8 +466,7 @@ class ObservationForm {
     }
     
     buildRegionOptions() {
-        const regions = [1,2,3,4,5,6,7,8,9,10,11,16,17,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39];
-        return regions.map(gg => {
+        return GEOGRAPHIC_REGIONS.map(gg => {
             const label = i18nStrings.geographic_regions[gg.toString()];
             return `<option value="${gg}">${String(gg).padStart(2, '0')} - ${label}</option>`;
         }).join('');
@@ -899,56 +898,45 @@ class ObservationForm {
                 const oldHOValue = this.fields.ho.value;
                 const oldHUValue = this.fields.hu.value;
                 
-                // Define height value arrays (without 0)
-                const heightValues = ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 
-                    '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', 
-                    '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
-                    '31', '32', '33', '34', '35', '36', '37', '38', '39', '40',
-                    '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
-                    '51', '52', '53', '54', '55', '56', '57', '58', '59', '60',
-                    '61', '62', '63', '64', '65', '66', '67', '68', '69', '70',
-                    '71', '72', '73', '74', '75', '76', '77', '78', '79', '80',
-                    '81', '82', '83', '84', '85', '86', '87', '88', '89', '90'];
-                
                 if (ee === 8) {
                     // EE=8 (Obere Lichtsäule): HO = -1, 1..90, HU = 0
-                    setOptionStates(this.fields.ho, hoOpts, heightValues);
+                    setOptionStates(this.fields.ho, hoOpts, PILLAR_HEIGHT_VALUES);
                     setOptionStates(this.fields.hu, huOpts, ['0']);
                     
-                    this.fieldConstraints.HO = heightValues;
+                    this.fieldConstraints.HO = PILLAR_HEIGHT_VALUES;
                     this.fieldConstraints.HU = ['0'];
                     
                     // Check if current values are valid
-                    if (!heightValues.includes(oldHOValue)) {
-                        this.fields.ho.value = heightValues[0]; // -1
+                    if (!PILLAR_HEIGHT_VALUES.includes(oldHOValue)) {
+                        this.fields.ho.value = PILLAR_HEIGHT_VALUES[0]; // -1
                     }
                     this.fields.hu.value = '0';
                 } else if (ee === 9) {
                     // EE=9 (Untere Lichtsäule): HO = 0, HU = -1, 1..90
                     setOptionStates(this.fields.ho, hoOpts, ['0']);
-                    setOptionStates(this.fields.hu, huOpts, heightValues);
+                    setOptionStates(this.fields.hu, huOpts, PILLAR_HEIGHT_VALUES);
                     
                     this.fieldConstraints.HO = ['0'];
-                    this.fieldConstraints.HU = heightValues;
+                    this.fieldConstraints.HU = PILLAR_HEIGHT_VALUES;
                     
                     this.fields.ho.value = '0';
-                    if (!heightValues.includes(oldHUValue)) {
-                        this.fields.hu.value = heightValues[0]; // -1
+                    if (!PILLAR_HEIGHT_VALUES.includes(oldHUValue)) {
+                        this.fields.hu.value = PILLAR_HEIGHT_VALUES[0]; // -1
                     }
                 } else if (ee === 10) {
                     // EE=10 (both light pillars): HO = -1, 1..90, HU = -1, 1..90
-                    setOptionStates(this.fields.ho, hoOpts, heightValues);
-                    setOptionStates(this.fields.hu, huOpts, heightValues);
+                    setOptionStates(this.fields.ho, hoOpts, PILLAR_HEIGHT_VALUES);
+                    setOptionStates(this.fields.hu, huOpts, PILLAR_HEIGHT_VALUES);
                     
-                    this.fieldConstraints.HO = heightValues;
-                    this.fieldConstraints.HU = heightValues;
+                    this.fieldConstraints.HO = PILLAR_HEIGHT_VALUES;
+                    this.fieldConstraints.HU = PILLAR_HEIGHT_VALUES;
                     
                     // Check if current values are valid
-                    if (!heightValues.includes(oldHOValue)) {
-                        this.fields.ho.value = heightValues[0]; // -1
+                    if (!PILLAR_HEIGHT_VALUES.includes(oldHOValue)) {
+                        this.fields.ho.value = PILLAR_HEIGHT_VALUES[0]; // -1
                     }
-                    if (!heightValues.includes(oldHUValue)) {
-                        this.fields.hu.value = heightValues[0]; // -1
+                    if (!PILLAR_HEIGHT_VALUES.includes(oldHUValue)) {
+                        this.fields.hu.value = PILLAR_HEIGHT_VALUES[0]; // -1
                     }
                 } else {
                     // All other EE values (including -1 and circular halos): HO = 0, HU = 0
@@ -964,14 +952,13 @@ class ObservationForm {
             }
             
             // Step 2: Set Sectors based on EE and V (always run for both triggers)
-            const circularHalos = [1, 7, 12, 31, 32, 33, 34, 35, 36, 40];
             
-            if (ee === -1 || !circularHalos.includes(ee)) {
+            if (ee === -1 || !CIRCULAR_HALOS.has(ee)) {
                 // EE=-1 or not a circular halo: Sectors inactive
                 this.fieldConstraints.sectors = [];
                 this.fields.sectors.value = '';
                 this.fields.sectors.disabled = true;
-            } else if (circularHalos.includes(ee)) {
+            } else if (CIRCULAR_HALOS.has(ee)) {
                 // EE is circular halo: Check V value
                 
                 if (v === 1) {
@@ -1127,349 +1114,6 @@ class ObservationForm {
             this.manageFieldDependencies(triggerField);
         };
         
-        // (Original function body moved to class method above)
-        /*
-            // Helper: Enable/disable specific option values
-            const setOptionStates = (opts, enabledValues) => {
-                opts.forEach(opt => {
-                    const val = opt.value;
-                    opt.disabled = !enabledValues.includes(val);
-                });
-            };
-            
-            // Helper: Enable all options
-            const enableAllOptions = (opts) => {
-                opts.forEach(opt => opt.disabled = false);
-            };
-            
-            // Apply rules based on which field triggered the change
-            if (triggerField === 'o') {
-                // O (Object) → d, N, C, c
-                const o = parseInt(this.fields.o.value);
-                
-                const dOpts = Array.from(this.fields.d.options);
-                const nOpts = Array.from(this.fields.n.options);
-                const cUpOpts = Array.from(this.fields.C.options);
-                const cLowOpts = Array.from(this.fields.c.options);
-                
-                let dValid, nValid, cUpValid, cLowValid;
-                
-                if (o >= 1 && o <= 4) {
-                    // O=1-4 (Sun, Moon, Planet, Star): All options available
-                    dValid = ['-1', '0', '1', '2', '4', '5', '6', '7'];
-                    nValid = ['-1', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-                    cUpValid = ['-1', '0', '1', '2', '3', '4', '5', '6', '7'];
-                    cLowValid = ['-1', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-                } else if (o === 5) {
-                    // O=5 (Earthbound light): Only non-cirrus sources
-                    dValid = ['-1', '4', '5', '6', '7'];
-                    nValid = ['-1'];
-                    cUpValid = ['-1'];
-                    cLowValid = ['-1'];
-                } else {
-                    // O=-1 or invalid: Reset all
-                    dValid = ['-1'];
-                    nValid = ['-1'];
-                    cUpValid = ['-1'];
-                    cLowValid = ['-1'];
-                }
-                
-                // Apply option states
-                setOptionStates(dOpts, dValid);
-                setOptionStates(nOpts, nValid);
-                setOptionStates(cUpOpts, cUpValid);
-                setOptionStates(cLowOpts, cLowValid);
-                
-                // Store constraints and set to first valid value (once for all options)
-                this.fieldConstraints.d = dValid;
-                this.fieldConstraints.n = nValid;
-                this.fieldConstraints.C = cUpValid;
-                this.fieldConstraints.c = cLowValid;
-                this.fields.d.value = dValid[0];
-                this.fields.n.value = nValid[0];
-                this.fields.C.value = cUpValid[0];
-                this.fields.c.value = cLowValid[0];
-            } else if (triggerField === 'd') {
-                // d (Cirrus Density) → N, C, c
-                const d = parseInt(this.fields.d.value);
-                
-                const nOpts = Array.from(this.fields.n.options);
-                const cUpOpts = Array.from(this.fields.C.options);
-                const cLowOpts = Array.from(this.fields.c.options);
-                
-                if (d >= 0 && d <= 2) {
-                    // d=0-2 (thin cirrus): Some cloud cover and cirrus required
-                    const nValid = ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-                    const cUpValid = ['-1', '1', '2', '3', '4', '5', '6', '7'];
-                    const cLowValid = ['-1', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-                } else if (d >= 4 && d <= 7) {
-                    // d=4-7 (thick cirrus/non-cirrus): Only -1 allowed
-                    const nValid = ['-1'];
-                    const cUpValid = ['-1'];
-                    const cLowValid = ['-1'];
-                } else {
-                    // d=-1 (not observed): Only -1 allowed
-                    const nValid = ['-1'];
-                    const cUpValid = ['-1'];
-                    const cLowValid = ['-1'];
-                }
-                    
-                setOptionStates(nOpts, nValid);
-                setOptionStates(cUpOpts, cUpValid);
-                setOptionStates(cLowOpts, cLowValid);
-                    
-                // Store constraints and set to first valid value
-                this.fieldConstraints.n = nValid;
-                this.fieldConstraints.C = cUpValid;
-                this.fieldConstraints.c = cLowValid;
-                this.fields.n.value = nValid[0];
-                this.fields.C.value = cUpValid[0];
-                this.fields.c.value = cLowValid[0];
-            } else if (triggerField === 'n') {
-                // N (Cloud Cover) → C, c
-                const n = parseInt(this.fields.n.value);
-                
-                const cUpOpts = Array.from(this.fields.C.options);
-                const cLowOpts = Array.from(this.fields.c.options);
-                
-                if (n === 0) {
-                    // N=0 (clear sky): No cirrus
-                    const cUpValid = ['0'];
-                    const cLowValid = ['-1'];
-                } else if (n >= 1 && n <= 8) {
-                    // N=1-8 (some clouds): Cirrus possible
-                    const cUpValid = ['-1', '1', '2', '3', '4', '5', '6', '7'];
-                    const cLowValid = ['-1', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-                } else if (n === 9) {
-                    // N=9 (overcast): All options
-                    const cUpValid = ['-1', '0', '1', '2', '3', '4', '5', '6', '7'];
-                    const cLowValid = ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-                } else {
-                    // N=-1 (not observed): Only -1
-                    const cUpValid = ['-1'];
-                    const cLowValid = ['-1'];
-                }
-                    
-                setOptionStates(cUpOpts, cUpValid);
-                setOptionStates(cLowOpts, cLowValid);
-                    
-                // Store constraints and set to first valid value
-                this.fieldConstraints.C = cUpValid;
-                this.fieldConstraints.c = cLowValid;
-                this.fields.C.value = cUpValid[0];
-                this.fields.c.value = cLowValid[0];
-            } else if (triggerField === 'kk') {
-                // KK (Observer) → g, GG
-                const kk = this.fields.kk.value;
-                
-                const gOpts = Array.from(this.fields.g.options);
-                const ggOpts = Array.from(this.fields.gg.options);
-                
-                if (kk && kk !== '') {
-                    // KK set: All location types available
-                    const gValid = ['0', '1', '2'];
-                } else {
-                    // KK not set: Reset
-                    const gValid = [''];
-                }
-                setOptionStates(gOpts, gValid);
-                // GG: All valid regions (will be auto-filled based on g)
-                enableAllOptions(ggOpts);
-                    
-                // Store constraints and set to first valid value
-                this.fieldConstraints.g = gValid;
-                this.fields.g.value = gValid[0];
-                // GG will be auto-filled by g trigger
-            } else if (triggerField === 'g' || triggerField === 'jj' || triggerField === 'mm') {
-                // g (Location Type) → GG (also triggered by jj/mm for auto-fill)
-                const g = parseInt(this.fields.g.value);
-                
-                if (g === 0 || g === 2) {
-                    // g=0 (Hauptbeobachtungsort) or g=2 (Nebenbeobachtungsort): Auto-fill GG
-                    const kk = this.fields.kk.value;
-                    const jj = this.fields.jj.value ? parseInt(this.fields.jj.value) % 100 : null;
-                    const mm = this.fields.mm.value ? parseInt(this.fields.mm.value) : null;
-                    
-                    if (kk) {
-                        // Fetch observer data
-                        (async () => {
-                            try {
-                                let url = `/api/observers?kk=${kk}`;
-                                if (jj && mm) {
-                                    url += `&jj=${jj}&mm=${mm}`;
-                                }
-                                const resp = await fetch(url);
-                                
-                                // Check if form was destroyed while fetching
-                                if (this.destroyed) return;
-                                
-                                if (resp.ok) {
-                                    const data = await resp.json();
-                                    if (data.observer) {
-                                        const gg = g === 0 ? data.observer.GH : data.observer.GN;
-                                        if (gg !== null && gg !== undefined && gg !== '') {
-                                            this.fields.gg.value = gg;
-                                            // Store GG as single value constraint
-                                            this.fieldConstraints.GG = gg;
-                                        }
-                                    }
-                                }
-                            } catch (e) {
-                                // Ignore errors if form was destroyed
-                                if (!this.destroyed) {
-                                    console.error('Error fetching GG:', e);
-                                }
-                            }
-                        })();
-                    }
-                } else if (g === 1) {
-                    // g=1 (Auswärtsbeobachtung): Manual GG entry
-                    if (!this.originalObservation) {
-                        this.fields.gg.value = '';
-                        this.fieldConstraints.GG = null;
-                    }
-                } else {
-                    // g=-1 (not set): Reset GG
-                    this.fields.gg.value = '';
-                    this.fieldConstraints.GG = null;
-                }
-            } else if (triggerField === 'mm') {
-                // MM (Month) → TT (Day)
-                const mm = parseInt(this.fields.mm.value);
-                const jj = parseInt(this.fields.jj.value);
-                const ttOpts = Array.from(this.fields.tt.options);
-                
-                if (mm >= 1 && mm <= 12 && jj) {
-                    // Calculate days in month
-                    const year = jj < 50 ? 2000 + jj : 1900 + jj;
-                    const daysInMonth = new Date(year, mm, 0).getDate();
-                    
-                    // Generate valid days array
-                    const ttValid = [];
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        ttValid.push(d.toString());
-                    }
-                    
-                    // Enable only valid days
-                    setOptionStates(ttOpts, ttValid);
-                    
-                    // Store constraints and set to first valid value
-                    this.fieldConstraints.TT = ttValid;
-                    
-                    // Set to first day if current value is invalid
-                    if (!ttValid.includes(this.fields.tt.value)) {
-                        this.fields.tt.value = ttValid[0];
-                    }
-                } else {
-                    // MM or JJ not set: All days available
-                    const ttValid = [];
-                    for (let d = 1; d <= 31; d++) {
-                        ttValid.push(d.toString());
-                    }
-                    enableAllOptions(ttOpts);
-                    this.fieldConstraints.TT = ttValid;
-                }
-            } else if (triggerField === 'ee') {
-                // EE (Phenomenon) → HO, HU, Sectors
-                const ee = this.fields.ee.value === '' ? -1 : parseInt(this.fields.ee.value);
-                
-                const hoOpts = Array.from(this.fields.ho.options);
-                const huOpts = Array.from(this.fields.hu.options);
-                const circularHalos = [1, 7, 12, 31, 32, 33, 34, 35, 36, 40];
-                
-                // Define height value arrays
-                const heightValues = ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 
-                    '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', 
-                    '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
-                    '31', '32', '33', '34', '35', '36', '37', '38', '39', '40',
-                    '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
-                    '51', '52', '53', '54', '55', '56', '57', '58', '59', '60',
-                    '61', '62', '63', '64', '65', '66', '67', '68', '69', '70',
-                    '71', '72', '73', '74', '75', '76', '77', '78', '79', '80',
-                    '81', '82', '83', '84', '85', '86', '87', '88', '89', '90'];
-                const allHoValues = ['0', '-1', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 
-                    '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', 
-                    '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
-                    '31', '32', '33', '34', '35', '36', '37', '38', '39', '40',
-                    '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
-                    '51', '52', '53', '54', '55', '56', '57', '58', '59', '60',
-                    '61', '62', '63', '64', '65', '66', '67', '68', '69', '70',
-                    '71', '72', '73', '74', '75', '76', '77', '78', '79', '80',
-                    '81', '82', '83', '84', '85', '86', '87', '88', '89', '90'];
-                const allHuValues = ['0', '-1', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 
-                    '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', 
-                    '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
-                    '31', '32', '33', '34', '35', '36', '37', '38', '39', '40',
-                    '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
-                    '51', '52', '53', '54', '55', '56', '57', '58', '59', '60',
-                    '61', '62', '63', '64', '65', '66', '67', '68', '69', '70',
-                    '71', '72', '73', '74', '75', '76', '77', '78', '79', '80',
-                    '81', '82', '83', '84', '85', '86', '87', '88', '89', '90'];
-                
-                if (ee === 8) {
-                    // EE=8 (Obere Lichtsäule): HO required, HU=0
-                    setOptionStates(hoOpts, heightValues);
-                    enableAllOptions(huOpts);
-                   
-                    this.fields.sectors.value = '';
-                } else if (ee === 9) {
-                    // EE=9 (Untere Lichtsäule): HO=0, HU required
-                    enableAllOptions(hoOpts);
-                    setOptionStates(huOpts, heightValues);
-                    
-                    this.fields.sectors.value = '';
-                } else if (ee === 10) {
-                    // EE=10 (both light pillars): Both required
-                    setOptionStates(hoOpts, heightValues);
-                    setOptionStates(huOpts, heightValues);
-                    
-                    this.fields.sectors.value = '';
-                } else if (circularHalos.includes(ee)) {
-                    // EE=circular halo: HO=0, HU=0, Sectors depend on V
-                    enableAllOptions(hoOpts);
-                    enableAllOptions(huOpts);
-                    
-                    // Check V value for sectors
-                    const v = parseInt(this.fields.v.value);
-                    if (v === 0 || v === 2 || isNaN(v)) {
-                        // V=0 (not set) or V=2 (complete): Sectors inactive
-                        this.fieldConstraints.sectors = []; // Inactive
-                        this.fields.sectors.value = '';
-                    } else if (v === 1) {
-                        // V=1 (incomplete): Sectors active
-                        this.fieldConstraints.sectors = ['any']; // Active
-                        // Keep existing sector value
-                    }
-                } else {
-                    // All other EE values (including -1): HO=0, HU=0, Sectors inactive
-                    enableAllOptions(hoOpts);
-                    enableAllOptions(huOpts);
-                    
-                    this.fields.sectors.value = '';
-                }
-                // Store constraints and set to first valid value
-                this.fieldConstraints.HO = heightValues;
-                this.fieldConstraints.HU = ['0'];
-                this.fieldConstraints.sectors = []; // Inactive
-                this.fields.ho.value = heightValues[0]; // -1
-                this.fields.hu.value = '0';
-            } else if (triggerField === 'v') {
-                // V (Completeness) → Sectors (supplementary to EE)
-                const ee = parseInt(this.fields.ee.value);
-                const v = parseInt(this.fields.v.value);
-                const circularHalos = [1, 7, 12, 31, 32, 33, 34, 35, 36, 40];
-                
-                if (ee && circularHalos.includes(ee)) {
-                    if (v === 1) {
-                        // V=1 (incomplete): Sectors active, keep existing value
-                        this.fieldConstraints.sectors = ['any']; // Active
-                    } else {
-                        // V=0 (not set) or V=2 (complete): Sectors inactive
-                        this.fieldConstraints.sectors = []; // Inactive
-                        this.fields.sectors.value = '';
-                    }
-        */
-        
         // Attach event listeners for trigger fields only (forward dependencies)
         // Trigger fields: O, d, N, KK, g, MM, EE
         this.fields.o.addEventListener('change', () => {
@@ -1487,7 +1131,7 @@ class ObservationForm {
             checkRequired();
         });
         this.fields.g.addEventListener('change', () => {
-            this.manageFieldDependencies('g');
+            manageFieldDependencies('g');
             checkRequired();
         });
         this.fields.jj.addEventListener('change', () => {

@@ -4,17 +4,40 @@ Copyright (c) 1992-2026 Sirko Molau
 Licensed under MIT License - see LICENSE file for details.
 """
 
-from flask import Blueprint, jsonify, request, current_app, Response, session
+# Standard library imports
+import calendar
+import csv
+import io
+import json
+import math
+import os
+import shutil
+import tempfile
+import traceback
+from collections import Counter, defaultdict
+from datetime import datetime
+from functools import cmp_to_key
+from io import StringIO
 from pathlib import Path
 from typing import Dict, Any
-import math
-import io
-import numpy as np
+
+# Third-party imports
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
+import numpy as np
+from flask import Blueprint, jsonify, request, current_app, Response, session, g, send_file, make_response
+
+# Project imports
+from halo.config import is_cloud_mode, get_cloud_server_url
 from halo.io.csv_handler import ObservationCSV
 from halo.io.observers import load_observers, save_observers, find_observer_records, add_observer_record, update_observer_record, delete_observer_record
+from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS, DEFAULT_OBSERVATION_LIMIT, resolve_halo_type, calculate_halo_activity
+from halo.models.types import Observation
+from halo.resources import I18n, set_language as set_lang
+from halo.resources.i18n import get_i18n
+from halo.services.auth import AuthService
+from halo.services.settings import Settings
 
 # NEW CODE - Using io.observations + io.observations_file (Layer 2 + Layer 3a)
 import halo.io.observations as obs_logic
@@ -48,9 +71,6 @@ def login() -> Dict[str, Any]:
             "is_admin": true/false
         }
     """
-    from halo.services.auth import AuthService
-    from halo.config import is_cloud_mode
-    
     if not is_cloud_mode():
         return jsonify({'success': False, 'error': 'auth_not_required_local_mode'}), 400
     
@@ -118,9 +138,6 @@ def change_password() -> Dict[str, Any]:
             "error": "error message" (if failed)
         }
     """
-    from halo.services.auth import AuthService
-    from halo.config import is_cloud_mode
-    
     if not is_cloud_mode():
         return jsonify({'success': False, 'error': 'password_change_not_available_local'}), 400
     
@@ -321,7 +338,6 @@ def health_check() -> Dict[str, Any]:
 @api_blueprint.route('/language', methods=['GET'])
 def get_language() -> Dict[str, Any]:
     """Get current language from session."""
-    from flask import session
     language = session.get('language', 'de')
     return jsonify({'language': language})
 
@@ -329,8 +345,6 @@ def get_language() -> Dict[str, Any]:
 @api_blueprint.route('/language/<lang>', methods=['POST'])
 def set_language(lang: str) -> Dict[str, Any]:
     """Set language in session and i18n system."""
-    from flask import session
-    from halo.resources import set_language as set_lang
     
     if lang not in ['de', 'en']:
         return jsonify({'error': 'invalid_language'}), 400
@@ -347,8 +361,7 @@ def set_language(lang: str) -> Dict[str, Any]:
 @api_blueprint.route('/i18n/<lang>', methods=['GET'])
 def get_i18n_strings(lang: str) -> Dict[str, Any]:
     """Get all i18n strings for specified language."""
-    from halo.resources import I18n
-    from flask import make_response
+    
     try:
         i18n = I18n(lang)
         response = make_response(jsonify(i18n.strings))
@@ -420,8 +433,6 @@ def get_observations() -> Dict[str, Any]:
     - limit: Maximum number of results (default from constants.DEFAULT_OBSERVATION_LIMIT, <=0 returns all)
     - offset: Pagination offset (default 0)
     """
-    from halo.models.constants import DEFAULT_OBSERVATION_LIMIT
-    
     limit = int(request.args.get('limit', DEFAULT_OBSERVATION_LIMIT))
     offset = int(request.args.get('offset', 0))
 
@@ -521,7 +532,7 @@ def _spaeter(a, b) -> int:
 @api_blueprint.route('/observations', methods=['POST'])
 def add_observation() -> Dict[str, Any]:
     """Add a new observation to the in-memory list at the correct sorted position (Zahleneingabe)."""
-    from flask import current_app, request
+    
     data = request.get_json() or {}
 
     # Minimal validation
@@ -531,7 +542,6 @@ def add_observation() -> Dict[str, Any]:
             return jsonify({'error': f'Missing field: {f}'}), 400
 
     try:
-        from halo.models.types import Observation
         obs = Observation()
         # Assign fields with defaults for unknowns
         for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
@@ -566,7 +576,6 @@ def add_observation() -> Dict[str, Any]:
 @api_blueprint.route('/observations/delete', methods=['POST'])
 def delete_observation() -> Dict[str, Any]:
     """Delete an observation by matching its field values."""
-    from flask import current_app, request
     data = request.get_json() or {}
 
     try:
@@ -602,9 +611,6 @@ def replace_observations() -> Dict[str, Any]:
     
     Used by Datei -> Selektieren to load filtered observations before save.
     """
-    from flask import current_app, request
-    from halo.models.types import Observation
-    
     data = request.get_json() or {}
     observations_data = data.get('observations', [])
     
@@ -630,9 +636,6 @@ def save_observations() -> Dict[str, Any]:
     
     Used by Datei -> Selektieren to save filtered observation list.
     """
-    from flask import current_app, request
-    import os
-    
     data = request.get_json() or {}
     filename = data.get('filename', '')
     observations_data = data.get('observations', [])
@@ -646,7 +649,6 @@ def save_observations() -> Dict[str, Any]:
         filename += '.csv'
     
     # Convert observation dicts to Observation objects
-    from halo.models.types import Observation
     observations = []
     for obs_dict in observations_data:
         obs = Observation()
@@ -658,18 +660,13 @@ def save_observations() -> Dict[str, Any]:
         observations.append(obs)
     
     # Write to file
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    filepath = datapath / filename
+    filepath = obs_file.get_data_path(filename)
     
     # Check if file exists
     if filepath.exists() and not overwrite:
         return jsonify({'success': False, 'exists': True, 'filename': filename}), 200
     
     try:
-        # OLD CODE - TO BE REMOVED AFTER TESTING
-        # ObservationCSV.write_observations(filepath, observations)
-        
-        # NEW CODE - Using io.observations_file
         obs_file.save_file(filename, observations)
         
         return jsonify({
@@ -702,8 +699,6 @@ def filter_observations() -> Dict[str, Any]:
         - kept_count: Number of observations kept
         - deleted_count: Number of observations deleted
     """
-    from flask import current_app
-    from halo.io.csv_handler import ObservationCSV
     
     try:
         params = request.get_json()
@@ -821,8 +816,6 @@ def get_statistics() -> Dict[str, Any]:
         - halo_types_distribution
         - regions_distribution
     """
-    from halo.io.csv_handler import ObservationCSV
-    from collections import Counter
     
     csv_handler = ObservationCSV()
     data_path = Path(__file__).parent.parent.parent.parent / 'data' / 'ALLE.CSV'
@@ -858,10 +851,6 @@ def get_statistics() -> Dict[str, Any]:
 @api_blueprint.route('/files', methods=['GET'])
 def list_files() -> Dict[str, Any]:
     """List available .HAL and .CSV files in data directory"""
-    from flask import current_app
-    from pathlib import Path
-    import os
-    
     datapath = Path(__file__).parent.parent.parent.parent / 'data'
     if not datapath.exists():
         return jsonify({'error': 'data_directory_not_found'}), 404
@@ -887,9 +876,6 @@ def list_files() -> Dict[str, Any]:
 @api_blueprint.route('/file/new', methods=['POST'])
 def new_file() -> Dict[str, Any]:
     """Create new empty file - implements 'Datei -> neue Datei'"""
-    from flask import current_app, request
-    import os
-    
     data = request.get_json()
     filename = data.get('filename', '')
     
@@ -907,11 +893,6 @@ def new_file() -> Dict[str, Any]:
         return jsonify({'error': 'file_already_exists'}), 400
     
     try:
-        # OLD CODE - TO BE REMOVED AFTER TESTING
-        # # Create empty CSV with header
-        # ObservationCSV.write_observations(Path(filepath), [])
-        
-        # NEW CODE - Using io.observations_file
         obs_file.new_file(filename)
         
         current_app.config['LOADED_FILE'] = filename
@@ -929,11 +910,6 @@ def new_file() -> Dict[str, Any]:
 @api_blueprint.route('/file/load', methods=['POST'])
 def load_file_from_browser() -> Dict[str, Any]:
     """Load a file from user's filesystem directly into memory."""
-    from flask import current_app
-    from pathlib import Path
-    import tempfile
-    import os
-    
     if 'file' not in request.files:
         return jsonify({'error': 'no_file_provided'}), 400
     
@@ -951,13 +927,6 @@ def load_file_from_browser() -> Dict[str, Any]:
             temp_path = Path(tmp.name)
         
         try:
-            # OLD CODE - TO BE REMOVED AFTER TESTING
-            # # Use unified load logic with legacy format detection
-            # observations, needs_conversion = ObservationCSV.read_observations(temp_path)
-            
-            # NEW CODE - Using io.observations_file
-            # Save to temp file in data folder
-            import shutil
             temp_filename = f"upload_{file.filename}"
             shutil.copy(temp_path, obs_file.get_data_path(temp_filename))
             observations, _ = obs_file.open_file(temp_filename)  # Returns (observations, filepath)
@@ -987,8 +956,6 @@ def load_file_from_browser() -> Dict[str, Any]:
 @api_blueprint.route('/file/merge', methods=['POST'])
 def merge_file() -> Dict[str, Any]:
     """Merge observations from uploaded file with currently loaded file - implements 'Datei -> Verbinden'."""
-    from flask import current_app
-    from io import StringIO
     
     # Check if a file is already loaded
     if not current_app.config.get('LOADED_FILE'):
@@ -1032,7 +999,6 @@ def merge_file() -> Dict[str, Any]:
                 added_count += 1
         
         # Sort observations using spaeter() equivalent
-        from functools import cmp_to_key
         current_observations = sorted(current_observations, key=cmp_to_key(_spaeter))
         
         # Update app config
@@ -1054,10 +1020,6 @@ def load_file(filename: str) -> Dict[str, Any]:
     
     Supports both GET and POST methods for convenience.
     """
-    from flask import current_app
-    from pathlib import Path
-    import os
-    
     datapath = Path(__file__).parent.parent.parent.parent / 'data'
     filepath = datapath / filename
     
@@ -1065,15 +1027,6 @@ def load_file(filename: str) -> Dict[str, Any]:
         return jsonify({'error': 'File not found'}), 404
     
     try:
-        # OLD CODE - TO BE REMOVED AFTER TESTING
-        # # Use unified load logic with legacy format detection
-        # observations, needs_conversion = ObservationCSV.read_observations(filepath)
-        # 
-        # # Auto-convert legacy format by overwriting file
-        # if needs_conversion:
-        #     ObservationCSV.write_observations(filepath, observations)
-        
-        # NEW CODE - Using io.observations_file
         observations = obs_file.open_file(filename)
         
         # Store in app config
@@ -1094,9 +1047,6 @@ def load_file(filename: str) -> Dict[str, Any]:
 @api_blueprint.route('/file/save', methods=['POST'])
 def save_file() -> Dict[str, Any]:
     """Save current observations to disk - triggers browser download"""
-    from flask import current_app, send_file
-    import io
-    
     filename = current_app.config.get('LOADED_FILE')
     if not filename:
         return jsonify({'error': 'No file loaded'}), 400
@@ -1104,47 +1054,6 @@ def save_file() -> Dict[str, Any]:
     observations = current_app.config.get('OBSERVATIONS', [])
     
     try:
-        # OLD CODE - TO BE REMOVED AFTER TESTING
-        # # Create CSV in memory
-        # output = io.StringIO()
-        # import csv
-        # writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
-        # 
-        # for obs in observations:
-        #     # Format fields
-        #     def format_field(value):
-        #         if value == -1:
-        #             return ''
-        #         elif value == -2:
-        #             return '/'
-        #         else:
-        #             return str(value)
-        #     
-        #     e_digit = str(obs.EE) if hasattr(obs, 'EE') else ''
-        #     ho_str = '' if obs.HO == -1 else ('//' if obs.HO == 0 else str(obs.HO))
-        #     hu_str = '' if obs.HU == -1 else ('//' if obs.HU == 0 else str(obs.HU))
-        #     ho_hu_field = f'{e_digit}{ho_str}{hu_str}' if ho_str or hu_str else '/////'
-        #     
-        #     fields = [
-        #         str(obs.KK), format_field(obs.O), str(obs.JJ), str(obs.MM), str(obs.TT), str(obs.g),
-        #         format_field(obs.ZS), format_field(obs.ZM), format_field(obs.d), format_field(obs.DD),
-        #         format_field(obs.N), format_field(obs.C), format_field(obs.c), str(obs.EE),
-        #         format_field(obs.H), format_field(obs.F), format_field(obs.V), format_field(obs.f),
-        #         format_field(obs.zz), str(obs.GG), ho_hu_field,
-        #         obs.sectors if obs.sectors else '',
-        #         obs.remarks if obs.remarks else ''
-        #     ]
-        #     writer.writerow(fields)
-        # 
-        # # Convert to bytes with UTF-8 encoding
-        # csv_bytes = output.getvalue().encode('utf-8')
-        # output.close()
-        # 
-        # # Create BytesIO object for send_file
-        # csv_io = io.BytesIO(csv_bytes)
-        # csv_io.seek(0)
-        
-        # NEW CODE - Using io.observations_file  
         datapath = Path(__file__).parent.parent.parent.parent / 'data'
         filepath = datapath / filename
         obs_file.save_file(observations, filepath)
@@ -1185,11 +1094,6 @@ def upload_file() -> Dict[str, Any]:
         - add: Add observations to existing all.csv
         - replace: Delete all observations of this observer first, then add new ones
     """
-    from flask import current_app
-    from halo.services.auth import AuthService
-    from halo.config import is_cloud_mode
-    from halo.models.types import Observation
-    from functools import cmp_to_key
     
     data = request.get_json()
     observer_kk = data.get('observerKK')
@@ -1312,9 +1216,6 @@ def download_file() -> Dict[str, Any]:
     Filters observations by user's KK unless user is admin.
     Returns CSV content for client-side file save dialog.
     """
-    from halo.config import is_cloud_mode
-    import os
-    import io
     
     data = request.get_json()
     observer_kk = data.get('observerKK')  # KK number or "Admin"
@@ -1342,7 +1243,6 @@ def download_file() -> Dict[str, Any]:
             # Local mode: authenticate via password
             if observer_kk.upper() == 'ADMIN':
                 # Admin authentication
-                from halo.services.auth import AuthService
                 is_valid, user_info = AuthService.verify_password('admin', password)
                 if not is_valid:
                     return jsonify({'error': 'invalid_admin_credentials'}), 401
@@ -1350,7 +1250,6 @@ def download_file() -> Dict[str, Any]:
                 authenticated_kk = None  # Admin has no specific KK
             else:
                 # Regular user authentication
-                from halo.services.auth import AuthService
                 is_valid, user_info = AuthService.verify_password(observer_kk, password)
                 if not is_valid:
                     return jsonify({'error': 'invalid_credentials'}), 401
@@ -1435,7 +1334,7 @@ def download_file() -> Dict[str, Any]:
 @api_blueprint.route('/file/status', methods=['GET'])
 def file_status() -> Dict[str, Any]:
     """Get current file status (loaded file, dirty state)"""
-    from flask import current_app
+    
     
     auto_loaded = current_app.config.get('AUTO_LOADED', False)
     # Clear the flag after first check
@@ -1453,7 +1352,6 @@ def file_status() -> Dict[str, Any]:
 @api_blueprint.route('/file/status/update', methods=['POST'])
 def update_file_status() -> Dict[str, Any]:
     """Update current filename in backend"""
-    from flask import current_app, request
     
     data = request.get_json()
     filename = data.get('filename')
@@ -1468,7 +1366,7 @@ def update_file_status() -> Dict[str, Any]:
 @api_blueprint.route('/file/autosave', methods=['POST'])
 def autosave() -> Dict[str, Any]:
     """Auto-save current observations to .$$$ temp file"""
-    from flask import current_app
+    
     
     filename = current_app.config.get('LOADED_FILE')
     if not filename:
@@ -1501,7 +1399,6 @@ def upload_observers() -> Dict[str, Any]:
     
     Admin can upload all observers, regular users only their own.
     """
-    import csv
     
     data = request.get_json()
     observer_kk = data.get('observerKK')
@@ -1530,18 +1427,18 @@ def upload_observers() -> Dict[str, Any]:
             if not observer_kk:
                 return jsonify({'error': 'observer_kk_missing'}), 400
             
+            auth_service = AuthService()
+            
             if observer_kk.upper() == 'ADMIN':
                 # Admin authentication
-                from ..services.auth import auth_service
-                user_info = auth_service.verify_password('admin', password)
-                if not user_info:
+                is_valid, user_info = auth_service.verify_password('admin', password)
+                if not is_valid:
                     return jsonify({'error': 'invalid_admin_credentials'}), 401
                 is_admin = user_info.get('is_admin', False)
             else:
                 # Regular user authentication
-                from ..services.auth import auth_service
-                user_info = auth_service.verify_password(observer_kk, password)
-                if not user_info:
+                is_valid, user_info = auth_service.verify_password(observer_kk, password)
+                if not is_valid:
                     return jsonify({'error': 'invalid_credentials'}), 401
                 authenticated_kk = int(observer_kk)
                 is_admin = user_info.get('is_admin', False)
@@ -1591,8 +1488,6 @@ def download_observers() -> Dict[str, Any]:
     1. Session-based (cloud mode): user authenticated via session
     2. No auth (local mode): no authentication required for download
     """
-    import csv
-    import io
     
     data = request.get_json()
     use_session = data.get('use_session', False)
@@ -1636,8 +1531,6 @@ def download_observers() -> Dict[str, Any]:
 @api_blueprint.route('/file/autosave_old', methods=['POST'])
 def autosave_old() -> Dict[str, Any]:
     """Auto-save current observations to .$$$ temp file - OLD VERSION"""
-    from flask import current_app
-    import os
     
     filename = current_app.config.get('LOADED_FILE')
     if not filename:
@@ -1655,10 +1548,6 @@ def autosave_old() -> Dict[str, Any]:
     temp_filepath = datapath / temp_filename
     
     try:
-        # OLD CODE - TO BE REMOVED AFTER TESTING
-        # ObservationCSV.write_observations(temp_filepath, observations)
-        
-        # NEW CODE - Using io.observations_file
         obs_file.create_temp_backup(temp_filename, observations)
         
         return jsonify({
@@ -1673,9 +1562,6 @@ def autosave_old() -> Dict[str, Any]:
 @api_blueprint.route('/file/check_autosave', methods=['GET'])
 def check_autosave() -> Dict[str, Any]:
     """Check if any .$$$ autosave files exist in temp directory"""
-    from flask import current_app
-    import os
-    
     temppath = Path(__file__).parent.parent.parent.parent / 'temp'
     
     if not temppath.exists():
@@ -1702,9 +1588,6 @@ def check_autosave() -> Dict[str, Any]:
 @api_blueprint.route('/file/restore_autosave', methods=['POST'])
 def restore_autosave() -> Dict[str, Any]:
     """Restore observations from .$$$ autosave file"""
-    from flask import current_app, request
-    import os
-    
     data = request.get_json() or {}
     temp_filename = data.get('temp_file')
     
@@ -1746,9 +1629,6 @@ def restore_autosave() -> Dict[str, Any]:
 @api_blueprint.route('/file/cleanup_autosave', methods=['POST'])
 def cleanup_autosave() -> Dict[str, Any]:
     """Delete .$$$ autosave file after successful save"""
-    from flask import current_app, request
-    import os
-    
     data = request.get_json() or {}
     temp_file = data.get('temp_file')
     
@@ -1782,11 +1662,35 @@ def cleanup_autosave() -> Dict[str, Any]:
         return jsonify({'success': True, 'warning': str(e)})
 
 
+@api_blueprint.route('/constants', methods=['GET'])
+def get_constants():
+    """Get application constants for frontend use"""
+    from halo.models.constants import (
+        GEOGRAPHIC_REGIONS,
+        CIRCULAR_HALOS,
+        COMBINED_TO_INDIVIDUAL_HALOS,
+        HALO_TYPE_FACTORS,
+        HALO_BRIGHTNESS_FACTORS,
+        DEFAULT_OBSERVATION_LIMIT,
+        PILLAR_HEIGHT_VALUES,
+        ALL_PILLAR_HEIGHT_VALUES
+    )
+    
+    return jsonify({
+        'geographic_regions': GEOGRAPHIC_REGIONS,
+        'circular_halos': list(CIRCULAR_HALOS),
+        'combined_to_individual_halos': COMBINED_TO_INDIVIDUAL_HALOS,
+        'halo_type_factors': HALO_TYPE_FACTORS,
+        'halo_brightness_factors': HALO_BRIGHTNESS_FACTORS,
+        'default_observation_limit': DEFAULT_OBSERVATION_LIMIT,
+        'pillar_height_values': PILLAR_HEIGHT_VALUES,
+        'all_pillar_height_values': ALL_PILLAR_HEIGHT_VALUES
+    })
+
+
 @api_blueprint.route('/config', methods=['GET'])
 def get_config() -> Dict[str, Any]:
     """Get configuration including cloud mode and admin status."""
-    from halo.config import is_cloud_mode, get_cloud_server_url
-    
     return jsonify({
         'cloud_mode': is_cloud_mode(),
         'cloud_server_url': get_cloud_server_url(),
@@ -1799,8 +1703,6 @@ def get_config() -> Dict[str, Any]:
 @api_blueprint.route('/config/inputmode', methods=['GET', 'POST'])
 def inputmode() -> Dict[str, Any]:
     """Get or set Eingabeart (input mode) - implements 'Einstellungen -> Eingabeart' from H_BEOBNG.PAS"""
-    from flask import current_app, request
-    
     if request.method == 'POST':
         data = request.get_json()
         mode = data.get('mode', 'N')
@@ -1810,9 +1712,7 @@ def inputmode() -> Dict[str, Any]:
         
         current_app.config['INPUT_MODE'] = mode
         # Persist setting
-        from pathlib import Path
         root_path = Path(__file__).parent.parent.parent.parent
-        from halo.services.settings import Settings
         Settings.save_key(current_app.config, root_path, 'INPUT_MODE', mode)
         
         return jsonify({
@@ -1831,8 +1731,6 @@ def inputmode() -> Dict[str, Any]:
 @api_blueprint.route('/config/outputmode', methods=['GET', 'POST'])
 def outputmode() -> Dict[str, Any]:
     """Get or set Ausgabeart (output format) - NEW FEATURE not in original software"""
-    from flask import current_app, request
-    
     if request.method == 'POST':
         data = request.get_json()
         mode = data.get('mode', 'P')
@@ -1842,9 +1740,7 @@ def outputmode() -> Dict[str, Any]:
         
         current_app.config['OUTPUT_MODE'] = mode
         # Persist setting
-        from pathlib import Path
         root_path = Path(__file__).parent.parent.parent.parent
-        from halo.services.settings import Settings
         Settings.save_key(current_app.config, root_path, 'OUTPUT_MODE', mode)
         
         display_map = {
@@ -1874,7 +1770,6 @@ def outputmode() -> Dict[str, Any]:
 @api_blueprint.route('/config/datedefault', methods=['GET', 'POST'])
 def datedefault() -> Dict[str, Any]:
     """Get or set date default (Datumsvoreinstellung) - NEW FEATURE"""
-    from flask import current_app, request
     
     if request.method == 'POST':
         data = request.get_json()
@@ -1890,9 +1785,7 @@ def datedefault() -> Dict[str, Any]:
         current_app.config['DATE_DEFAULT_YEAR'] = year
         
         # Persist settings
-        from pathlib import Path
         root_path = Path(__file__).parent.parent.parent.parent
-        from halo.services.settings import Settings
         Settings.save_from(current_app.config, root_path)
         
         return jsonify({
@@ -1915,9 +1808,6 @@ def datedefault() -> Dict[str, Any]:
 @api_blueprint.route('/config/fixed_observer', methods=['GET', 'POST'])
 def fixed_observer() -> Dict[str, Any]:
     """Get or set fixed observer (fester Beobachter)"""
-    from flask import current_app, request
-    from halo.config import is_cloud_mode
-    
     if request.method == 'POST':
         # In cloud mode, fixed observer cannot be changed via API
         if is_cloud_mode():
@@ -1931,9 +1821,7 @@ def fixed_observer() -> Dict[str, Any]:
         
         current_app.config['FIXED_OBSERVER'] = observer
         # Persist setting
-        from pathlib import Path
         root_path = Path(__file__).parent.parent.parent.parent
-        from halo.services.settings import Settings
         Settings.save_key(current_app.config, root_path, 'FIXED_OBSERVER', observer)
         
         return jsonify({
@@ -1952,9 +1840,6 @@ def fixed_observer() -> Dict[str, Any]:
 @api_blueprint.route('/config/upload_password', methods=['GET', 'POST'])
 def upload_password() -> Dict[str, Any]:
     """Get or set upload password (obfuscated)."""
-    from flask import current_app, request
-    from halo.services.settings import Settings
-    from pathlib import Path
     
     if request.method == 'POST':
         data = request.get_json()
@@ -1987,16 +1872,13 @@ def active_observers_setting() -> Dict[str, Any]:
     This setting controls whether only active observers should be considered.
     As requested, this setting does not change current observers or observations menus behavior.
     """
-    from flask import current_app, request
 
     if request.method == 'POST':
         data = request.get_json() or {}
         enabled = bool(data.get('enabled', False))
         current_app.config['ACTIVE_OBSERVERS_ONLY'] = enabled
         # Persist setting
-        from pathlib import Path
         root_path = Path(__file__).parent.parent.parent.parent
-        from halo.services.settings import Settings
         Settings.save_key(current_app.config, root_path, 'ACTIVE_OBSERVERS_ONLY', '1' if enabled else '0')
         return jsonify({
             'success': True,
@@ -2013,7 +1895,6 @@ def startup_file_setting() -> Dict[str, Any]:
     
     This setting controls whether a file should be automatically loaded on program start.
     """
-    from flask import current_app, request
     
     if request.method == 'POST':
         data = request.get_json() or {}
@@ -2024,9 +1905,7 @@ def startup_file_setting() -> Dict[str, Any]:
         current_app.config['STARTUP_FILE_PATH'] = file_path if enabled else ''
         
         # Persist settings
-        from pathlib import Path
         root_path = Path(__file__).parent.parent.parent.parent
-        from halo.services.settings import Settings
         Settings.save_key(current_app.config, root_path, 'STARTUP_FILE_ENABLED', '1' if enabled else '0')
         Settings.save_key(current_app.config, root_path, 'STARTUP_FILE_PATH', file_path if enabled else '')
         
@@ -2193,7 +2072,6 @@ def _format_monthly_report_text(data: Dict[str, Any], i18n) -> str:
     observations = data.get('observations', [])
     
     # Convert dict observations to objects if needed
-    from halo.models.types import Observation
     obs_objects = []
     for obs_data in observations:
         if isinstance(obs_data, dict):
@@ -2301,7 +2179,6 @@ def _format_monthly_report_markdown(data: Dict[str, Any], i18n) -> str:
         md += '```\n'
         
         # Convert dict observations to objects if needed
-        from halo.models.types import Observation
         for obs_data in observations:
             if isinstance(obs_data, dict):
                 obs = Observation(
@@ -2356,7 +2233,7 @@ def get_monthly_report() -> Dict[str, Any]:
         mm: Month 1-12 (required)
         jj: Year 0-99 (required)
     """
-    from flask import current_app
+    
     
     # Check if observations are loaded
     observations = current_app.config.get('OBSERVATIONS', [])
@@ -2437,7 +2314,6 @@ def get_monthly_report() -> Dict[str, Any]:
         gn_idx = 0
     
     # Get region names from i18n
-    from flask import g
     regions = g.i18n.get_array('geographic_regions') if hasattr(g, 'i18n') else {}
     
     observer_gh = regions.get(str(gh_idx), '') if gh_idx > 0 else ''
@@ -2496,7 +2372,6 @@ def get_monthly_report() -> Dict[str, Any]:
         return jsonify(data)
     elif output_format in ['text', 'markdown']:
         # Get i18n for formatting
-        from halo.resources.i18n import get_i18n
         i18n = get_i18n()
         
         if output_format == 'text':
@@ -2753,7 +2628,6 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
 def _format_monthly_stats_html(data: Dict[str, Any], month_name: str, year: str, i18n) -> str:
     """Format monthly statistics as HTML - returns JSON for client-side HTML formatting."""
     # Return JSON data; client-side formatter will generate HTML tables
-    import json
     return json.dumps(data)
 
 
@@ -2933,8 +2807,6 @@ def get_monthly_stats() -> Dict[str, Any]:
     Note: Combined halo types (e.g., EE 04 = both 22° parhelia) are resolved to
     their individual components (EE 02 + EE 03) for statistical counting.
     """
-    from flask import current_app, Response
-    from halo.models.constants import resolve_halo_type
     
     # Check if observations are loaded
     observations = current_app.config.get('OBSERVATIONS', [])
@@ -3225,8 +3097,6 @@ def get_monthly_stats() -> Dict[str, Any]:
     rare_halos.sort(key=lambda x: (x['tt'], x['ee'], x['kk']))
     
     # Calculate halo activity (real and relative)
-    from halo.models.constants import calculate_halo_activity
-    
     # Get all observations for the month (not just solar)
     activity_data = calculate_halo_activity(
         observations=filtered_obs,
@@ -3276,7 +3146,6 @@ def get_monthly_stats() -> Dict[str, Any]:
         return jsonify(data)
     elif output_format in ['text', 'markdown']:
         # Get month name and formatted year for display
-        from halo.resources.i18n import get_i18n
         i18n = get_i18n()
         month_name = i18n.get(f'months.{mm_int}')
         year = f"19{str(jj_int).zfill(2)}" if jj_int >= 50 else f"20{str(jj_int).zfill(2)}"
@@ -3289,13 +3158,11 @@ def get_monthly_stats() -> Dict[str, Any]:
             return Response(content, mimetype='text/markdown; charset=utf-8')
     elif output_format == 'linegraph':
         # Generate PNG line chart
-        from halo.resources.i18n import get_i18n
         i18n = get_i18n()
         img_data = _generate_monthly_stats_chart(data, mm_int, jj_int, i18n)
         return Response(img_data, mimetype='image/png')
     elif output_format == 'bargraph':
         # Generate PNG bar chart
-        from halo.resources.i18n import get_i18n
         i18n = get_i18n()
         img_data = _generate_monthly_stats_bar_chart(data, mm_int, jj_int, i18n)
         return Response(img_data, mimetype='image/png')
@@ -4166,8 +4033,6 @@ def get_annual_stats() -> Dict[str, Any]:
         - format=text: Pseudographic output with box-drawing characters
         - format=markdown: Markdown tables for all statistics
     """
-    from flask import current_app
-    from halo.models.constants import calculate_halo_activity
     
     # Check if observations are loaded
     observations = current_app.config.get('OBSERVATIONS', [])
@@ -4500,6 +4365,7 @@ def get_annual_stats() -> Dict[str, Any]:
     
     # Check requested format
     output_format = request.args.get('format', 'json').lower()
+    i18n = get_i18n()
     
     if output_format in ['json', 'html']:
         # JSON format and HTML format both return data; HTML is formatted client-side
@@ -4507,10 +4373,6 @@ def get_annual_stats() -> Dict[str, Any]:
     elif output_format in ['text', 'markdown']:
         # Get formatted year for display
         year = f"19{str(jj_int).zfill(2)}" if jj_int >= 50 else f"20{str(jj_int).zfill(2)}"
-        
-        from halo.resources.i18n import get_i18n
-        i18n = get_i18n()
-        
         if output_format == 'text':
             content = _format_annual_stats_text(data, year, i18n)
             return Response(content, mimetype='text/plain; charset=utf-8')
@@ -4519,14 +4381,10 @@ def get_annual_stats() -> Dict[str, Any]:
             return Response(content, mimetype='text/markdown; charset=utf-8')
     elif output_format == 'linegraph':
         # Generate PNG line chart
-        from halo.resources.i18n import get_i18n
-        i18n = get_i18n()
         img_data = _generate_annual_stats_chart(data, jj_int, i18n)
         return Response(img_data, mimetype='image/png')
     elif output_format == 'bargraph':
         # Generate PNG bar chart
-        from halo.resources.i18n import get_i18n
-        i18n = get_i18n()
         img_data = _generate_annual_stats_bar_chart(data, jj_int, i18n)
         return Response(img_data, mimetype='image/png')
     else:
@@ -4546,8 +4404,6 @@ def get_observers() -> Dict[str, Any]:
         jj: Year (2-digit) for observation date filtering
         mm: Month (1-12) for observation date filtering
     """
-    from flask import current_app
-    from datetime import datetime
     
     observers = current_app.config.get('OBSERVERS', [])
     filter_type = request.args.get('filter_type', 'none')
@@ -4687,7 +4543,7 @@ def get_observers() -> Dict[str, Any]:
 @api_blueprint.route('/observers/list', methods=['GET'])
 def get_observers_list() -> Dict[str, Any]:
     """Get list of unique observers (KK + Name) for dropdown."""
-    from flask import current_app
+    
     
     observers = current_app.config.get('OBSERVERS', [])
     
@@ -4751,7 +4607,7 @@ def _parse_seit(seit_str: str) -> int:
 @api_blueprint.route('/observers/regions', methods=['GET'])
 def get_observer_regions() -> Dict[str, Any]:
     """Get list of unique geographic regions for dropdown."""
-    from flask import current_app
+    
     
     observers = current_app.config.get('OBSERVERS', [])
     
@@ -4799,9 +4655,6 @@ def add_observer() -> Dict[str, Any]:
         NBM: Secondary site latitude minutes
         NNS: Secondary site latitude hemisphere (N/S)
     """
-    from flask import current_app, request
-    from pathlib import Path
-    import csv
     
     data = request.get_json() or {}
     
@@ -4887,10 +4740,6 @@ def update_observer(kk: str) -> Dict[str, Any]:
         
     Note: seit and active are bound to observation sites and cannot be changed here.
     """
-    from flask import current_app, request
-    from pathlib import Path
-    import csv
-    
     data = request.get_json() or {}
     
     # Normalize KK to 2 digits
@@ -4981,7 +4830,7 @@ def update_observer(kk: str) -> Dict[str, Any]:
 @api_blueprint.route('/observers/<kk>/sites', methods=['GET'])
 def get_observer_sites(kk):
     """Get all observation site entries for an observer"""
-    from flask import current_app
+    
     
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
@@ -5052,7 +4901,6 @@ def check_observer_active(kk):
     Multiple records per observer: Find the LATEST record where seit <= check_date,
     then check if that record has aktiv=1.
     """
-    from flask import current_app, request
     
     # Get MM and JJ from query parameters
     mm = request.args.get('mm', type=int)
@@ -5105,10 +4953,6 @@ def check_observer_active(kk):
 @api_blueprint.route('/observers/<kk>/sites', methods=['POST'])
 def add_observer_site(kk):
     """Add a new observation site entry for an observer"""
-    from flask import current_app, request
-    from pathlib import Path
-    import csv
-    
     data = request.get_json() or {}
     
     # Normalize KK to 2 digits
@@ -5209,10 +5053,6 @@ def add_observer_site(kk):
 @api_blueprint.route('/observers/<kk>/sites', methods=['PUT'])
 def update_observer_site(kk):
     """Update an observation site entry for an observer"""
-    from flask import current_app, request
-    from pathlib import Path
-    import csv
-    
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
     
@@ -5294,9 +5134,6 @@ def update_observer_site(kk):
 @api_blueprint.route('/observers/<kk>/sites', methods=['DELETE'])
 def delete_observer_site(kk):
     """Delete an observation site entry for an observer"""
-    from flask import current_app, request
-    from pathlib import Path
-    import csv
     
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
@@ -5345,9 +5182,6 @@ def delete_observer_site(kk):
 @api_blueprint.route('/observers', methods=['DELETE'])
 def delete_observer():
     """Delete all site entries for an observer"""
-    from flask import current_app, request
-    from pathlib import Path
-    import csv
     
     # Get KK from request body
     data = request.get_json()
@@ -5422,8 +5256,6 @@ def analyze_observations() -> Dict[str, Any]:
         - data: Object with grouped observation counts {value: count, ...}
         - total: Total number of observations matching criteria
     """
-    from halo.io.csv_handler import ObservationCSV
-    from collections import defaultdict
     
     try:
         # Get request parameters
@@ -5483,7 +5315,6 @@ def analyze_observations() -> Dict[str, Any]:
         return jsonify(response_payload)
         
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({
             'success': False,
@@ -6009,7 +5840,6 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
 
 def _group_by_parameter(observations, param_name, all_params, prefix):
     """Group observations by a single parameter and return counts."""
-    from collections import defaultdict
     
     groups = defaultdict(int)
     
@@ -6086,7 +5916,6 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
             split_key = f'{prefix}_ee_split'
             if value is not None and all_params.get(split_key):
                 # When split is enabled, expand combined halo types into components
-                from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS
                 ee_value = int(value) if isinstance(value, (int, str)) else value
                 if ee_value in COMBINED_TO_INDIVIDUAL_HALOS:
                     left, right = COMBINED_TO_INDIVIDUAL_HALOS[ee_value]
@@ -6167,7 +5996,6 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
                             
                             if month is not None and year is not None:
                                 try:
-                                    import calendar
                                     month = int(month)
                                     year = int(year)
                                     # Convert 2-digit year to 4-digit for calendar
@@ -6242,7 +6070,6 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
             result.pop(combined_c, None)
     elif param_name == 'EE' and all_params.get(f'{prefix}_ee_split'):
         # Remove combined halo types
-        from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS
         for combined_ee in COMBINED_TO_INDIVIDUAL_HALOS.keys():
             result.pop(str(combined_ee), None)
     
@@ -6257,7 +6084,6 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
 
 def _group_by_two_parameters(observations, param1_name, param2_name, all_params):
     """Group observations by two parameters and return cross-tabulation."""
-    from collections import defaultdict
     
     # Create nested structure for cross-tab
     groups = defaultdict(lambda: defaultdict(int))
@@ -6373,7 +6199,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 val1_list = [str(c_value)]
         # Handle EE (halo) splitting for param1
         elif param1_name == 'EE' and val1 is not None and all_params.get('param1_ee_split'):
-            from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS
             ee_value = int(val1) if isinstance(val1, (int, str)) else val1
             if ee_value in COMBINED_TO_INDIVIDUAL_HALOS:
                 left, right = COMBINED_TO_INDIVIDUAL_HALOS[ee_value]
@@ -6423,7 +6248,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 val2_list = [str(c_value)]
         # Handle EE (halo) splitting for param2
         elif param2_name == 'EE' and val2 is not None and all_params.get('param2_ee_split'):
-            from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS
             ee_value = int(val2) if isinstance(val2, (int, str)) else val2
             if ee_value in COMBINED_TO_INDIVIDUAL_HALOS:
                 left, right = COMBINED_TO_INDIVIDUAL_HALOS[ee_value]
@@ -6461,6 +6285,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         from_val = all_params[param1_from_key]
         to_val = all_params[param1_to_key]
         
+        i18n = get_i18n()
         if from_val is not None and to_val is not None:
             try:
                 from_val = int(from_val) if from_val else None
@@ -6475,8 +6300,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                             param1_range_values = list(range(from_val, to_val + 1))
                     elif param1_name == 'EE':
                         # Halo types - only those defined in i18n
-                        from halo.resources.i18n import get_i18n
-                        i18n = get_i18n()
                         valid_ee = set(int(k) for k in i18n.strings['halo_types'].keys())
                         param1_range_values = []
                         for val in range(from_val, to_val + 1):
@@ -6484,8 +6307,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                                 param1_range_values.append(val)
                     elif param1_name == 'GG':
                         # Geographic regions - only those defined in i18n
-                        from halo.resources.i18n import get_i18n
-                        i18n = get_i18n()
                         valid_gg = set(int(k) for k in i18n.strings['geographic_regions'].keys())
                         param1_range_values = []
                         for val in range(from_val, to_val + 1):
@@ -6528,8 +6349,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                             param2_range_values = list(range(from_val, to_val + 1))
                     elif param2_name == 'EE':
                         # Halo types - only those defined in i18n
-                        from halo.resources.i18n import get_i18n
-                        i18n = get_i18n()
                         valid_ee = set(int(k) for k in i18n.strings['halo_types'].keys())
                         param2_range_values = []
                         for val in range(from_val, to_val + 1):
@@ -6537,8 +6356,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                                 param2_range_values.append(val)
                     elif param2_name == 'GG':
                         # Geographic regions - only those defined in i18n
-                        from halo.resources.i18n import get_i18n
-                        i18n = get_i18n()
                         valid_gg = set(int(k) for k in i18n.strings['geographic_regions'].keys())
                         param2_range_values = []
                         for val in range(from_val, to_val + 1):
@@ -6606,7 +6423,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         for combined_c in ['4', '5', '6', '7']:
             result.pop(combined_c, None)
     elif param1_name == 'EE' and all_params.get('param1_ee_split'):
-        from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS
         for combined_ee in COMBINED_TO_INDIVIDUAL_HALOS.keys():
             result.pop(str(combined_ee), None)
     
@@ -6617,7 +6433,6 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             for combined_c in combined_c_list:
                 result[param1_val].pop(combined_c, None)
     elif param2_name == 'EE' and all_params.get('param2_ee_split'):
-        from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS
         combined_ee_list = [str(k) for k in COMBINED_TO_INDIVIDUAL_HALOS.keys()]
         for param1_val in result:
             for combined_ee in combined_ee_list:
@@ -6647,7 +6462,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
 
 def _format_parameter_value(value, param_name, all_params, prefix):
     """Format a parameter value for display."""
-    from flask import current_app
+    
     
     if value is None:
         return 'keine Angabe'
@@ -6707,35 +6522,4 @@ def _format_parameter_value(value, param_name, all_params, prefix):
             return value.rstrip('+')
     
     return value
-
-
-# OLD DUPLICATE CODE - REMOVED (duplicate route definition)
-# @api_blueprint.route('/language/<lang>', methods=['POST'])
-# def set_language(lang: str):
-#     """
-#     Save language preference to settings.
-#     
-#     Args:
-#         lang: 'de' or 'en'
-#         
-#     Returns:
-#         JSON with success status
-#     """
-#     from flask import current_app, session
-#     from halo.services.settings import Settings
-#     from halo.resources.i18n import set_language as i18n_set_language
-#     
-#     # Validate language
-#     if lang not in ('de', 'en'):
-#         return jsonify({'success': False, 'error': 'invalid_language'}), 400
-#     
-#     # Set in session (immediate effect)
-#     session['language'] = lang
-#     i18n_set_language(lang)
-#     
-#     # Save to settings file (halo.cfg or halo.KK.cfg)
-#     current_app.config['LANGUAGE'] = lang
-#     Settings.save_from(current_app.config)
-#     
-#     return jsonify({'success': True, 'language': lang})
 

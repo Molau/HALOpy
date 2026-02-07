@@ -13,6 +13,11 @@ window.currentLanguage = currentLanguage;
 let i18nStrings = {};
 let observerData = null; // cache of observer data with regions
 
+// Application constants loaded from backend
+let CIRCULAR_HALOS = new Set(); // Will be loaded from /api/constants on page load
+let PILLAR_HEIGHT_VALUES = []; // Light pillar height values (-1, 1-90)
+let ALL_PILLAR_HEIGHT_VALUES = []; // All height values including 0
+
 // Wait for i18nStrings to be loaded - reusable helper function
 // Usage: await waitForI18n() in any module's DOMContentLoaded handler
 window.waitForI18n = function() {
@@ -64,6 +69,20 @@ function saveHaloDataToSession() {
 document.addEventListener('DOMContentLoaded', async () => {
     sessionStorage.removeItem('deleteDebug');
     sessionStorage.removeItem('loadDebug');
+    
+    // Load application constants first
+    try {
+        const constantsResponse = await fetch('/api/constants');
+        if (constantsResponse.ok) {
+            const constants = await constantsResponse.json();
+            GEOGRAPHIC_REGIONS = constants.geographic_regions;
+            CIRCULAR_HALOS = new Set(constants.circular_halos);
+            PILLAR_HEIGHT_VALUES = constants.pillar_height_values;
+            ALL_PILLAR_HEIGHT_VALUES = constants.all_pillar_height_values;
+        }
+    } catch (e) {
+        console.error('Failed to load application constants:', e);
+    }
     
     // Load i18n FIRST - required for all UI operations
     await loadCurrentLanguage();
@@ -824,7 +843,6 @@ async function showAddObservationDialogNumeric() {
                     const ee = parseInt(eing.slice(20,22),10);
                     const g = parseInt(eing.slice(9,10),10);
                     const v = parseInt(eing.slice(24,25),10);
-                    const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
                     
                     if (ee === 8) {
                         // EE 08: Jump to position 32 (delete last char of HO)
@@ -840,7 +858,7 @@ async function showAddObservationDialogNumeric() {
                         renderNumericGuide(eing);
                         ev.preventDefault();
                         return;
-                    } else if (v === 1 && circularHalos.has(ee)) {
+                    } else if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                         // Incomplete circular halo: Sectors were manually entered
                         // Delete trailing spaces AND the last entered sector character
                         let pos = 49; // Start at end of sectors (position 49)
@@ -881,9 +899,8 @@ async function showAddObservationDialogNumeric() {
                     const ee = parseInt(eing.slice(20,22),10);
                     const g = parseInt(eing.slice(9,10),10);
                     const v = parseInt(eing.slice(24,25),10);
-                    const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
                     
-                    if (v === 1 && circularHalos.has(ee)) {
+                    if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                         // Incomplete circular halo: Sectors were manually entered and now all deleted
                         // If g=1: Delete last char of GG → position 29
                         // If g != 1: Delete GG completely and last char of zz → position 27
@@ -1129,14 +1146,13 @@ async function showAddObservationDialogNumeric() {
                                 // Sectors are only needed for incomplete (V=1) circular halos
                                 // CRITICAL: For EE 08/09/10, don't auto-fill sectors yet - user must enter HO/HU first
                                 const v = parseInt(eing.slice(24,25),10);
-                                const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
                                 
                                 // Only auto-fill sectors if 8HHHH field is COMPLETE (5 chars = position 35)
                                 // For EE 08/09/10: field is NOT complete yet, user needs to enter HO/HU
                                 const is8HHHHComplete = eing.length === 35;
                                 
                                 if (is8HHHHComplete) {
-                                    if (v === 1 && circularHalos.has(ee)) {
+                                    if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                                         // Incomplete circular halo: user will enter sectors (do nothing)
                                     } else {
                                         // Complete halo or non-circular: auto-fill 15 spaces
@@ -1170,7 +1186,6 @@ async function showAddObservationDialogNumeric() {
         if (eing.length === 29) {
             const ee = parseInt(eing.slice(20,22),10);
             const v = parseInt(eing.slice(24,25),10);
-            const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
             
             if (ee === 8) {
                 // EE 08: 8HOHU// ? user enters HO at positions 31-32, HU at 33-34, then // auto-filled
@@ -1189,7 +1204,7 @@ async function showAddObservationDialogNumeric() {
                 
                 // Since we just auto-filled 8//// (5 chars), we're now at position 35
                 // Check if we need to auto-fill sectors (15 spaces) for non-circular or complete halos
-                if (v === 1 && circularHalos.has(ee)) {
+                if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                     // Incomplete circular halo: user will enter sectors (do nothing)
                 } else {
                     // Complete halo or non-circular: auto-fill 15 spaces
@@ -1225,11 +1240,10 @@ async function showAddObservationDialogNumeric() {
         if (eing.length === 34) {
             const v = parseInt(eing.slice(24,25),10);
             const ee = parseInt(eing.slice(20,22),10);
-            const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
             
             // For EE 09 and EE 10, skip auto-fill - HU validation happens at position 35
             if (ee === 9 || ee === 10) {
-            } else if (v === 1 && circularHalos.has(ee)) {
+            } else if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                 // Incomplete circular halo: user will enter sectors (do nothing)
             } else {
                 // Complete halo or non-circular: auto-fill 15 spaces
@@ -1242,9 +1256,8 @@ async function showAddObservationDialogNumeric() {
         if (eing.length >= 35 && eing.length < 50 && ch === ' ') {
             const v = parseInt(eing.slice(24,25),10);
             const ee = parseInt(eing.slice(20,22),10);
-            const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
             
-            if (v === 1 && circularHalos.has(ee)) {
+            if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                 const sectorStart = 35;
                 const posInSector = eing.length - sectorStart;
                 
@@ -1306,9 +1319,8 @@ async function showAddObservationDialogNumeric() {
                         
                         // Now auto-fill sectors since 8HHHH is complete
                         const v = parseInt(eing.slice(24,25),10);
-                        const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
                         
-                        if (v === 1 && circularHalos.has(ee)) {
+                        if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                             // Incomplete circular halo: user will enter sectors (do nothing)
                         } else {
                             // Complete halo or non-circular: auto-fill 15 spaces
@@ -1324,9 +1336,8 @@ async function showAddObservationDialogNumeric() {
                 if ((ee === 9 || ee === 10) && newLength === 35 && oldLength === 34) {
                     // User just completed HU validation at position 35
                     const v = parseInt(eing.slice(24,25),10);
-                    const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
                     
-                    if (v === 1 && circularHalos.has(ee)) {
+                    if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                         // Incomplete circular halo: user will enter sectors (do nothing)
                     } else {
                         // Complete halo or non-circular: auto-fill 15 spaces
@@ -1890,12 +1901,11 @@ function validateNumericProgress(s, observerCodes) {
     if (len >= 36 && len <= 50) {
         const v = parseInt(s.slice(24,25),10);
         const ee = parseInt(s.slice(20,22),10);
-        const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
         const char = s[len-1];
         
 
         
-        if (v === 1 && circularHalos.has(ee)) {
+        if (v === 1 && CIRCULAR_HALOS.has(ee)) {
             // User enters sector notation using shared validator
             const sectorStart = 35;
             const sectorField = s.slice(sectorStart, len);// Use shared validation function
@@ -5085,9 +5095,6 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
     
     modal.show();
 }
-
-// OLD CODE REMOVED - uploadLocalModeObservations no longer needed
-// Both Local and Cloud mode now use File Picker via showUploadFileDialog()
 
 // Download file from HALO server
 async function showDownloadDialog() {
