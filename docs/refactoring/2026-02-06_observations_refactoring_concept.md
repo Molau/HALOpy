@@ -443,6 +443,64 @@ class ObservationStorage(Protocol):
 
 ---
 
+## Storage-Specific Implementation Differences
+
+### UPDATE Operation Strategy
+
+**Layer 2 (storage-agnostic):**
+```python
+def update_observation(key, updated_obs, collection):
+    # Works with in-memory list, no knowledge of File/DB
+    # Simply replaces observation at matching index
+```
+
+**Layer 3a (File Storage) - DELETE + INSERT + Sort:**
+```python
+def update_observation_in_file(filepath, key, updated_obs):
+    observations = load_observations_from_file(filepath)
+    success, observations = delete_observation(key, observations)
+    success, observations = add_observation(updated_obs, observations)
+    observations = sort_observations(observations)  # CRITICAL: Re-sort!
+    save_observations_to_file(filepath, observations)
+```
+
+**Rationale for File Storage:**
+- CSV files store observations in sorted order (J→M→T→ZS→ZM→K→E→GG)
+- If sort fields change (JJ, MM, TT, etc.), position in file must change
+- Sorting is embedded in file structure, not handled by query
+- DELETE + INSERT ensures correct position after update
+
+**Layer 3b (Database Storage) - SQL UPDATE:**
+```python
+def update_observation_in_db(key, updated_obs):
+    cursor.execute("""
+        UPDATE observations 
+        SET JJ=?, MM=?, TT=?, ZS=?, ZM=?, EE=?, GG=?, ... 
+        WHERE KK=? AND O=? AND JJ=? AND MM=? AND TT=? AND EE=? AND GG=?
+    """, (updated_obs.JJ, ..., *key))
+```
+
+**Rationale for Database Storage:**
+1. ✅ **Efficient**: Single operation instead of DELETE + INSERT
+2. ✅ **Atomic**: No race condition between DELETE and INSERT
+3. ✅ **Preserves Metadata**: Auto-increment IDs, timestamps, etc. remain intact
+4. ✅ **Sorting via SQL**: `ORDER BY JJ, MM, TT, ...` in query, not in storage
+5. ✅ **Indexes**: Database indexes handle efficient sorting and lookups
+
+**Key Insight:**
+The same high-level operation (`update_observation`) has different optimal implementations depending on storage backend. This is exactly why Layer 2 is storage-agnostic—it provides a uniform interface while allowing Layer 3 to optimize for the specific storage technology.
+
+### INSERT Operation Strategy
+
+**Both Layer 3a and Layer 3b:**
+- Simple append/INSERT without sorting
+- Layer 3a sorts on SAVE (not on ADD)
+- Layer 3b sorts on SELECT (via ORDER BY)
+
+This design allows bulk operations to be efficient (add many, sort once).
+
+---
+
 ## Nächster Schritt
 
 ✓ Layer 2 und Layer 3a sind implementiert und getestet!
