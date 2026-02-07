@@ -103,7 +103,9 @@ def open_file(file_path: Path = None) -> Tuple[List[List[str]], Path]:
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
+            # Remove NULL characters that can cause PostgreSQL import issues
+            content = f.read().replace('\x00', '')
+            reader = csv.reader(content.splitlines())
             records = list(reader)
         return records, file_path
     except Exception as e:
@@ -207,7 +209,9 @@ def restore_from_backup() -> Optional[List[List[str]]]:
     
     try:
         with open(backup_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
+            # Remove NULL characters that can cause PostgreSQL import issues
+            content = f.read().replace('\x00', '')
+            reader = csv.reader(content.splitlines())
             return list(reader)
     except Exception as e:
         raise IOError(f"Failed to restore from backup {backup_path}: {str(e)}")

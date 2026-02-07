@@ -125,10 +125,13 @@ class ObservationCSV:
         observations = []
         
         with open(filepath, 'r', encoding=encoding) as f:
+            # Remove NULL characters that can cause PostgreSQL import issues
+            content = f.read().replace('\x00', '')
+            
             if is_legacy:
                 # Legacy format: simple comma split (spaces between fields)
-                for line in f:
-                    parts = line.rstrip(',\n').split(',')
+                for line in content.splitlines():
+                    parts = line.rstrip(',').split(',')
                     if len(parts) < 20:
                         continue
                     obs = ObservationCSV._parse_observation_parts(parts)
@@ -136,7 +139,7 @@ class ObservationCSV:
                         observations.append(obs)
             else:
                 # Modern format: proper CSV with quoted remarks
-                reader = csv.reader(f)
+                reader = csv.reader(content.splitlines())
                 for parts in reader:
                     if len(parts) < 20:
                         continue
