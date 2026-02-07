@@ -1010,7 +1010,7 @@ def merge_file() -> Dict[str, Any]:
         file_object = StringIO(content)
         
         # Parse CSV directly from memory
-        new_observations = ObservationCSV.read_observations_from_stream(file_object)
+        new_observations = obs_file.import_observations_from_csv(file_object)
         
         # Get currently loaded observations
         current_observations = current_app.config.get('OBSERVATIONS', [])
@@ -1383,7 +1383,7 @@ def download_file() -> Dict[str, Any]:
         
         # Generate CSV content
         csv_buffer = io.StringIO()
-        ObservationCSV.write_to_buffer(filtered_observations, csv_buffer)
+        obs_file.export_observations_to_csv(filtered_observations, csv_buffer)
         csv_content = csv_buffer.getvalue()
         
         # Return CSV content for client-side download

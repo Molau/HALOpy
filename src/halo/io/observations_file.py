@@ -424,4 +424,47 @@ def delete_temp_file(base_filename: str) -> bool:
     return True
 
 
+# ============================================================================
+# Import/Export Operations (for Cloud Upload/Download)
+# ============================================================================
+
+def import_observations_from_csv(file_stream) -> List[Observation]:
+    """
+    Import observations from uploaded CSV file stream.
+    
+    Args:
+        file_stream: File-like object from HTTP upload (e.g., request.files['file'])
+        
+    Returns:
+        List of Observation objects
+        
+    Example:
+        >>> observations = import_observations_from_csv(request.files['file'])
+        
+    Use Case:
+        Cloud mode: User uploads CSV file → Server imports observations
+    """
+    return ObservationCSV.read_observations_from_stream(file_stream)
+
+
+def export_observations_to_csv(observations: List[Observation], buffer) -> None:
+    """
+    Export observations to CSV buffer for file download.
+    
+    Args:
+        observations: List of Observation objects to export
+        buffer: StringIO buffer to write CSV content to
+        
+    Example:
+        >>> import io
+        >>> buffer = io.StringIO()
+        >>> export_observations_to_csv(observations, buffer)
+        >>> csv_content = buffer.getvalue()
+        
+    Use Case:
+        Cloud mode: Server exports filtered observations → User downloads CSV file
+    """
+    ObservationCSV.write_to_buffer(observations, buffer)
+
+
 
