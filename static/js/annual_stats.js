@@ -195,8 +195,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         // Format year
-        const year = data.jj >= 50 ? `19${data.jj.toString().padStart(2, '0')}` : 
-                     `20${data.jj.toString().padStart(2, '0')}`;
+        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
+                 `20${data.jj.toString().padStart(2, '0')}`;
         
         // Set title
         const resultsTitle = document.getElementById('results-modal-title');
@@ -660,8 +660,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!currentStatsData) return;
         
         // Format year
-        const year = currentStatsData.jj >= 50 ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
-                     `20${currentStatsData.jj.toString().padStart(2, '0')}`;
+        const year = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
+                 `20${currentStatsData.jj.toString().padStart(2, '0')}`;
         
         // Set chart title
         const chartTitle = document.getElementById('chart-printable-title-line');
@@ -784,8 +784,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     function showBarChart() {
         if (!currentStatsData) return;
         
-        const year = currentStatsData.jj >= 50 ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
-                     `20${currentStatsData.jj.toString().padStart(2, '0')}`;
+        const year = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
+                 `20${currentStatsData.jj.toString().padStart(2, '0')}`;
         
         // Set chart title
         const chartTitle = document.getElementById('chart-printable-title-bar');
@@ -935,7 +935,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnChartSaveLine.onclick = async () => {
                 if (!window.chartData) return;
                 try {
-                    const year = window.chartData.jj >= 50 ? `19${window.chartData.jj.toString().padStart(2, '0')}` : 
+                    const year = window.chartData.jj >= (YEAR_MIN-1900) ? `19${window.chartData.jj.toString().padStart(2, '0')}` : 
                                  `20${window.chartData.jj.toString().padStart(2, '0')}`;
                     const filename = `Jahresstatistik_${year}.png`;
                     
@@ -990,7 +990,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnChartSaveBar.onclick = async () => {
                 if (!window.chartData) return;
                 try {
-                    const year = window.chartData.jj >= 50 ? `19${window.chartData.jj.toString().padStart(2, '0')}` : 
+                    const year = window.chartData.jj >= (YEAR_MIN-1900) ? `19${window.chartData.jj.toString().padStart(2, '0')}` : 
                                  `20${window.chartData.jj.toString().padStart(2, '0')}`;
                     const filename = `Jahresstatistik_${year}_Balken.png`;
                     
@@ -1025,8 +1025,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function saveStatistics() {
         if (!currentStatsData) return;
         
-        const year = currentStatsData.jj >= 50 ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
-                     `20${currentStatsData.jj.toString().padStart(2, '0')}`;
+        const year = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
+                 `20${currentStatsData.jj.toString().padStart(2, '0')}`;
         
         // Check output mode
         const modeResponse = await fetch('/api/config/outputmode');

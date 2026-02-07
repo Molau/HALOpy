@@ -32,12 +32,6 @@ PATTERNS = {
         # i18n.strings - direct attribute access (exclude method calls)
         # Only matches if followed by word boundary, not by '(' or more dots+methods
         r'i18n\.strings(?!\()',
-        # Backend error keys: jsonify({'error': 'key_name'})
-        # Only matches simple identifiers (underscore, alphanumeric), not strings with spaces/apostrophes
-        # Matches 'error': 'key_name' where key_name is a complete identifier (no spaces, no punctuation)
-        r"['\"]error['\"]:\s*['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"](?=\s*[,})])",
-        # Backend error keys with 'or' fallback: 'error': error or 'key_name'
-        r"['\"]error['\"]:\s*\w+\s+or\s+['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]",
     ],
     'html': [
         # {{ i18n.key }}, {{ i18nStrings.key }}
@@ -67,9 +61,6 @@ def scan_file(filepath, file_type):
     """Scan a single file for i18n references."""
     results = []
     
-    # Check if this is a backend routes.py file
-    is_backend_routes = 'routes.py' in str(filepath) and 'api' in str(filepath)
-    
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
@@ -79,10 +70,6 @@ def scan_file(filepath, file_type):
                 for match in re.finditer(pattern, line):
                     key = extract_key_from_match(match, file_type)
                     if key:
-                        # Backend error keys are under messages.* namespace
-                        if is_backend_routes and file_type == 'python' and "'error':" in line:
-                            key = 'messages.' + key
-                        
                         results.append({
                             'file': str(filepath),
                             'line': line_num,

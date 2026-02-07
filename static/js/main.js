@@ -2466,7 +2466,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
     
     // Build year options (1980-2079)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = (YEAR_MIN-1900) + i; // 50-149
+        const year = (YEAR_MIN-1900) + i; // 80-179
         const displayYear = year < (YEAR_MIN-1900) ? 2000 + year : 1900 + year;
         return `<option value="${year}">${displayYear}</option>`;
     }).join('');
@@ -4282,7 +4282,7 @@ async function showSelectDialog() {
                 
                 // Check for leap year in February
                 if (month === 2) {
-                    const fullYear = year < 50 ? 2000 + year : 1900 + year;
+                    const fullYear = year < (YEAR_MIN-1900) ? 2000 + year : 1900 + year;
                     if (fullYear % 4 === 0) {
                         maxDay = 29;
                     }
@@ -4769,7 +4769,7 @@ async function saveFile() {
 }
 
 // Authentication modal for HALO server login
-async function showAuthenticationModal(onSuccess) {
+async function showAuthenticationModal(onSuccess, cloudServerUrl) {
     // Load observers, fixed observer, and saved password
     let observers = [];
     let fixedObserver = '';
@@ -4900,6 +4900,36 @@ async function showAuthenticationModal(onSuccess) {
             return;
         }
         
+        if (!cloudServerUrl) {
+            showErrorDialog(i18nStrings.messages.error_loading);
+            return;
+        }
+
+        const loginUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/login`;
+        try {
+            const loginResponse = await fetch(loginUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: observerKK,
+                    password: password
+                })
+            });
+
+            const loginResult = await loginResponse.json();
+
+            if (!loginResponse.ok || !loginResult.success) {
+                showErrorDialog(i18nStrings.messages[loginResult.error]);
+                return;
+            }
+        } catch (error) {
+            showErrorDialog(
+                i18nStrings.upload_download.server_unreachable_details.replace('{0}', loginUrl),
+                () => { window.navigateInternal('/'); }
+            );
+            return;
+        }
+
         // Save password to halo.cfg (obfuscated)
         try {
             await fetch('/api/config/upload_password', {
@@ -4908,10 +4938,6 @@ async function showAuthenticationModal(onSuccess) {
                 body: JSON.stringify({ password: password })
             });
         } catch (error) {}
-        
-        // TODO: Validate credentials against HALO server API
-        // For now, we'll just pass the credentials to the callback
-        // In production, you would verify them here first
         
         modal.hide();
         setTimeout(() => {
@@ -4939,7 +4965,7 @@ async function showUploadDialog() {
         const configResponse = await fetch('/api/config');
         const config = await configResponse.json();
         const isCloudMode = config.cloud_mode;
-        const cloudServerUrl = config.cloud_server_url || 'https://halo.online';
+        const cloudServerUrl = config.cloud_server_url;
         
         // Check if there are unsaved changes
         const statusResponse = await fetch('/api/file/status');
@@ -4950,7 +4976,7 @@ async function showUploadDialog() {
         if (isDirty) {
             showConfirmDialog(
                 i18nStrings.messages.unsaved_changes_title,
-                i18nStrings.messages.upload_warning_unsaved_changes || 'Sie haben ungespeicherte Änderungen. Möchten Sie nicht erst speichern? Sonst laden Sie eine alte Version hoch.',
+                i18nStrings.messages.upload_warning_unsaved_changes,
                 () => {
                     // User chose to continue despite unsaved changes
                     continueUpload(isCloudMode, cloudServerUrl, config.username);
@@ -4972,7 +4998,7 @@ function continueUpload(isCloudMode, cloudServerUrl, username) {
     showAuthenticationModal(async (observerKK, password) => {
         // After authentication, show file picker
         showUploadFileDialog(observerKK, password, isCloudMode, cloudServerUrl);
-    });
+    }, cloudServerUrl);
 }
 
 // Upload in cloud mode: Select file from local disk
@@ -5037,7 +5063,7 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
             loadingSpinner.modal.hide();
             setTimeout(() => loadingSpinner.modalEl.remove(), 300);
             
-            const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.messages.uploading || 'Datei wird hochgeladen...');
+            const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
             
             // Upload to cloud server
             const uploadUrl = `${cloudServerUrl}/api/sync/upload`;
@@ -5058,7 +5084,7 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
             if (response.ok) {
                 const result = await response.json();
                 showNotification(
-                    `✓ ${result.count || 0} ${i18nStrings.messages.observations_uploaded || 'Beobachtungen hochgeladen'}`,
+                    `✓ ${result.count || 0} ${i18nStrings.upload_download.upload_success}`,
                     'success',
                     5000
                 );
@@ -5101,8 +5127,8 @@ async function showDownloadDialog() {
     // Detect cloud vs local mode
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
-    const isCloudMode = config.is_cloud;
-    const cloudServerUrl = config.cloud_server_url || 'https://halo.online';
+    const isCloudMode = config.cloud_mode;
+    const cloudServerUrl = config.cloud_server_url;
     
     if (isCloudMode) {
         // Cloud mode: use session authentication
@@ -5240,7 +5266,7 @@ async function downloadLocalMode(cloudServerUrl) {
                 }
             }
         });
-    });
+    }, cloudServerUrl);
 }
 
 function triggerFileSaveDialog(csvContent, defaultFilename) {
@@ -5273,20 +5299,15 @@ async function showObserverUploadDialog() {
     // Detect cloud vs local mode
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
-    const isCloudMode = config.is_cloud;
     
-    if (isCloudMode) {
-        await uploadObserversCloudMode();
+    if (config.cloud_mode) {
+        await downloadObserversCloudMode(config.cloud_server_url);
     } else {
-        await uploadObserversLocalMode();
+        await downloadObserversLocalMode(config.cloud_server_url);
     }
-}
-
-async function uploadObserversCloudMode() {
-    // Cloud mode: user is already authenticated via session
     let spinner = null;
     try {
-        spinner = showInfoModal(i18nStrings.observers.upload_title, i18nStrings.observers.upload_progress);
+        spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
         
         // Load current observers from app
         const observersResponse = await fetch('/api/observers');
@@ -5303,7 +5324,7 @@ async function uploadObserversCloudMode() {
         }
         
         // Upload to server with session authentication
-        const response = await fetch('/api/observers/upload', {
+        const response = await fetch(uploadUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -5312,7 +5333,16 @@ async function uploadObserversCloudMode() {
             })
         });
         
-        const result = await response.json();
+        let result = null;
+        if (response.ok) {
+            result = await response.json();
+        } else {
+            try {
+                result = await response.json();
+            } catch (e) {
+                result = null;
+            }
+        }
         
         // Hide spinner
         if (spinner) {
@@ -5320,26 +5350,36 @@ async function uploadObserversCloudMode() {
             setTimeout(() => spinner.modalEl.remove(), 300);
         }
         
-        if (response.ok && result.success) {
-            showNotification(i18nStrings.observers.upload_success, 'success');
+        if (response.ok && result && result.success) {
+            showNotification(i18nStrings.upload_download.upload_success_observer, 'success');
+        } else if (!response.ok) {
+            showErrorDialog(
+                i18nStrings.upload_download.server_unreachable_details.replace('{0}', uploadUrl),
+                () => { window.navigateInternal('/'); }
+            );
         } else {
-            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            const errorMessage = result && result.error ? result.error : i18nStrings.upload_download.server_unreachable;
+            showErrorDialog(i18nStrings.common.error + ': ' + errorMessage);
         }
     } catch (error) {
         if (spinner) {
             spinner.modal.hide();
             setTimeout(() => spinner.modalEl.remove(), 300);
         }
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        showErrorDialog(
+            i18nStrings.upload_download.server_unreachable_details.replace('{0}', uploadUrl),
+            () => { window.navigateInternal('/'); }
+        );
     }
 }
 
-async function uploadObserversLocalMode() {
+async function uploadObserversLocalMode(cloudServerUrl) {
+    const uploadUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/observers/upload`;
     // Local mode: show authentication dialog
     showAuthenticationModal(async (observerKK, password) => {
         let spinner = null;
         try {
-            spinner = showInfoModal(i18nStrings.observers.upload_title, i18nStrings.observers.upload_progress);
+            spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
             
             // Load current observers from app
             const observersResponse = await fetch('/api/observers');
@@ -5367,7 +5407,7 @@ async function uploadObserversLocalMode() {
             }
             
             // Upload to server
-            const response = await fetch('/api/observers/upload', {
+            const response = await fetch(uploadUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -5378,7 +5418,16 @@ async function uploadObserversLocalMode() {
                 })
             });
             
-            const result = await response.json();
+            let result = null;
+            if (response.ok) {
+                result = await response.json();
+            } else {
+                try {
+                    result = await response.json();
+                } catch (e) {
+                    result = null;
+                }
+            }
             
             // Hide spinner
             if (spinner) {
@@ -5386,42 +5435,51 @@ async function uploadObserversLocalMode() {
                 setTimeout(() => spinner.modalEl.remove(), 300);
             }
             
-            if (response.ok && result.success) {
-                showNotification(i18nStrings.observers.upload_success, 'success');
+            if (response.ok && result && result.success) {
+                showNotification(i18nStrings.upload_download.upload_success_observer, 'success');
+            } else if (!response.ok) {
+                showErrorDialog(
+                    i18nStrings.upload_download.server_unreachable_details.replace('{0}', uploadUrl),
+                    () => { window.navigateInternal('/'); }
+                );
             } else {
-                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+                const errorMessage = result && result.error ? result.error : i18nStrings.upload_download.server_unreachable;
+                showErrorDialog(i18nStrings.common.error + ': ' + errorMessage);
             }
         } catch (error) {
             if (spinner) {
                 spinner.modal.hide();
                 setTimeout(() => spinner.modalEl.remove(), 300);
             }
-            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+            showErrorDialog(
+                i18nStrings.upload_download.server_unreachable_details.replace('{0}', uploadUrl),
+                () => { window.navigateInternal('/'); }
+            );
         }
-    });
+    }, cloudServerUrl);
 }
 
 async function showObserverDownloadDialog() {
     // Detect cloud vs local mode
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
-    const isCloudMode = config.is_cloud;
     
-    if (isCloudMode) {
-        await downloadObserversCloudMode();
+    if (config.cloud_mode) {
+        await downloadObserversCloudMode(config.cloud_server_url);
     } else {
-        await downloadObserversLocalMode();
+        await downloadObserversLocalMode(config.cloud_server_url);
     }
 }
 
-async function downloadObserversCloudMode() {
+async function downloadObserversCloudMode(cloudServerUrl) {
+    const downloadUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/observers/download`;
     // Cloud mode: download complete halobeo.csv (no KK filter)
     let spinner = null;
     try {
-        spinner = showInfoModal(i18nStrings.observers.download_title, i18nStrings.observers.download_progress);
+        spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
         // Download from server with session authentication
-        const response = await fetch('/api/observers/download', {
+        const response = await fetch(downloadUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -5444,7 +5502,12 @@ async function downloadObserversCloudMode() {
             triggerFileSaveDialog(csvContent, defaultFilename);
             
             // Success notification
-            showNotification(i18nStrings.observers.download_success, 'success');
+            showNotification(i18nStrings.upload_download.download_success_observer, 'success');
+        } else if (!response.ok) {
+            showErrorDialog(
+                i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
+                () => { window.navigateInternal('/'); }
+            );
         } else {
             showErrorDialog(i18nStrings.common.error + ': ' + result.error);
         }
@@ -5453,7 +5516,10 @@ async function downloadObserversCloudMode() {
             spinner.modal.hide();
             setTimeout(() => spinner.modalEl.remove(), 300);
         }
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        showErrorDialog(
+            i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
+            () => { window.navigateInternal('/'); }
+        );
     }
 }
 
@@ -5507,49 +5573,60 @@ function showDownloadScopeDialog(callback) {
     });
 }
 
-async function downloadObserversLocalMode() {
-    // Local mode: download complete halobeo.csv (no KK filter)
-    // Note: No authentication needed for download in local mode
-    let spinner = null;
-    try {
-        spinner = showInfoModal(i18nStrings.observers.download_title, i18nStrings.observers.download_progress);
-        
-        // Download from server (no authentication for local mode download)
-        const response = await fetch('/api/observers/download', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                use_session: false,
-                no_auth: true  // Special flag for local mode download without auth
-            })
-        });
-        
-        const result = await response.json();
-        
-        // Hide spinner
-        if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-        }
-        
-        if (response.ok && result.success) {
-            // Trigger file save dialog
-            const csvContent = result.csv_content;
-            const defaultFilename = 'halobeo.csv';
-            triggerFileSaveDialog(csvContent, defaultFilename);
+async function downloadObserversLocalMode(cloudServerUrl) {
+    const downloadUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/observers/download`;
+    // Local mode: authenticate against cloud server, then download complete halobeo.csv
+    showAuthenticationModal(async (observerKK, password) => {
+        let spinner = null;
+        try {
+            spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
             
-            // Success notification
-            showNotification(i18nStrings.observers.download_success, 'success');
-        } else {
-            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            // Download from cloud server with password authentication
+            const response = await fetch(downloadUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    observerKK: observerKK,
+                    password: password,
+                    use_session: false
+                })
+            });
+            
+            const result = await response.json();
+            
+            // Hide spinner
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            
+            if (response.ok && result.success) {
+                // Trigger file save dialog
+                const csvContent = result.csv_content;
+                const defaultFilename = 'halobeo.csv';
+                triggerFileSaveDialog(csvContent, defaultFilename);
+                
+                // Success notification
+                showNotification(i18nStrings.upload_download.download_success_observer, 'success');
+            } else if (!response.ok) {
+                showErrorDialog(
+                    i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
+                    () => { window.navigateInternal('/'); }
+                );
+            } else {
+                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            }
+        } catch (error) {
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            showErrorDialog(
+                i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
+                () => { window.navigateInternal('/'); }
+            );
         }
-    } catch (error) {
-        if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-        }
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-    }
+    }, cloudServerUrl);
 }
 
 // Helper function - shows a toast message in top-right corner
@@ -6643,7 +6720,15 @@ async function showChangePasswordDialog() {
                 }
                 
                 try {
-                    const response = await fetch('/api/change-password', {
+                    const configResponse = await fetch('/api/config');
+                    const config = await configResponse.json();
+                    const apiBase = config.cloud_mode ? '' : config.cloud_server_url;
+                    if (!config.cloud_mode && !apiBase) {
+                        showError(i18nStrings.messages.error_loading);
+                        return;
+                    }
+                    const changeUrl = apiBase === '' ? '/api/change-password' : `${apiBase.replace(/\/$/, '')}/api/change-password`;
+                    const response = await fetch(changeUrl, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
@@ -6687,7 +6772,15 @@ async function showChangePasswordDialog() {
                 }
                 
                 try {
-                    const response = await fetch('/api/change-password', {
+                    const configResponse = await fetch('/api/config');
+                    const config = await configResponse.json();
+                    const apiBase = config.cloud_mode ? '' : config.cloud_server_url;
+                    if (!config.cloud_mode && !apiBase) {
+                        showError(i18nStrings.messages.error_loading);
+                        return;
+                    }
+                    const changeUrl = apiBase === '' ? '/api/change-password' : `${apiBase.replace(/\/$/, '')}/api/change-password`;
+                    const response = await fetch(changeUrl, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
@@ -6883,7 +6976,15 @@ async function showHelpDialog() {
 // Logout handler (cloud mode only)
 async function handleLogout() {
     try {
-        const response = await fetch('/api/logout', {
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        const apiBase = config.cloud_mode ? '' : config.cloud_server_url;
+        if (!config.cloud_mode && !apiBase) {
+            showErrorDialog(i18nStrings.messages.error_loading);
+            return;
+        }
+        const logoutUrl = apiBase === '' ? '/api/logout' : `${apiBase.replace(/\/$/, '')}/api/logout`;
+        const response = await fetch(logoutUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -7413,7 +7514,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
     // Build table rows
     const tableRows = sites.map(site => {
         const yearNum = parseInt(site.seit_year);
-        const fullYear = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+        const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
         const monthName = i18nStrings.months[site.seit_month];
         const seitDisplay = `${String(site.seit_month).padStart(2, '0')}/${String(yearNum).padStart(2, '0')}`;
         const aktivDisplay = site.active === 1 ? i18nStrings.common.yes : i18nStrings.common.no;
@@ -7426,10 +7527,10 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                 <td>${aktivDisplay}</td>
                 <td>${site.HbOrt}</td>
                 <td>${site.GH.padStart(2, '0')}</td>
-                <td>${site.HLG}? ${site.HLM}' ${site.HOW} / ${site.HBG}? ${site.HBM}' ${site.HNS}</td>
+                <td>${site.HLG}° ${site.HLM}' ${site.HOW} / ${site.HBG}° ${site.HBM}' ${site.HNS}</td>
                 <td>${site.NbOrt}</td>
                 <td>${site.GN.padStart(2, '0')}</td>
-                <td>${site.NLG}? ${site.NLM}' ${site.NOW} / ${site.NBG}? ${site.NBM}' ${site.NNS}</td>
+                <td>${site.NLG}° ${site.NLM}' ${site.NOW} / ${site.NBG}° ${site.NBM}' ${site.NNS}</td>
             </tr>`;
     }).join('');
     
@@ -8043,7 +8144,7 @@ async function showAddSiteDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_added}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -8268,7 +8369,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     
     // Convert 2-digit year to 4-digit year
     const yearNum = parseInt(site.seit_year);
-    const fullYear = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+    const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
     
     // Pre-fill form with existing values (disabled)
     document.getElementById('confirm-edit-site-seit-month').value = site.seit_month;
@@ -8510,7 +8611,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
     
     // Convert 2-digit year to 4-digit year
     const yearNum = parseInt(site.seit_year);
-    const fullYear = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+    const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
     
     // Pad GH and GN to 2 digits for select matching
     const ghPadded = String(site.GH).padStart(2, '0');
@@ -8611,7 +8712,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_updated}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -8839,7 +8940,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     
     // Convert 2-digit year to 4-digit for display
     const yearNum = parseInt(site.seit_year);
-    const fullYear = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+    const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
     
     // Pre-fill form with existing values (disabled)
     document.getElementById('delete-site-seit-month').value = site.seit_month;
@@ -8905,7 +9006,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_deleted}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {

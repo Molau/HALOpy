@@ -1,129 +1,100 @@
 """
-Observer file I/O operations for halobeo.csv
+Layer 2: Observer Management (Business Logic)
 
-Centralizes all read/write operations for the observer database (halobeo.csv).
-This module provides a single source of truth for observer data persistence.
+Storage-agnostic observer operations - NO file I/O or database access.
+This module provides business logic for observer record management.
 
-Observer record format (CSV):
-    KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
-
-    Fields:
-        0: KK - Observer code (01-99)
-        1: VName - First name
-        2: NName - Last name
-        3: seit - Start date (MM/YY format)
-        4: active - Active status (1=active, 0=inactive)
-        5: HbOrt - Primary observation site name
-        6: GH - Primary site geographic region code (1-39)
-        7: HLG - Primary site longitude degrees
-        8: HLM - Primary site longitude minutes
-        9: HOW - Primary site longitude hemisphere (O=East, W=West)
-        10: HBG - Primary site latitude degrees
-        11: HBM - Primary site latitude minutes
-        12: HNS - Primary site latitude hemisphere (N=North, S=South)
-        13: NbOrt - Secondary observation site name
-        14: GN - Secondary site geographic region code
-        15: NLG - Secondary site longitude degrees
-        16: NLM - Secondary site longitude minutes
-        17: NOW - Secondary site longitude hemisphere
-        18: NBG - Secondary site latitude degrees
-        19: NBM - Secondary site latitude minutes
-        20: NNS - Secondary site latitude hemisphere
+Observer record format:
+    List[str] with 21 fields:
+    
+    [0] KK - Observer code (01-99)
+    [1] VName - First name
+    [2] NName - Last name
+    [3] seit - Start date (MM/YY format)
+    [4] active - Active status (1=active, 0=inactive)
+    [5] HbOrt - Primary observation site name
+    [6] GH - Primary site geographic region code (1-39)
+    [7] HLG - Primary site longitude degrees
+    [8] HLM - Primary site longitude minutes
+    [9] HOW - Primary site longitude hemisphere (O=East, W=West)
+    [10] HBG - Primary site latitude degrees
+    [11] HBM - Primary site latitude minutes
+    [12] HNS - Primary site latitude hemisphere (N=North, S=South)
+    [13] NbOrt - Secondary observation site name
+    [14] GN - Secondary site geographic region code
+    [15] NLG - Secondary site longitude degrees
+    [16] NLM - Secondary site longitude minutes
+    [17] NOW - Secondary site longitude hemisphere
+    [18] NBG - Secondary site latitude degrees
+    [19] NBM - Secondary site latitude minutes
+    [20] NNS - Secondary site latitude hemisphere
 
 Sorting rules:
     - Primary: KK (observer code)
     - Secondary: seit date (chronological: YYYYMM)
-    - Year conversion: YY < 50 → 20YY, YY ≥ 50 → 19YY
+    - Year conversion: YY < YEAR_CUTOFF → 20YY, YY ≥ YEAR_CUTOFF → 19YY
+
+Layer Architecture:
+    - Layer 2: This module (storage-agnostic business logic)
+    - Layer 3a: observers_file.py (File I/O)
+    - Layer 3b: observers_db.py (Database I/O - future)
+
+Usage:
+    from halo.io import observers
+    from halo.io import observers_file
+    
+    # Load from file (Layer 3a)
+    records, path = observers_file.open_file()
+    
+    # Sort (Layer 2)
+    records = observers.sort_observers(records)
+    
+    # Find (Layer 2)
+    kk44_records = observers.find_observer_records('44', records)
+    
+    # Add (Layer 2)
+    records = observers.add_observer_record(new_record, records)
+    
+    # Save to file (Layer 3a)
+    observers_file.save_file(records)
 """
 
-import csv
-from pathlib import Path
 from typing import List, Tuple
 
+from halo.models.constants import jj_to_full_year
 
-def get_observers_path() -> Path:
+
+def sort_observers(observers: List[List[str]]) -> List[List[str]]:
     """
-    Get the standard path to halobeo.csv file.
+    Sort observer records by KK and seit.
     
-    Returns:
-        Path: Full path to resources/halobeo.csv
-    """
-    # Navigate from src/halo/io/ to project root
-    module_path = Path(__file__).resolve()
-    project_root = module_path.parent.parent.parent.parent
-    return project_root / 'resources' / 'halobeo.csv'
-
-
-def load_observers(file_path: Path = None) -> List[List[str]]:
-    """
-    Load all observer records from halobeo.csv.
+    Storage-agnostic business logic.
+    
+    Sorting rules:
+        - Primary: KK (observer code, string comparison)
+        - Secondary: seit date (chronological: YYYYMM numeric)
+        - Year conversion: YY < YEAR_CUTOFF → 20YY, YY ≥ YEAR_CUTOFF → 19YY
     
     Args:
-        file_path: Path to CSV file (default: resources/halobeo.csv)
+        observers: List of observer records
         
     Returns:
-        List of observer records, where each record is a list of strings.
-        Returns empty list if file doesn't exist.
+        New list with sorted records
         
     Example:
-        >>> observers = load_observers()
-        >>> for obs in observers:
-        ...     print(f"Observer {obs[0]}: {obs[1]} {obs[2]}")
+        >>> observers = sort_observers(observers)
     """
-    if file_path is None:
-        file_path = get_observers_path()
-    
-    if not file_path.exists():
+    if not observers:
         return []
     
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            return list(reader)
-    except Exception as e:
-        raise IOError(f"Failed to load observers from {file_path}: {str(e)}")
-
-
-def save_observers(observers: List[List[str]], file_path: Path = None, sort: bool = True) -> None:
-    """
-    Save observer records to halobeo.csv with optional sorting.
-    
-    Args:
-        observers: List of observer records (each record is a list of strings)
-        file_path: Path to CSV file (default: resources/halobeo.csv)
-        sort: If True, sort observers by KK and seit before saving (default: True)
-        
-    Raises:
-        IOError: If file write fails
-        
-    Sorting:
-        - Primary key: KK (observer code)
-        - Secondary key: seit (start date, converted to YYYYMM for proper chronological sorting)
-        - Year conversion: YY < 50 → 20YY, YY ≥ 50 → 19YY
-        
-    Example:
-        >>> observers = load_observers()
-        >>> observers.append(['44', 'John', 'Doe', '01/25', '1', ...])
-        >>> save_observers(observers)  # Automatically sorted
-    """
-    if file_path is None:
-        file_path = get_observers_path()
-    
-    # Sort observers if requested
-    if sort and observers:
-        observers = sorted(observers, key=_observer_sort_key)
-    
-    try:
-        with open(file_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerows(observers)
-    except Exception as e:
-        raise IOError(f"Failed to save observers to {file_path}: {str(e)}")
+    return sorted(observers, key=_observer_sort_key)
 
 
 def _observer_sort_key(obs: List[str]) -> Tuple[str, int]:
     """
     Generate sort key for observer record.
+    
+    Internal helper for sort_observers().
     
     Sorting logic:
         - Primary: KK (observer code, string comparison)
@@ -135,7 +106,7 @@ def _observer_sort_key(obs: List[str]) -> Tuple[str, int]:
     Returns:
         Tuple of (KK, seit_numeric) for sorting
     """
-    kk = obs[0]  # Observer code
+    kk = obs[0] if len(obs) > 0 else ''  # Observer code
     seit = obs[3] if len(obs) > 3 else ''  # Start date (MM/YY)
     
     # Parse seit to numeric value for proper chronological sorting
@@ -146,7 +117,7 @@ def _observer_sort_key(obs: List[str]) -> Tuple[str, int]:
                 month = int(parts[0])
                 year = int(parts[1])
                 # Convert to 4-digit year
-                full_year = (2000 + year) if year < 50 else (1900 + year)
+                full_year = jj_to_full_year(year)
                 # Return YYYYMM as numeric value
                 return (kk, full_year * 100 + month)
     except (ValueError, IndexError):
@@ -156,146 +127,139 @@ def _observer_sort_key(obs: List[str]) -> Tuple[str, int]:
     return (kk, 0)
 
 
-def find_observer_records(kk: str, observers: List[List[str]] = None) -> List[List[str]]:
+def find_observer_records(kk: str, observers: List[List[str]]) -> List[List[str]]:
     """
     Find all records for a specific observer.
     
+    Storage-agnostic business logic.
     An observer may have multiple records (different observation sites over time).
     
     Args:
         kk: Observer code (will be normalized to 2 digits)
-        observers: List of observer records (if None, loads from file)
+        observers: List of all observer records
         
     Returns:
         List of matching observer records
         
     Example:
-        >>> records = find_observer_records('44')
+        >>> records = find_observer_records('44', all_observers)
         >>> for rec in records:
         ...     print(f"Site since {rec[3]}: {rec[5]}")
     """
     # Normalize KK to 2 digits
-    kk = str(kk).zfill(2)
+    kk_normalized = str(kk).zfill(2)
     
-    if observers is None:
-        observers = load_observers()
-    
-    return [obs for obs in observers if obs[0] == kk]
+    return [obs for obs in observers if len(obs) > 0 and obs[0] == kk_normalized]
 
 
-def add_observer_record(new_record: List[str], observers: List[List[str]] = None, 
-                       save_to_file: bool = True) -> List[List[str]]:
+def add_observer_record(new_record: List[str], observers: List[List[str]]) -> List[List[str]]:
     """
-    Add a new observer record to the database.
+    Add a new observer record to the collection.
+    
+    Storage-agnostic business logic - does NOT save to file/database.
     
     Args:
         new_record: Observer record to add (list of strings)
-        observers: Existing observer records (if None, loads from file)
-        save_to_file: If True, save to halobeo.csv immediately (default: True)
+        observers: Existing observer records
         
     Returns:
-        Updated list of all observers (sorted)
+        New list with all observers including the new record (sorted)
         
-    Raises:
-        IOError: If save fails
+    Note:
+        Caller must save to storage (file or database) if needed.
         
     Example:
         >>> new_obs = ['44', 'John', 'Doe', '01/25', '1', 'Berlin', ...]
-        >>> updated = add_observer_record(new_obs)
+        >>> observers = add_observer_record(new_obs, observers)
+        >>> # Then save: observers_file.save_file(observers)
     """
-    if observers is None:
-        observers = load_observers()
-    
-    observers.append(new_record)
-    
-    if save_to_file:
-        save_observers(observers, sort=True)
-    
-    # Return sorted list
-    return sorted(observers, key=_observer_sort_key)
+    updated = observers.copy()
+    updated.append(new_record)
+    return sort_observers(updated)
 
 
 def update_observer_record(kk: str, seit: str, updated_fields: dict, 
-                          observers: List[List[str]] = None, 
-                          save_to_file: bool = True) -> Tuple[bool, List[List[str]]]:
+                          observers: List[List[str]]) -> Tuple[bool, List[List[str]]]:
     """
-    Update a specific observer record.
+    Update a specific observer record in the collection.
+    
+    Storage-agnostic business logic - does NOT save to file/database.
     
     Args:
         kk: Observer code (2 digits)
         seit: Start date (MM/YY) to identify the record
         updated_fields: Dictionary of field_index → new_value
-        observers: Existing observer records (if None, loads from file)
-        save_to_file: If True, save to halobeo.csv immediately (default: True)
+        observers: Existing observer records
         
     Returns:
         Tuple of (success, updated_observers_list)
         
+    Note:
+        Caller must save to storage (file or database) if needed.
+        
     Example:
         >>> # Update active status (field 4) for observer 44, site since 01/25
-        >>> success, observers = update_observer_record('44', '01/25', {4: '0'})
+        >>> success, observers = update_observer_record('44', '01/25', {4: '0'}, observers)
+        >>> if success:
+        ...     observers_file.save_file(observers)
     """
-    kk = str(kk).zfill(2)
+    kk_normalized = str(kk).zfill(2)
     
-    if observers is None:
-        observers = load_observers()
-    
+    updated = [obs.copy() if isinstance(obs, list) else list(obs) for obs in observers]
     found = False
-    for i, obs in enumerate(observers):
-        if obs[0] == kk and obs[3] == seit:
+    
+    for i, obs in enumerate(updated):
+        if len(obs) > 3 and obs[0] == kk_normalized and obs[3] == seit:
             # Apply updates
             for field_idx, value in updated_fields.items():
                 if field_idx < len(obs):
                     obs[field_idx] = value
-            observers[i] = obs
+            updated[i] = obs
             found = True
             break
     
-    if found and save_to_file:
-        save_observers(observers, sort=True)
-    
-    return (found, observers)
+    return (found, updated)
 
 
-def delete_observer_record(kk: str, seit: str = None, 
-                          observers: List[List[str]] = None,
-                          save_to_file: bool = True) -> Tuple[int, List[List[str]]]:
+def delete_observer_record(kk: str, seit: str, 
+                          observers: List[List[str]]) -> Tuple[int, List[List[str]]]:
     """
-    Delete observer record(s).
+    Delete observer record(s) from the collection.
+    
+    Storage-agnostic business logic - does NOT save to file/database.
     
     Args:
         kk: Observer code (2 digits)
         seit: Start date (MM/YY) to delete specific record, or None to delete all records for observer
-        observers: Existing observer records (if None, loads from file)
-        save_to_file: If True, save to halobeo.csv immediately (default: True)
+        observers: Existing observer records
         
     Returns:
         Tuple of (deleted_count, updated_observers_list)
         
+    Note:
+        Caller must save to storage (file or database) if needed.
+        
     Examples:
         >>> # Delete specific site entry
-        >>> count, observers = delete_observer_record('44', '01/25')
+        >>> count, observers = delete_observer_record('44', '01/25', observers)
+        >>> if count > 0:
+        ...     observers_file.save_file(observers)
         
         >>> # Delete all entries for observer
-        >>> count, observers = delete_observer_record('44')
+        >>> count, observers = delete_observer_record('44', None, observers)
     """
-    kk = str(kk).zfill(2)
-    
-    if observers is None:
-        observers = load_observers()
+    kk_normalized = str(kk).zfill(2)
     
     initial_count = len(observers)
     
     if seit is None:
         # Delete all records for this observer
-        observers = [obs for obs in observers if obs[0] != kk]
+        updated = [obs for obs in observers if not (len(obs) > 0 and obs[0] == kk_normalized)]
     else:
         # Delete specific record
-        observers = [obs for obs in observers if not (obs[0] == kk and obs[3] == seit)]
+        updated = [obs for obs in observers 
+                  if not (len(obs) > 3 and obs[0] == kk_normalized and obs[3] == seit)]
     
-    deleted_count = initial_count - len(observers)
+    deleted_count = initial_count - len(updated)
     
-    if deleted_count > 0 and save_to_file:
-        save_observers(observers, sort=True)
-    
-    return (deleted_count, observers)
+    return (deleted_count, updated)

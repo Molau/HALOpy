@@ -1,17 +1,34 @@
 """
 I/O layer - File operations for observations and observers
+
+Architecture:
+- Layer 2: observers.py, observations.py (Business Logic)
+- Layer 3a: observers_file.py, observations_file.py (File Storage)
+- Layer 3b: observers_db.py, observations_db.py (Database - future)
 """
 
+# Observer Layer 2 (Business Logic)
 from .observers import (
-    load_observers,
-    save_observers,
+    sort_observers,
     find_observer_records,
     add_observer_record,
     update_observer_record,
-    delete_observer_record,
-    get_observers_path
+    delete_observer_record
 )
 
+# Observer Layer 3a (File Storage)
+from .observers_file import (
+    get_default_path as get_observers_path,
+    get_backup_path as get_observers_backup_path,
+    file_exists as observer_file_exists,
+    open_file as open_observer_file,
+    save_file as save_observer_file,
+    create_backup as create_observer_backup,
+    restore_from_backup as restore_observer_backup,
+    backup_exists as observer_backup_exists
+)
+
+# Observation Layer 3a (File Storage)
 from .observations_file import (
     # File operations
     new_file,
@@ -32,15 +49,22 @@ from .observations_file import (
 )
 
 __all__ = [
-    # Observer operations
-    'load_observers',
-    'save_observers',
+    # Observer Layer 2 (Business Logic)
+    'sort_observers',
     'find_observer_records',
     'add_observer_record',
     'update_observer_record',
     'delete_observer_record',
+    # Observer Layer 3a (File Storage)
     'get_observers_path',
-    # Observation file operations
+    'get_observers_backup_path',
+    'observer_file_exists',
+    'open_observer_file',
+    'save_observer_file',
+    'create_observer_backup',
+    'restore_observer_backup',
+    'observer_backup_exists',
+    # Observation file operations (Layer 3a)
     'new_file',
     'open_file',
     'save_file',

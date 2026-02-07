@@ -255,7 +255,7 @@ async function showAddSiteDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_added}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -418,7 +418,7 @@ function showDeleteSiteConfirmDialog(observer, sites, currentIndex) {
             modalEl.addEventListener('hidden.bs.modal', () => {
                 modalEl.remove();
                 // Show success and reload
-                showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
+                showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_deleted}`);
                 
                 setTimeout(() => {
                     if (window.location.pathname === '/observers') {

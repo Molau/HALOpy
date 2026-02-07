@@ -11,6 +11,27 @@ import sys
 # API Configuration
 DEFAULT_OBSERVATION_LIMIT = 200000  # Default maximum observations returned by API
 
+# Year range and cutoff for 2-digit year conversion
+# YEAR_MIN is also the cutoff boundary (e.g., 1980 → cutoff 80)
+YEAR_MIN = 1980
+YEAR_MAX = 2079
+YEAR_CUTOFF = YEAR_MIN % 100
+
+
+def jj_to_full_year(jj: int) -> int:
+    """
+    Convert 2-digit year to 4-digit year using YEAR_MIN cutoff.
+
+    Args:
+        jj: 2-digit year (0-99)
+
+    Returns:
+        4-digit year (e.g., 79 → 2079 if cutoff=80, 80 → 1980)
+    """
+    if (jj>=100):
+        return jj  # Already a full year
+    return (2000 + jj) if jj < YEAR_CUTOFF else (1900 + jj)
+
 # Geographic regions (available region numbers in HALO system)
 # Germany: 1-11, International: 16-17, 19-39
 # Region 12 (Deutschland gesamt) is not used for observations

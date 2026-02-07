@@ -202,10 +202,10 @@ class ObservationForm {
             return `<option value="${obs.KK}" ${selected}>${obs.KK} - ${obs.VName || ''} ${obs.NName || ''}</option>`;
         }).join('');
         
-        // Build year options ((YEAR_MIN-YEAR_MAX)
+        // Build year options (YEAR_MIN-YEAR_MAX)
         const yearOptions = Array.from({length: 100}, (_, i) => {
-            const year = (YEAR_MIN-1900) + i;
-            const displayYear = year < (YEAR_MIN-1900) ? 2000 + year : 1900 + year;
+            const year = (YEAR_MIN - 1900) + i;
+            const displayYear = year < YEAR_MIN-1900 ? 2000 + year : 1900 + year;
             return `<option value="${year}">${displayYear}</option>`;
         }).join('');
         
@@ -1441,10 +1441,10 @@ class ObservationForm {
         // Convert KK to 2-digit string with leading zero to match option values
         this.fields.kk.value = obs.KK !== undefined && obs.KK !== null && obs.KK !== '' ? String(obs.KK).padStart(2, '0') : '';
         this.fields.o.value = obs.O || '';
-        // Year: CSV stores 0-99, dropdown uses 50-149 (50-99=1950-1999, 0-49=2000-2049)
+        // Year: CSV stores 0-99, dropdown uses 80-179 (80-99=1980-1999, 0-79=2000-2079)
         if (obs.JJ !== undefined && obs.JJ !== null && obs.JJ !== '') {
             const jj = parseInt(obs.JJ);
-            this.fields.jj.value = jj < (YEAR_MIN-1900) ? jj + 100 : jj;  // 5 -> 105 (2005), 95 -> 95 (1995)
+            this.fields.jj.value = jj < YEAR_CUTOFF ? jj + 100 : jj;  // 5 -> 105 (2005), 95 -> 95 (1995)
         } else {
             this.fields.jj.value = '';
         }
@@ -1486,12 +1486,12 @@ class ObservationForm {
             throw new Error('Invalid observer code (KK)');
         }
         
-        // Year: Convert dropdown value (50-149) back to CSV format (0-99)
+        // Year: Convert dropdown value (80-179) back to CSV format (0-99)
         let jj = parseInt(this.fields.jj.value);
         if (jj >= 100) {
             jj = jj - 100;  // 105 -> 5 (2005), 149 -> 49 (2049)
         }
-        // else: 50-99 stays as is (1950-1999)
+        // else: 80-99 stays as is (1980-1999)
         
         return {
             KK: kk,

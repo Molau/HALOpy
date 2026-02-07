@@ -20,6 +20,7 @@ Does NOT handle:
 
 from typing import List, Optional, Tuple, Dict, Any, Callable
 from ..models.types import Observation
+from halo.models.constants import jj_to_full_year
 
 
 # ============================================================================
@@ -201,7 +202,7 @@ def sort_observations(collection: List[Observation]) -> List[Observation]:
     def sort_key(obs: Observation) -> Tuple:
         """Generate sort key matching HALO standard."""
         # Convert 2-digit year to 4-digit for proper sorting
-        jj_full = (2000 + obs.JJ) if obs.JJ < 50 else (1900 + obs.JJ)
+        jj_full = jj_to_full_year(obs.JJ)
         
         return (
             jj_full,      # Year (4-digit)
@@ -371,10 +372,10 @@ def filter_observations(collection: List[Observation], **criteria) -> List[Obser
         year = criteria['year']
         if isinstance(year, tuple):
             min_year, max_year = year
-            filtered = [obs for obs in filtered 
-                       if min_year <= _get_full_year(obs.JJ) <= max_year]
+            filtered = [obs for obs in filtered
+                       if min_year <= jj_to_full_year(obs.JJ) <= max_year]
         else:
-            filtered = [obs for obs in filtered if _get_full_year(obs.JJ) == year]
+            filtered = [obs for obs in filtered if jj_to_full_year(obs.JJ) == year]
     
     # Month filter
     if 'month' in criteria:
@@ -428,7 +429,7 @@ def filter_observations(collection: List[Observation], **criteria) -> List[Obser
 
 def _get_full_year(jj: int) -> int:
     """Convert 2-digit year to 4-digit year."""
-    return (2000 + jj) if jj < 50 else (1900 + jj)
+    return jj_to_full_year(jj)
 
 
 # ============================================================================

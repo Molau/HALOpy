@@ -31,8 +31,15 @@ from flask import Blueprint, jsonify, request, current_app, Response, session, g
 # Project imports
 from halo.config import is_cloud_mode, get_cloud_server_url
 from halo.io.csv_handler import ObservationCSV
-from halo.io.observers import load_observers, save_observers, find_observer_records, add_observer_record, update_observer_record, delete_observer_record
-from halo.models.constants import COMBINED_TO_INDIVIDUAL_HALOS, DEFAULT_OBSERVATION_LIMIT, resolve_halo_type, calculate_halo_activity
+from halo.models.constants import (
+    COMBINED_TO_INDIVIDUAL_HALOS,
+    DEFAULT_OBSERVATION_LIMIT,
+    YEAR_MIN,
+    YEAR_MAX,
+    jj_to_full_year,
+    resolve_halo_type,
+    calculate_halo_activity,
+)
 from halo.models.types import Observation
 from halo.resources import I18n, set_language as set_lang
 from halo.resources.i18n import get_i18n
@@ -42,6 +49,10 @@ from halo.services.settings import Settings
 # NEW CODE - Using io.observations + io.observations_file (Layer 2 + Layer 3a)
 import halo.io.observations as obs_logic
 import halo.io.observations_file as obs_file
+
+# NEW CODE - Using io.observers + io.observers_file (Layer 2 + Layer 3a)
+import halo.io.observers as observer_logic
+import halo.io.observers_file as observer_file
 
 api_blueprint = Blueprint('api', __name__, url_prefix='/api')
 
@@ -72,7 +83,7 @@ def login() -> Dict[str, Any]:
         }
     """
     if not is_cloud_mode():
-        return jsonify({'success': False, 'error': 'auth_not_required_local_mode'}), 400
+        return jsonify({'success': False, 'error': 'server_unreachable'}), 503
     
     data = request.get_json()
     username = data.get('username', '').strip()
@@ -110,6 +121,8 @@ def login() -> Dict[str, Any]:
 @api_blueprint.route('/logout', methods=['POST'])
 def logout_api() -> Dict[str, Any]:
     """Logout current user."""
+    if not is_cloud_mode():
+        return jsonify({'success': False, 'error': 'server_unreachable'}), 503
     session.clear()
     return jsonify({'success': True})
 
@@ -139,7 +152,7 @@ def change_password() -> Dict[str, Any]:
         }
     """
     if not is_cloud_mode():
-        return jsonify({'success': False, 'error': 'password_change_not_available_local'}), 400
+        return jsonify({'success': False, 'error': 'server_unreachable'}), 503
     
     if not session.get('authenticated'):
         return jsonify({'success': False, 'error': 'not_authenticated'}), 401
@@ -197,9 +210,7 @@ def calculate_solar_altitude(
     longitude: float, latitude: float, altitude_type: str = 'mean', gg: int = 0
 ) -> int:
     """Calculate solar altitude (sun's elevation above horizon) in degrees."""
-    jahr = 1900 + year
-    if jahr < 1950:
-        jahr = jahr + 100
+    jahr = jj_to_full_year(year)
     
     def calc_altitude_at_time(zeit):
         zeit = zeit % 24
@@ -292,7 +303,7 @@ def get_days_in_month(month: int, year: int) -> int:
     # Check for leap year in February
     if month == 2:
         # Convert 2-digit year to 4-digit
-        full_year = year + 2000 if year < 50 else year + 1900
+        full_year = jj_to_full_year(year)
         # Simple leap year check (divisible by 4)
         if full_year % 4 == 0:
             days = 29
@@ -502,10 +513,9 @@ def _spaeter(a, b) -> int:
     """
     spt = -1
     
-    # Year comparison with century wrap (50 = cutoff for 1950/2050)
-    hilf = (((a.JJ > b.JJ) and not ((a.JJ >= 50) and (b.JJ < 50))) or
-            ((a.JJ < 50) and (b.JJ >= 50)))
-    
+    # Year comparison with century wrap ((YEAR_MIN-1900) is boundary for 19xx/20xx)
+    hilf = (((a.JJ > b.JJ) and not ((a.JJ >= (YEAR_MIN-1900)) and (b.JJ < (YEAR_MIN-1900)))) or ((a.JJ < (YEAR_MIN-1900)) and (b.JJ >= (YEAR_MIN-1900))))
+
     if a.JJ == b.JJ:
         hilf = a.MM > b.MM
         if a.MM == b.MM:
@@ -1399,6 +1409,9 @@ def upload_observers() -> Dict[str, Any]:
     
     Admin can upload all observers, regular users only their own.
     """
+
+    if not is_cloud_mode():
+        return jsonify({'error': 'server_unreachable'}), 503
     
     data = request.get_json()
     observer_kk = data.get('observerKK')
@@ -1449,8 +1462,8 @@ def upload_observers() -> Dict[str, Any]:
                 if len(obs_record) >= 1 and obs_record[0] != str(authenticated_kk):
                     return jsonify({'error': 'observer_kk_mismatch', 'details': {'expected': authenticated_kk, 'found': obs_record[0]}}), 403
         
-        # Load existing observers
-        existing_observers = load_observers()
+        # Load existing observers (Layer 3a)
+        existing_observers, _ = observer_file.open_file()
         
         # Replace mode: Remove all existing records for uploaded observers
         uploaded_kks = set()
@@ -1464,8 +1477,11 @@ def upload_observers() -> Dict[str, Any]:
         # Add new observers
         filtered_observers.extend(observers)
         
-        # Save and update app config
-        save_observers(filtered_observers)
+        # Sort (Layer 2)
+        filtered_observers = observer_logic.sort_observers(filtered_observers)
+        
+        # Save to file (Layer 3a)
+        observer_file.save_file(filtered_observers)
         current_app.config['OBSERVERS'] = filtered_observers
         
         return jsonify({
@@ -1488,6 +1504,9 @@ def download_observers() -> Dict[str, Any]:
     1. Session-based (cloud mode): user authenticated via session
     2. No auth (local mode): no authentication required for download
     """
+
+    if not is_cloud_mode():
+        return jsonify({'error': 'server_unreachable'}), 503
     
     data = request.get_json()
     use_session = data.get('use_session', False)
@@ -1502,8 +1521,8 @@ def download_observers() -> Dict[str, Any]:
             if not authenticated_kk and not is_admin:
                 return jsonify({'error': 'Nicht authentifiziert. Bitte neu anmelden.'}), 401
         
-        # Load observers
-        all_observers = load_observers()
+        # Load observers (Layer 3a)
+        all_observers, _ = observer_file.open_file()
         
         if not all_observers:
             return jsonify({'error': 'no_observers'}), 404
@@ -2046,7 +2065,7 @@ def _format_monthly_report_text(data: Dict[str, Any], i18n) -> str:
     month_name = i18n.get(f'months.{data["mm"]}', str(data['mm']))
     
     # Format title
-    year = 1900 + data['jj'] if data['jj'] >= 50 else 2000 + data['jj']
+    year = jj_to_full_year(data['jj'])
     title = i18n.get('monthly_report.report_title_template')
     title = title.replace('{observer}', data['observer_name'])
     title = title.replace('{month}', month_name)
@@ -2153,7 +2172,7 @@ def _format_monthly_report_markdown(data: Dict[str, Any], i18n) -> str:
     month_name = i18n.get(f'months.{data["mm"]}', str(data['mm']))
     
     # Format title
-    year = 1900 + data['jj'] if data['jj'] >= 50 else 2000 + data['jj']
+    year = jj_to_full_year(data['jj'])
     title = i18n.get('monthly_report.report_title_template')
     title = title.replace('{observer}', data['observer_name'])
     title = title.replace('{month}', month_name)
@@ -2275,7 +2294,7 @@ def get_monthly_report() -> Dict[str, Any]:
     observer_gn = ''
     
     # Create sortable seit value for this month/year: YYYYMM
-    obs_year = 1900 + jj_int if jj_int >= 50 else 2000 + jj_int
+    obs_year = jj_to_full_year(jj_int)
     month_year_comparable = obs_year * 100 + mm_int
     
     # Find the observer record valid for this month/year
@@ -2286,7 +2305,7 @@ def get_monthly_report() -> Dict[str, Any]:
                 seit_parts = obs_rec[3].split('/')
                 seit_month = int(seit_parts[0])
                 seit_year_2digit = int(seit_parts[1])
-                seit_year = 1900 + seit_year_2digit if seit_year_2digit >= 50 else 2000 + seit_year_2digit
+                seit_year = jj_to_full_year(seit_year_2digit)
                 rec_seit_comparable = seit_year * 100 + seit_month
                 
                 if rec_seit_comparable <= month_year_comparable:
@@ -3148,7 +3167,7 @@ def get_monthly_stats() -> Dict[str, Any]:
         # Get month name and formatted year for display
         i18n = get_i18n()
         month_name = i18n.get(f'months.{mm_int}')
-        year = f"19{str(jj_int).zfill(2)}" if jj_int >= 50 else f"20{str(jj_int).zfill(2)}"
+        year = str(jj_to_full_year(jj_int))
         
         if output_format == 'text':
             content = _format_monthly_stats_text(data, month_name, year, i18n)
@@ -3189,7 +3208,7 @@ def _generate_monthly_stats_chart(data: Dict[str, Any], mm: int, jj: int, i18n) 
     
     # Get month name and year for title
     month_name = i18n.get(f'months.{mm}')
-    year = f"19{str(jj).zfill(2)}" if jj >= 50 else f"20{str(jj).zfill(2)}"
+    year = str(jj_to_full_year(jj))
     observation_count = data.get('activity_observation_count', 0)
     
     # Get labels from i18n
@@ -3282,7 +3301,7 @@ def _generate_monthly_stats_bar_chart(data: Dict[str, Any], mm: int, jj: int, i1
     
     # Get month name and year for title
     month_name = i18n.get(f'months.{mm}')
-    year = f"19{str(jj).zfill(2)}" if jj >= 50 else f"20{str(jj).zfill(2)}"
+    year = str(jj_to_full_year(jj))
     observation_count = data.get('activity_observation_count', 0)
     
     # Get labels from i18n
@@ -3353,7 +3372,7 @@ def _generate_annual_stats_chart(data: Dict[str, Any], jj: int, i18n) -> bytes:
     
     # Get month names and year for labels
     month_labels = [i18n.get(f'months.{m}')[:3] for m in months]  # Use first 3 chars (Jan, Feb, etc.)
-    year = f"19{str(jj).zfill(2)}" if jj >= 50 else f"20{str(jj).zfill(2)}"
+    year = str(jj_to_full_year(jj))
     
     # Get labels from i18n
     label_real = i18n.get('annual_stats.chart_real')
@@ -3449,7 +3468,7 @@ def _generate_annual_stats_bar_chart(data: Dict[str, Any], jj: int, i18n) -> byt
     
     # Get month names and year for labels
     month_labels = [i18n.get(f'months.{m}')[:3] for m in months]  # Use first 3 chars (Jan, Feb, etc.)
-    year = f"19{str(jj).zfill(2)}" if jj >= 50 else f"20{str(jj).zfill(2)}"
+    year = str(jj_to_full_year(jj))
     
     # Get labels from i18n
     label_real = i18n.get('annual_stats.chart_real')
@@ -4025,7 +4044,7 @@ def get_annual_stats() -> Dict[str, Any]:
     """Get annual statistics for a given year.
     
     Query parameters:
-        jj: Year (2-digit, 50-99 for 1950-2099)
+        jj: Year (2-digit, (YEAR_MIN-1900)-99 for 19xx)
         format: Output format - 'json' (default), 'html', 'text', or 'markdown'
     
     Returns:
@@ -4050,13 +4069,13 @@ def get_annual_stats() -> Dict[str, Any]:
     try:
         jj_int = int(jj)
 
-        # Accept both 2-digit and 4-digit years (1950-2049) and normalize to 2-digit
-        if 1950 <= jj_int <= 1999:
+        # Accept both 2-digit and 4-digit years (YEAR_MIN-YEAR_MAX) and normalize to 2-digit
+        if YEAR_MIN <= jj_int <= 1999:
             jj_int -= 1900
-        elif 2000 <= jj_int <= 2049:
+        elif 2000 <= jj_int <= YEAR_MAX:
             jj_int -= 2000
         elif jj_int < 0 or jj_int > 99:
-            return jsonify({'error': 'Invalid year (0-99 or 1950-2049)'}), 400
+            return jsonify({'error': f'Invalid year (0-99 or {YEAR_MIN}-{YEAR_MAX})'}), 400
 
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameter'}), 400
@@ -4372,7 +4391,7 @@ def get_annual_stats() -> Dict[str, Any]:
         return jsonify(data)
     elif output_format in ['text', 'markdown']:
         # Get formatted year for display
-        year = f"19{str(jj_int).zfill(2)}" if jj_int >= 50 else f"20{str(jj_int).zfill(2)}"
+        year = str(jj_to_full_year(jj_int))
         if output_format == 'text':
             content = _format_annual_stats_text(data, year, i18n)
             return Response(content, mimetype='text/plain; charset=utf-8')
@@ -4421,8 +4440,8 @@ def get_observers() -> Dict[str, Any]:
             mm = int(mm_param)
             
             # Handle century boundary for observation year (same as _parse_seit)
-            # Years 00-49 are treated as 2000-2049, so add 100 to year
-            if jj < 50:
+            # Years 00-((YEAR_MIN-1900)-1) are treated as 2000-20xx, so add 100 to year
+            if jj < (YEAR_MIN-1900):
                 jj += 100
             
             # Calculate seit value for observation date: month + 13 × year
@@ -4493,8 +4512,8 @@ def get_observers() -> Dict[str, Any]:
             # Parse seit (MM/YY) to compare dates
             try:
                 month, year = map(int, seit.split('/'))
-                # Convert to full year (assume 20xx for years < 50, 19xx otherwise)
-                full_year = 2000 + year if year < 50 else 1900 + year
+                # Convert to full year using (YEAR_MIN-1900)
+                full_year = jj_to_full_year(year)
                 date_key = (full_year, month)
                 
                 if kk not in latest_sites or date_key > latest_sites[kk][1]:
@@ -4585,8 +4604,8 @@ def _parse_seit(seit_str: str) -> int:
         seit value as integer (month + 13 × year)
         
     Note:
-        Years 00-49 are treated as 2000-2049 (add 100 to year for formula)
-        Years 50-99 are treated as 1950-1999 (use year as-is)
+        Years 00-((YEAR_MIN-1900)-1) are treated as 2000-20xx (add 100 to year for formula)
+        Years (YEAR_MIN-1900)-99 are treated as 19xx (use year as-is)
     """
     try:
         parts = seit_str.split('/')
@@ -4594,8 +4613,8 @@ def _parse_seit(seit_str: str) -> int:
             month = int(parts[0])
             year = int(parts[1])
             
-            # Handle century boundary: years 00-49 are 2000+, so add 100 to year
-            if year < 50:
+            # Handle century boundary using (YEAR_MIN-1900)
+            if year < (YEAR_MIN-1900):
                 year += 100
             
             return month + 13 * year
@@ -4620,9 +4639,16 @@ def get_observer_regions() -> Dict[str, Any]:
         regions.add(int(obs[6]))  # GH - primary region
         regions.add(int(obs[14]))  # GN - secondary region
     
-    # Sort and create list with region numbers
-    # TODO: Add region names from a lookup table
-    region_list = [{'number': r, 'name': f'Region {r}'} for r in sorted(regions)]
+    # Get region names from i18n (no fallbacks)
+    i18n = g.i18n if hasattr(g, 'i18n') else get_i18n()
+    region_names = i18n.get_array('geographic_regions')
+
+    # Sort and create list with region numbers + localized names
+    region_list = []
+    for r in sorted(regions):
+        if r <= 0:
+            continue
+        region_list.append({'number': r, 'name': region_names[str(r)]})
     
     return jsonify({'regions': region_list})
 
@@ -4710,7 +4736,11 @@ def add_observer() -> Dict[str, Any]:
     
     # Add observer using io module
     try:
-        observers = add_observer_record(new_row, observers, save_to_file=True)
+        # Add record (Layer 2)
+        observers = observer_logic.add_observer_record(new_row, observers)
+        
+        # Save to file (Layer 3a)
+        observer_file.save_file(observers)
         current_app.config['OBSERVERS'] = observers
         
         return jsonify({
@@ -4795,8 +4825,11 @@ def update_observer(kk: str) -> Dict[str, Any]:
     first_updated = observers[observer_indices[0]]
     
     try:
-        # Save updated observers
-        save_observers(observers)
+        # Sort (Layer 2)
+        observers = observer_logic.sort_observers(observers)
+        
+        # Save to file (Layer 3a)
+        observer_file.save_file(observers)
         current_app.config['OBSERVERS'] = observers
         
         # Update metadata in observation files (if loaded)
@@ -4888,7 +4921,7 @@ def check_observer_active(kk):
     
     Query parameters:
         mm: Month (1-12)
-        jj: Year (2-digit: 50-99 = 1950-1999, 0-49 = 2000-2049)
+        jj: Year (2-digit: (YEAR_MIN-1900)-99 = 19xx, 00-((YEAR_MIN-1900)-1) = 20xx)
     
     Returns:
         {'active': True/False}
@@ -4918,7 +4951,7 @@ def check_observer_active(kk):
     observers = current_app.config.get('OBSERVERS', [])
     
     # Convert jj to 4-digit year for comparison
-    year_4digit = (2000 + jj) if jj < 50 else (1900 + jj)
+    year_4digit = jj_to_full_year(jj)
     check_date = year_4digit * 100 + mm
     
     # Find all site entries for this observer where seit <= check_date
@@ -4929,7 +4962,7 @@ def check_observer_active(kk):
             seit_parts = obs[3].split('/')
             seit_month = int(seit_parts[0])
             seit_year = int(seit_parts[1])
-            seit_year_4digit = (2000 + seit_year) if seit_year < 50 else (1900 + seit_year)
+            seit_year_4digit = jj_to_full_year(seit_year)
             seit_date = seit_year_4digit * 100 + seit_month
             
             # Only consider records where seit <= check_date
@@ -5024,8 +5057,8 @@ def add_observer_site(kk):
             if len(parts) == 2:
                 month = int(parts[0])
                 year = int(parts[1])
-                # Convert to full year: years < 50 are 20xx, years >= 50 are 19xx
-                full_year = 2000 + year if year < 50 else 1900 + year
+                # Convert to full year using (YEAR_MIN-1900)
+                full_year = jj_to_full_year(year)
                 # Create sortable value: YYYYMM
                 return (kk_val, full_year * 100 + month)
         return (kk_val, 0)
@@ -5034,7 +5067,11 @@ def add_observer_site(kk):
     
     # Save using io module
     try:
-        save_observers(observers)
+        # Sort (Layer 2)
+        observers = observer_logic.sort_observers(observers)
+        
+        # Save to file (Layer 3a)
+        observer_file.save_file(observers)
         current_app.config['OBSERVERS'] = observers
         
         return jsonify({
@@ -5114,14 +5151,18 @@ def update_observer_site(kk):
         seit_parts = obs[3].split('/')
         month = int(seit_parts[0])
         year = int(seit_parts[1])
-        full_year = 2000 + year if year < 50 else 1900 + year
+        full_year = jj_to_full_year(year)
         return (kk_val, full_year * 100 + month)
     
     updated_observers.sort(key=sort_key)
     
     # Save using io module
     try:
-        save_observers(updated_observers)
+        # Sort (Layer 2)
+        updated_observers = observer_logic.sort_observers(updated_observers)
+        
+        # Save to file (Layer 3a)
+        observer_file.save_file(updated_observers)
         current_app.config['OBSERVERS'] = updated_observers
         
         return jsonify({
@@ -5169,7 +5210,11 @@ def delete_observer_site(kk):
     
     # Save using io module
     try:
-        save_observers(new_observers)
+        # Sort (Layer 2)
+        new_observers = observer_logic.sort_observers(new_observers)
+        
+        # Save to file (Layer 3a)
+        observer_file.save_file(new_observers)
         current_app.config['OBSERVERS'] = new_observers
         
         return jsonify({
@@ -5208,7 +5253,12 @@ def delete_observer():
     
     # Save using io module
     try:
-        save_observers(new_observers)
+        # No need to sort after deleting all records for one observer
+        # But we do it for consistency
+        new_observers = observer_logic.sort_observers(new_observers)
+        
+        # Save to file (Layer 3a)
+        observer_file.save_file(new_observers)
         current_app.config['OBSERVERS'] = new_observers
         
         return jsonify({
@@ -5399,10 +5449,10 @@ def _calculate_observation_solar_altitude(obs, observers_list, sh_type='mean'):
     observer_record = None
     
     # Convert observation date to comparable format
-    # obs.JJ is 2-digit year: >= 50 means 19xx, < 50 means 20xx
+    # obs.JJ uses (YEAR_MIN-1900) boundary for 19xx/20xx
     obs_month = obs.MM
     obs_year_2digit = obs.JJ
-    obs_year = 1900 + obs_year_2digit if obs_year_2digit >= 50 else 2000 + obs_year_2digit
+    obs_year = jj_to_full_year(obs_year_2digit)
     
     # Create sortable seit value for observation: YYYYMM (year*100 + month)
     obs_seit_comparable = obs_year * 100 + obs_month
@@ -5417,7 +5467,7 @@ def _calculate_observation_solar_altitude(obs, observers_list, sh_type='mean'):
                 seit_parts = obs_rec[3].split('/')
                 seit_month = int(seit_parts[0])
                 seit_year_2digit = int(seit_parts[1])
-                seit_year = 1900 + seit_year_2digit if seit_year_2digit >= 50 else 2000 + seit_year_2digit
+                seit_year = jj_to_full_year(seit_year_2digit)
                 
                 # Create sortable seit value for record: YYYYMM
                 rec_seit_comparable = seit_year * 100 + seit_month
@@ -5569,7 +5619,7 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         
         # Handle year ranges that cross century boundary
         if from_val > to_val:
-            # Range crosses century (e.g., 50-49 means 1950-1999 AND 2000-2049)
+            # Range crosses century (e.g., (YEAR_MIN-1900)-1 wrap across 19xx/20xx)
             for obs in observations:
                 val = getattr(obs, param_name, None)
                 if val is not None and (from_val <= val <= 99 or 0 <= val <= to_val):
@@ -5945,12 +5995,8 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
         # Convert 2-digit years to 4-digit years for JJ parameter
         if param_name == 'JJ' and value is not None:
             year = int(value) if isinstance(value, (int, str)) else value
-            # Year < 50 = 20xx, Year >= 50 = 19xx (as per HALO key standard)
-            if year < 50:
-                value = 2000 + year
-            elif year < 100:
-                value = 1900 + year
-            # else: already 4-digit year
+            # Year < (YEAR_MIN-1900) = 20xx, Year >= (YEAR_MIN-1900) = 19xx
+            value = jj_to_full_year(year)
         
         # Use unformatted key for grouping to avoid duplicates
         if value is None:
@@ -5999,10 +6045,7 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
                                     month = int(month)
                                     year = int(year)
                                     # Convert 2-digit year to 4-digit for calendar
-                                    if year < 50:
-                                        year = 2000 + year
-                                    elif year < 100:
-                                        year = 1900 + year
+                                    year = jj_to_full_year(year)
                                     
                                     # Get max days in this month
                                     max_day = calendar.monthrange(year, month)[1]
@@ -6017,24 +6060,16 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
                                 range_values = list(range(1, 32))
                         elif param_name == 'JJ':
                             # Year - convert 2-digit to 4-digit, then handle range
-                            # Year < 50 = 20xx, Year >= 50 = 19xx
+                            # Year < (YEAR_MIN-1900) = 20xx, Year >= (YEAR_MIN-1900) = 19xx
                             from_year = from_val
                             to_year = to_val
-                            
-                            if from_year < 50:
-                                from_year = 2000 + from_year
-                            elif from_year < 100:
-                                from_year = 1900 + from_year
-                                
-                            if to_year < 50:
-                                to_year = 2000 + to_year
-                            elif to_year < 100:
-                                to_year = 1900 + to_year
+                            from_year = jj_to_full_year(from_year)
+                            to_year = jj_to_full_year(to_year)
                             
                             # Now generate range with 4-digit years
                             if from_year > to_year:
-                                # Century boundary case: 1990-2010 for example
-                                range_values = list(range(from_year, 2050)) + list(range(1950, to_year + 1))
+                                # Century boundary case (wrap across YEAR_MAX/YEAR_MIN)
+                                range_values = list(range(from_year, YEAR_MAX + 1)) + list(range(YEAR_MIN, to_year + 1))
                             else:
                                 # Normal case
                                 range_values = list(range(from_year, to_year + 1))
@@ -6489,10 +6524,7 @@ def _format_parameter_value(value, param_name, all_params, prefix):
     # For year (JJ), convert 2-digit to 4-digit for display
     if param_name == 'JJ':
         year = int(value)
-        if year < 50:
-            return str(2000 + year)
-        else:
-            return str(1900 + year)
+        return str(jj_to_full_year(year))
     
     # For SH (solar altitude), just return numeric string (no degree symbol)
     if param_name == 'SH':

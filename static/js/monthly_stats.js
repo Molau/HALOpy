@@ -192,8 +192,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const monthName = months[data.mm] || months[data.mm.toString()];
         
         // Format year
-        const year = data.jj >= 50 ? `19${data.jj.toString().padStart(2, '0')}` : 
-                     `20${data.jj.toString().padStart(2, '0')}`;
+        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
+                 `20${data.jj.toString().padStart(2, '0')}`;
         
         // Set title with month and year
         const resultsTitle = document.getElementById('results-modal-title');
@@ -709,8 +709,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     function showActivityChart(data) {
         const months = i18nStrings.months || {};
         const monthName = months[data.mm];
-        const year = data.jj >= 50 ? `19${data.jj.toString().padStart(2, '0')}` : 
-                     `20${data.jj.toString().padStart(2, '0')}`;
+        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
+                 `20${data.jj.toString().padStart(2, '0')}`;
         
         // Set chart title - LINE CHART
         const chartPrintableTitle = document.getElementById('chart-printable-title-line');
@@ -833,8 +833,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     function showActivityBarChart(data) {
         const monthName = i18nStrings.months[data.mm];
-        const year = data.jj >= 50 ? `19${data.jj.toString().padStart(2, '0')}` : 
-                     `20${data.jj.toString().padStart(2, '0')}`;
+        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
+                 `20${data.jj.toString().padStart(2, '0')}`;
         
         // Set chart title - BAR CHART
         const chartPrintableTitle = document.getElementById('chart-printable-title-bar');
@@ -1075,8 +1075,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const data = currentStatsData;
         const monthName = i18nStrings.months[data.mm];
-        const year = data.jj >= 50 ? `19${data.jj.toString().padStart(2, '0')}` : 
-                     `20${data.jj.toString().padStart(2, '0')}`;
+        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
+                 `20${data.jj.toString().padStart(2, '0')}`;
         
         let text = '';
         
@@ -1172,8 +1172,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         let csv = '';
         const months = i18nStrings.months || {};
         const monthName = months[data.mm];
-        const year = data.jj >= 50 ? `19${data.jj.toString().padStart(2, '0')}` : 
-                     `20${data.jj.toString().padStart(2, '0')}`;
+        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
+                 `20${data.jj.toString().padStart(2, '0')}`;
         
         // Table 1: Observer Overview
         if (data.observer_overview && data.observer_overview.length > 0) {

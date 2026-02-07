@@ -15,10 +15,10 @@ from flask import Flask, render_template, session, request, g, redirect, url_for
 from halo.api import api_blueprint
 from halo.api.update import update_blueprint
 from halo.config import is_cloud_mode
-from halo.io.observers import load_observers
 from halo.resources import get_current_language, get_i18n, set_language, get_string, get_language
 from halo.services.settings import Settings
 import halo.io.observations_file as obs_file
+import halo.io.observers_file as observer_file
 
 
 def create_app(config=None):
@@ -85,8 +85,9 @@ def create_app(config=None):
             except Exception as e:
                 pass
     
-    # Load observer metadata from resources/halobeo.csv
-    app.config['OBSERVERS'] = load_observers()
+    # Load observer metadata from resources/halobeo.csv (Layer 3a)
+    observers, _ = observer_file.open_file()
+    app.config['OBSERVERS'] = observers
     
     @app.before_request
     def setup_language():

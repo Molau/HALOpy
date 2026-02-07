@@ -153,7 +153,7 @@ function calculateFieldConstraints(fieldKey, context) {
                 maxDay = 30;
             } else if (mm === 2) {
                 // February - check for leap year
-                const year = jj > -1 ? (jj < 50 ? 2000 + jj : 1900 + jj) : 2024;
+                const year = jj > -1 ? (jj < (YEAR_MIN - 1900) ? 2000 + jj : 1900 + jj) : YEAR_MIN;
                 maxDay = new Date(year, 2, 0).getDate();  // Days in February
             } else {
                 return [''];

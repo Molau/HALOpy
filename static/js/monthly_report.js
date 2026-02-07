@@ -448,7 +448,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const monthName = i18nStrings.months[data.mm];
         
         // Format title
-        const year = data.jj < 50 ? 2000 + data.jj : 1900 + data.jj;
+        const year = data.jj < (YEAR_MIN-1900) ? 2000 + data.jj : 1900 + data.jj;
         const title = i18nStrings.monthly_report.report_title_template
             .replace('{observer}', data.observer_name)
             .replace('{month}', monthName)
@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const data = currentReportData;
         const monthName = i18nStrings.months[data.mm];
-        const year = data.jj < 50 ? 2000 + data.jj : 1900 + data.jj;
+        const year = data.jj < (YEAR_MIN-1900) ? 2000 + data.jj : 1900 + data.jj;
         const title = i18nStrings.monthly_report.report_title_template
             .replace('{observer}', data.observer_name)
             .replace('{month}', monthName)
