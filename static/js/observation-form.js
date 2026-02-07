@@ -16,6 +16,7 @@ class ObservationForm {
         this.originalObservation = null;
         this.saved = false;
         this.skipped = false;
+        this.destroyed = false; // Track if form has been destroyed
         // Field constraints: Store current valid value ranges for dependent fields
         this.fieldConstraints = {
             d: [],      // Valid values for cirrus density
@@ -794,6 +795,10 @@ class ObservationForm {
                             url += `&jj=${jj}&mm=${mm}`;
                         }
                         const resp = await fetch(url);
+                        
+                        // Check if form was destroyed while fetching
+                        if (this.destroyed) return;
+                        
                         if (resp.ok) {
                             const data = await resp.json();
                             if (data.observer && data.observer.GH) {
@@ -809,7 +814,10 @@ class ObservationForm {
                             }
                         }
                     } catch (e) {
-                        console.error('Error fetching GG:', e);
+                        // Ignore errors if form was destroyed
+                        if (!this.destroyed) {
+                            console.error('Error fetching GG:', e);
+                        }
                     }
                 } else {
                     setOptionStates(this.fields.gg, ggOpts, ['']);
@@ -831,6 +839,10 @@ class ObservationForm {
                             url += `&jj=${jj}&mm=${mm}`;
                         }
                         const resp = await fetch(url);
+                        
+                        // Check if form was destroyed while fetching
+                        if (this.destroyed) return;
+                        
                         if (resp.ok) {
                             const data = await resp.json();
                             if (data.observer && data.observer.GN) {
@@ -846,7 +858,10 @@ class ObservationForm {
                             }
                         }
                     } catch (e) {
-                        console.error('Error fetching GG:', e);
+                        // Ignore errors if form was destroyed
+                        if (!this.destroyed) {
+                            console.error('Error fetching GG:', e);
+                        }
                     }
                 } else {
                     setOptionStates(this.fields.gg, ggOpts, ['']);
@@ -1284,6 +1299,10 @@ class ObservationForm {
                                     url += `&jj=${jj}&mm=${mm}`;
                                 }
                                 const resp = await fetch(url);
+                                
+                                // Check if form was destroyed while fetching
+                                if (this.destroyed) return;
+                                
                                 if (resp.ok) {
                                     const data = await resp.json();
                                     if (data.observer) {
@@ -1296,7 +1315,10 @@ class ObservationForm {
                                     }
                                 }
                             } catch (e) {
-                                console.error('Error fetching GG:', e);
+                                // Ignore errors if form was destroyed
+                                if (!this.destroyed) {
+                                    console.error('Error fetching GG:', e);
+                                }
                             }
                         })();
                     }
@@ -1476,7 +1498,14 @@ class ObservationForm {
             manageFieldDependencies('mm');
             checkRequired();
         });
+        this.fields.tt.addEventListener('change', () => {
+            checkRequired();
+        });
         this.fields.ee.addEventListener('change', () => {
+            manageFieldDependencies('ee');
+            checkRequired();
+        });
+        this.fields.gg.addEventListener('change', () => {
             manageFieldDependencies('ee');
             checkRequired();
         });
@@ -1684,6 +1713,7 @@ class ObservationForm {
                     window.navigateInternal('/');
                 }
             }
+            this.destroyed = true; // Mark as destroyed to prevent async operations
             this.modalElement.remove();
         });
         

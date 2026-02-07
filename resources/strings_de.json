@@ -94,7 +94,8 @@
     "loading_file": "Lade Datei",
     "loading_spinner": "Loading...",
     "new_file_title": "Neue Datei",
-    "new_file_prompt": "Geben Sie einen Dateinamen ein (ohne Erweiterung):",
+    "new_file_default_name": "neue_datei.csv",
+    "new_file_created": "Neue Datei {0} erstellt",
     "loaded_from": "aus",
     "loaded": "geladen",
     "added": "hinzugefügt aus",
@@ -102,6 +103,7 @@
     "selection_result": "{kept} Beobachtungen behalten, {deleted} gelöscht",
     "unsaved_changes_title": "Ungespeicherte Änderungen",
     "unsaved_changes_message": "Sie haben ungespeicherte Änderungen. Möchten Sie wirklich fortfahren?",
+    "upload_warning_unsaved_changes": "Sie haben ungespeicherte Änderungen. Möchten Sie erst speichern? Sonst laden Sie ggf. eine alte Dateiversion hoch.",
     "autosave_recovery_title": "Automatische Wiederherstellung",
     "autosave_recovery_message": "Es wurde eine ungesicherte Datei gefunden:",
     "autosave_recovery_prompt": "Möchten Sie diese wiederherstellen?",
@@ -113,7 +115,6 @@
     "no_observers": "Keine Beobachtunger gefunden",
     "no_data": "Keine Daten geladen! Bitte laden Sie zuerst eine Datei.",
     "empty_filter_result": "Keine Beobachtungen entsprechen den Filterkriterien. Es würde eine leere Datei erstellt.",
-    "save_as_prompt": "Dateinamen (ohne Erweiterung):",
     "overwrite_confirm": "Überschreiben?",
     "back_to_main": "Zurück zum Hauptmenü",
     "please_enter_filename": "Bitte geben Sie einen Dateinamen (ohne Erweiterung) ein!",
@@ -187,7 +188,6 @@
     "select": "Selektieren",
     "merge": "Verbinden",
     "save": "Speichern",
-    "save_as": "Speichern unter",
     "upload": "Upload",
     "download": "Download"
   },
@@ -213,7 +213,9 @@
       "download_scope_own": "Nur eigene Beobachtungen",
       "download_scope_all": "Alle Beobachtungen",
       "legacy_format_converted_title": "Dateiformat konvertiert",
-      "legacy_format_converted_message": "Die Datei wurde aus dem alten HALO-Format in das aktuelle CSV-Format konvertiert und gespeichert."
+      "legacy_format_converted_message": "Die Datei wurde aus dem alten HALO-Format in das aktuelle CSV-Format konvertiert und gespeichert.",
+      "server_unreachable": "HALO Online-Service ist nicht erreichbar",
+      "server_unreachable_details": "Der HALO Online-Service ({0}) kann aktuell nicht erreicht werden. Bitte überprüfen Sie Ihre Internetverbindung oder versuchen Sie es später erneut."
   },
   "observations": {
     "title": "Beobachtungen",
@@ -237,7 +239,6 @@
     "input_incomplete": "Eingabe unvollständig oder ungültig.",
     "error_adding": "Fehler beim Hinzufügen",
     "no_file_loaded": "Bitte laden Sie zuerst eine Datei oder legen Sie eine neue an.",
-    "new_filename": "Neuer Dateiname",
     "records_label": "Datensätze",
     "select_action": "Sollen diese Beobachtungen erhalten bleiben oder gelöscht werden?",
     "select_keep": "Erhalten",

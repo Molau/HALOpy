@@ -186,6 +186,17 @@ class FilterDialog {
         
         // Clean up on modal hidden
         this.modalElement.addEventListener('hidden.bs.modal', () => {
+            // Call pending callback if exists
+            if (this.pendingCallback && this.onApply) {
+                const callbackPromise = this.onApply(this.pendingCallback);
+                this.pendingCallback = null;
+                
+                // If callback returns a Promise, handle errors
+                if (callbackPromise && typeof callbackPromise.then === 'function') {
+                    callbackPromise.catch(err => console.error('Filter callback error:', err));
+                }
+            }
+            
             this.modalElement.remove();
         });
     }
@@ -435,17 +446,16 @@ class FilterDialog {
             this.filterValue2 = null;
         }
         
-        // Hide modal and call callback
-        this.modal.hide();
+        // Store callback info for execution after modal is hidden
+        this.pendingCallback = {
+            criterion1: this.filterCriterion1,
+            value1: this.filterValue1,
+            criterion2: this.filterCriterion2,
+            value2: this.filterValue2
+        };
         
-        if (this.onApply) {
-            this.onApply({
-                criterion1: this.filterCriterion1,
-                value1: this.filterValue1,
-                criterion2: this.filterCriterion2,
-                value2: this.filterValue2
-            });
-        }
+        // Hide modal - callback will be called in hidden.bs.modal handler
+        this.modal.hide();
     }
     
     showWarning(message) {

@@ -14,38 +14,17 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 from halo.io.csv_handler import ObservationCSV
+from halo.io.observers import load_observers, save_observers, find_observer_records, add_observer_record, update_observer_record, delete_observer_record
+
+# NEW CODE - Using io.observations + io.observations_file (Layer 2 + Layer 3a)
+import halo.io.observations as obs_logic
+import halo.io.observations_file as obs_file
 
 api_blueprint = Blueprint('api', __name__, url_prefix='/api')
 
 
 # ============================================================================
 # Helper Functions
-# ============================================================================
-
-def _auto_save_if_cloud():
-    """
-    In cloud mode, automatically save changes to all.csv.
-    In local mode, just mark as dirty.
-    """
-    from halo.config import is_cloud_mode
-    
-    if is_cloud_mode():
-        # Auto-save in cloud mode
-        try:
-            observations = current_app.config.get('OBSERVATIONS', [])
-            root_path = Path(current_app.root_path).parent.parent
-            data_path = root_path / 'data' / 'all.csv'
-            ObservationCSV.write_observations(data_path, observations)
-            current_app.config['DIRTY'] = False
-        except Exception as e:
-            # If save fails, mark as dirty so user knows
-            current_app.config['DIRTY'] = True
-            raise e
-    else:
-        # Local mode - just mark as dirty
-        current_app.config['DIRTY'] = True
-
-
 # ============================================================================
 # Authentication API (Cloud Mode)
 # ============================================================================
@@ -578,7 +557,6 @@ def add_observation() -> Dict[str, Any]:
         
         observations.insert(insert_pos, obs)
         current_app.config['OBSERVATIONS'] = observations
-        _auto_save_if_cloud()
 
         return jsonify({'success': True, 'count': len(observations)})
     except Exception as e:
@@ -611,7 +589,6 @@ def delete_observation() -> Dict[str, Any]:
         if original_obs is not None:
             observations.pop(original_obs)
             current_app.config['OBSERVATIONS'] = observations
-            _auto_save_if_cloud()
             return jsonify({'success': True, 'deleted': True, 'count': len(observations)})
         else:
             return jsonify({'success': False, 'deleted': False, 'count': len(observations)})
@@ -643,7 +620,6 @@ def replace_observations() -> Dict[str, Any]:
         observations.append(obs)
     
     current_app.config['OBSERVATIONS'] = observations
-    _auto_save_if_cloud()
     
     return jsonify({'success': True, 'count': len(observations)})
 
@@ -690,7 +666,12 @@ def save_observations() -> Dict[str, Any]:
         return jsonify({'success': False, 'exists': True, 'filename': filename}), 200
     
     try:
-        ObservationCSV.write_observations(filepath, observations)
+        # OLD CODE - TO BE REMOVED AFTER TESTING
+        # ObservationCSV.write_observations(filepath, observations)
+        
+        # NEW CODE - Using io.observations_file
+        obs_file.save_file(filename, observations)
+        
         return jsonify({
             'success': True,
             'filename': filename,
@@ -926,8 +907,12 @@ def new_file() -> Dict[str, Any]:
         return jsonify({'error': 'file_already_exists'}), 400
     
     try:
-        # Create empty CSV with header
-        ObservationCSV.write_observations(Path(filepath), [])
+        # OLD CODE - TO BE REMOVED AFTER TESTING
+        # # Create empty CSV with header
+        # ObservationCSV.write_observations(Path(filepath), [])
+        
+        # NEW CODE - Using io.observations_file
+        obs_file.new_file(filename)
         
         current_app.config['LOADED_FILE'] = filename
         current_app.config['OBSERVATIONS'] = []
@@ -966,21 +951,29 @@ def load_file_from_browser() -> Dict[str, Any]:
             temp_path = Path(tmp.name)
         
         try:
-            # Use unified load logic with legacy format detection
-            observations, needs_conversion = ObservationCSV.read_observations(temp_path)
+            # OLD CODE - TO BE REMOVED AFTER TESTING
+            # # Use unified load logic with legacy format detection
+            # observations, needs_conversion = ObservationCSV.read_observations(temp_path)
             
-            # Store in app config (do NOT auto-save to data folder)
-            # Converted data stays in memory only until user explicitly saves
+            # NEW CODE - Using io.observations_file
+            # Save to temp file in data folder
+            import shutil
+            temp_filename = f"upload_{file.filename}"
+            shutil.copy(temp_path, obs_file.get_data_path(temp_filename))
+            observations, _ = obs_file.open_file(temp_filename)  # Returns (observations, filepath)
+            obs_file.delete_file(temp_filename)  # Clean up after loading
+            
+            # Store in app config
             current_app.config['LOADED_FILE'] = file.filename
             current_app.config['OBSERVATIONS'] = observations
-            current_app.config['DIRTY'] = needs_conversion  # Mark as dirty if conversion needed
+            current_app.config['DIRTY'] = False  # File just loaded, no changes yet
             
             return jsonify({
                 'success': True,
                 'filename': file.filename,
                 'count': len(observations),
                 'message': f'{len(observations)} Beobachtungen geladen!',
-                'converted': needs_conversion
+                'converted': False
             })
         finally:
             # Clean up temp file
@@ -1045,8 +1038,6 @@ def merge_file() -> Dict[str, Any]:
         # Update app config
         current_app.config['OBSERVATIONS'] = current_observations
         # Mark as dirty only if at least one observation was added
-        if added_count > 0:
-            _auto_save_if_cloud()
         
         return jsonify({
             'success': True,
@@ -1074,12 +1065,16 @@ def load_file(filename: str) -> Dict[str, Any]:
         return jsonify({'error': 'File not found'}), 404
     
     try:
-        # Use unified load logic with legacy format detection
-        observations, needs_conversion = ObservationCSV.read_observations(filepath)
+        # OLD CODE - TO BE REMOVED AFTER TESTING
+        # # Use unified load logic with legacy format detection
+        # observations, needs_conversion = ObservationCSV.read_observations(filepath)
+        # 
+        # # Auto-convert legacy format by overwriting file
+        # if needs_conversion:
+        #     ObservationCSV.write_observations(filepath, observations)
         
-        # Auto-convert legacy format by overwriting file
-        if needs_conversion:
-            ObservationCSV.write_observations(filepath, observations)
+        # NEW CODE - Using io.observations_file
+        observations = obs_file.open_file(filename)
         
         # Store in app config
         current_app.config['LOADED_FILE'] = filename
@@ -1090,7 +1085,7 @@ def load_file(filename: str) -> Dict[str, Any]:
             'success': True,
             'filename': filename,
             'count': len(observations),
-            'converted': needs_conversion
+            'converted': False  # obs_file.open_file() handles legacy conversion internally
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1109,42 +1104,54 @@ def save_file() -> Dict[str, Any]:
     observations = current_app.config.get('OBSERVATIONS', [])
     
     try:
-        # Create CSV in memory
-        output = io.StringIO()
-        import csv
-        writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+        # OLD CODE - TO BE REMOVED AFTER TESTING
+        # # Create CSV in memory
+        # output = io.StringIO()
+        # import csv
+        # writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+        # 
+        # for obs in observations:
+        #     # Format fields
+        #     def format_field(value):
+        #         if value == -1:
+        #             return ''
+        #         elif value == -2:
+        #             return '/'
+        #         else:
+        #             return str(value)
+        #     
+        #     e_digit = str(obs.EE) if hasattr(obs, 'EE') else ''
+        #     ho_str = '' if obs.HO == -1 else ('//' if obs.HO == 0 else str(obs.HO))
+        #     hu_str = '' if obs.HU == -1 else ('//' if obs.HU == 0 else str(obs.HU))
+        #     ho_hu_field = f'{e_digit}{ho_str}{hu_str}' if ho_str or hu_str else '/////'
+        #     
+        #     fields = [
+        #         str(obs.KK), format_field(obs.O), str(obs.JJ), str(obs.MM), str(obs.TT), str(obs.g),
+        #         format_field(obs.ZS), format_field(obs.ZM), format_field(obs.d), format_field(obs.DD),
+        #         format_field(obs.N), format_field(obs.C), format_field(obs.c), str(obs.EE),
+        #         format_field(obs.H), format_field(obs.F), format_field(obs.V), format_field(obs.f),
+        #         format_field(obs.zz), str(obs.GG), ho_hu_field,
+        #         obs.sectors if obs.sectors else '',
+        #         obs.remarks if obs.remarks else ''
+        #     ]
+        #     writer.writerow(fields)
+        # 
+        # # Convert to bytes with UTF-8 encoding
+        # csv_bytes = output.getvalue().encode('utf-8')
+        # output.close()
+        # 
+        # # Create BytesIO object for send_file
+        # csv_io = io.BytesIO(csv_bytes)
+        # csv_io.seek(0)
         
-        for obs in observations:
-            # Format fields
-            def format_field(value):
-                if value == -1:
-                    return ''
-                elif value == -2:
-                    return '/'
-                else:
-                    return str(value)
-            
-            e_digit = str(obs.EE) if hasattr(obs, 'EE') else ''
-            ho_str = '' if obs.HO == -1 else ('//' if obs.HO == 0 else str(obs.HO))
-            hu_str = '' if obs.HU == -1 else ('//' if obs.HU == 0 else str(obs.HU))
-            ho_hu_field = f'{e_digit}{ho_str}{hu_str}' if ho_str or hu_str else '/////'
-            
-            fields = [
-                str(obs.KK), format_field(obs.O), str(obs.JJ), str(obs.MM), str(obs.TT), str(obs.g),
-                format_field(obs.ZS), format_field(obs.ZM), format_field(obs.d), format_field(obs.DD),
-                format_field(obs.N), format_field(obs.C), format_field(obs.c), str(obs.EE),
-                format_field(obs.H), format_field(obs.F), format_field(obs.V), format_field(obs.f),
-                format_field(obs.zz), str(obs.GG), ho_hu_field,
-                obs.sectors if obs.sectors else '',
-                obs.remarks if obs.remarks else ''
-            ]
-            writer.writerow(fields)
+        # NEW CODE - Using io.observations_file  
+        datapath = Path(__file__).parent.parent.parent.parent / 'data'
+        filepath = datapath / filename
+        obs_file.save_file(observations, filepath)
         
-        # Convert to bytes with UTF-8 encoding
-        csv_bytes = output.getvalue().encode('utf-8')
-        output.close()
-        
-        # Create BytesIO object for send_file
+        # Read file back for download
+        with open(filepath, 'rb') as f:
+            csv_bytes = f.read()
         csv_io = io.BytesIO(csv_bytes)
         csv_io.seek(0)
         
@@ -1157,46 +1164,6 @@ def save_file() -> Dict[str, Any]:
             as_attachment=True,
             download_name=filename
         )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@api_blueprint.route('/file/saveas', methods=['POST'])
-def save_file_as() -> Dict[str, Any]:
-    """Save as new file - implements 'Datei -> als ... speichern'"""
-    from flask import current_app, request
-    import os
-    
-    data = request.get_json()
-    filename = data.get('filename', '')
-    overwrite = data.get('overwrite', False)
-    
-    if not filename:
-        return jsonify({'error': 'filename_required'}), 400
-    
-    # Ensure .csv extension
-    if not filename.lower().endswith('.csv'):
-        filename += '.csv'
-    
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    filepath = os.path.join(str(datapath), filename)
-    
-    if os.path.exists(filepath) and not overwrite:
-        return jsonify({'exists': True}), 200
-    
-    observations = current_app.config.get('OBSERVATIONS', [])
-    
-    try:
-        ObservationCSV.write_observations(Path(filepath), observations)
-        
-        current_app.config['LOADED_FILE'] = filename
-        current_app.config['DIRTY'] = False
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'count': len(observations)
-        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1223,10 +1190,6 @@ def upload_file() -> Dict[str, Any]:
     from halo.config import is_cloud_mode
     from halo.models.types import Observation
     from functools import cmp_to_key
-    
-    # Only works in cloud mode
-    if not is_cloud_mode():
-        return jsonify({'error': 'Upload only available in cloud mode'}), 400
     
     data = request.get_json()
     observer_kk = data.get('observerKK')
@@ -1326,7 +1289,6 @@ def upload_file() -> Dict[str, Any]:
         
         # Update config and save
         current_app.config['OBSERVATIONS'] = current_observations
-        _auto_save_if_cloud()
         
         return jsonify({
             'success': True,
@@ -1350,6 +1312,7 @@ def download_file() -> Dict[str, Any]:
     Filters observations by user's KK unless user is admin.
     Returns CSV content for client-side file save dialog.
     """
+    from halo.config import is_cloud_mode
     import os
     import io
     
@@ -1379,29 +1342,30 @@ def download_file() -> Dict[str, Any]:
             # Local mode: authenticate via password
             if observer_kk.upper() == 'ADMIN':
                 # Admin authentication
-                from ..services.auth import auth_service
-                user_info = auth_service.verify_password('admin', password)
-                if not user_info:
+                from halo.services.auth import AuthService
+                is_valid, user_info = AuthService.verify_password('admin', password)
+                if not is_valid:
                     return jsonify({'error': 'invalid_admin_credentials'}), 401
-                is_admin = user_info.get('is_admin', False)
+                is_admin = True
                 authenticated_kk = None  # Admin has no specific KK
             else:
                 # Regular user authentication
-                from ..services.auth import auth_service
-                user_info = auth_service.verify_password(observer_kk, password)
-                if not user_info:
+                from halo.services.auth import AuthService
+                is_valid, user_info = AuthService.verify_password(observer_kk, password)
+                if not is_valid:
                     return jsonify({'error': 'invalid_credentials'}), 401
                 authenticated_kk = int(observer_kk)
-                is_admin = user_info.get('is_admin', False)
+                is_admin = False
         
-        # Load all.csv observations
+        # Load all.csv observations (Cloud mode only)
         root_path = Path(current_app.root_path).parent.parent
         all_csv_path = root_path / 'data' / 'all.csv'
         
         if not all_csv_path.exists():
             return jsonify({'error': 'all_csv_not_found'}), 404
         
-        all_observations, _ = ObservationCSV.read_observations(all_csv_path)
+        # Using io.observations_file
+        all_observations, _ = obs_file.open_file(str(all_csv_path))
         
         # Filter observations by KK (unless admin or download_all requested)
         if is_admin or download_all:
@@ -1456,7 +1420,6 @@ def download_file() -> Dict[str, Any]:
         
         current_app.config['OBSERVATIONS'] = observations
         current_app.config['LOADED_FILE'] = filename
-        _auto_save_if_cloud()
         
         return jsonify({
             'success': True,
@@ -1506,6 +1469,26 @@ def update_file_status() -> Dict[str, Any]:
 def autosave() -> Dict[str, Any]:
     """Auto-save current observations to .$$$ temp file"""
     from flask import current_app
+    
+    filename = current_app.config.get('LOADED_FILE')
+    if not filename:
+        return jsonify({'error': 'No file loaded'}), 400
+    
+    observations = current_app.config.get('OBSERVATIONS', [])
+    if not observations:
+        return jsonify({'error': 'No observations to save'}), 400
+    
+    try:
+        # NEW CODE - Using io.observations_file
+        temp_path = obs_file.create_temp_backup(observations, filename)
+        
+        return jsonify({
+            'success': True,
+            'temp_file': temp_path.name,
+            'count': len(observations)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @api_blueprint.route('/observers/upload', methods=['POST'])
@@ -1569,15 +1552,8 @@ def upload_observers() -> Dict[str, Any]:
                 if len(obs_record) >= 1 and obs_record[0] != str(authenticated_kk):
                     return jsonify({'error': 'observer_kk_mismatch', 'details': {'expected': authenticated_kk, 'found': obs_record[0]}}), 403
         
-        # Load existing halobeo.csv
-        root_path = Path(current_app.root_path).parent.parent
-        halobeo_path = root_path / 'resources' / 'halobeo.csv'
-        
-        existing_observers = []
-        if halobeo_path.exists():
-            with open(halobeo_path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
-                existing_observers = list(reader)
+        # Load existing observers
+        existing_observers = load_observers()
         
         # Replace mode: Remove all existing records for uploaded observers
         uploaded_kks = set()
@@ -1591,12 +1567,8 @@ def upload_observers() -> Dict[str, Any]:
         # Add new observers
         filtered_observers.extend(observers)
         
-        # Write back to halobeo.csv
-        with open(halobeo_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerows(filtered_observers)
-        
-        # Update app config
+        # Save and update app config
+        save_observers(filtered_observers)
         current_app.config['OBSERVERS'] = filtered_observers
         
         return jsonify({
@@ -1635,17 +1607,8 @@ def download_observers() -> Dict[str, Any]:
             if not authenticated_kk and not is_admin:
                 return jsonify({'error': 'Nicht authentifiziert. Bitte neu anmelden.'}), 401
         
-        # Load halobeo.csv
-        root_path = Path(current_app.root_path).parent.parent
-        halobeo_path = root_path / 'resources' / 'halobeo.csv'
-        
-        if not halobeo_path.exists():
-            return jsonify({'error': 'halobeo_csv_not_found'}), 404
-        
-        all_observers = []
-        with open(halobeo_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            all_observers = list(reader)
+        # Load observers
+        all_observers = load_observers()
         
         if not all_observers:
             return jsonify({'error': 'no_observers'}), 404
@@ -1692,7 +1655,12 @@ def autosave_old() -> Dict[str, Any]:
     temp_filepath = datapath / temp_filename
     
     try:
-        ObservationCSV.write_observations(temp_filepath, observations)
+        # OLD CODE - TO BE REMOVED AFTER TESTING
+        # ObservationCSV.write_observations(temp_filepath, observations)
+        
+        # NEW CODE - Using io.observations_file
+        obs_file.create_temp_backup(temp_filename, observations)
+        
         return jsonify({
             'success': True,
             'temp_file': temp_filename,
@@ -1704,17 +1672,17 @@ def autosave_old() -> Dict[str, Any]:
 
 @api_blueprint.route('/file/check_autosave', methods=['GET'])
 def check_autosave() -> Dict[str, Any]:
-    """Check if any .$$$ autosave files exist in data directory"""
+    """Check if any .$$$ autosave files exist in temp directory"""
     from flask import current_app
     import os
     
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
+    temppath = Path(__file__).parent.parent.parent.parent / 'temp'
     
-    if not datapath.exists():
+    if not temppath.exists():
         return jsonify({'found': False})
     
     # Find all .$$$ files
-    autosave_files = list(datapath.glob('*.$$$'))
+    autosave_files = list(temppath.glob('*.$$$'))
     
     if not autosave_files:
         return jsonify({'found': False})
@@ -1743,18 +1711,17 @@ def restore_autosave() -> Dict[str, Any]:
     if not temp_filename:
         return jsonify({'error': 'Temp filename required'}), 400
     
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    temp_filepath = datapath / temp_filename
+    temppath = Path(__file__).parent.parent.parent.parent / 'temp'
+    temp_filepath = temppath / temp_filename
     
     if not temp_filepath.exists():
         return jsonify({'error': 'Autosave file not found'}), 404
     
     try:
-        # Load observations from temp file
-        observations, needs_conversion = ObservationCSV.read_observations(temp_filepath)
-        # Auto-convert legacy format
-        if needs_conversion:
-            ObservationCSV.write_observations(temp_filepath, observations)
+        # NEW CODE - Using io.observations_file
+        # Extract base filename (without .$$$) to pass to restore_from_temp
+        base_filename = os.path.splitext(temp_filename)[0] + '.csv'
+        observations = obs_file.restore_from_temp(base_filename)
         
         # Store in app config
         current_app.config['OBSERVATIONS'] = observations
@@ -1762,13 +1729,10 @@ def restore_autosave() -> Dict[str, Any]:
         # Set original filename (without .$$$)
         original_name = os.path.splitext(temp_filename)[0] + '.CSV'
         current_app.config['LOADED_FILE'] = original_name
-        _auto_save_if_cloud()  # Mark as dirty since restored from temp
+        current_app.config['DIRTY'] = True  # Mark as dirty since restored from temp
         
-        # Delete the temp file
-        try:
-            temp_filepath.unlink()
-        except Exception:
-            pass  # Ignore deletion errors
+        # DO NOT delete the temp file - keep it until user explicitly saves
+        # If browser crashes again before save, we can recover from it
         
         return jsonify({
             'success': True,
@@ -1782,26 +1746,37 @@ def restore_autosave() -> Dict[str, Any]:
 @api_blueprint.route('/file/cleanup_autosave', methods=['POST'])
 def cleanup_autosave() -> Dict[str, Any]:
     """Delete .$$$ autosave file after successful save"""
-    from flask import current_app
+    from flask import current_app, request
     import os
     
+    data = request.get_json() or {}
+    temp_file = data.get('temp_file')
+    
+    # If temp_file is provided, delete that specific file
+    if temp_file:
+        temppath = Path(__file__).parent.parent.parent.parent / 'temp'
+        temp_filepath = temppath / temp_file
+        try:
+            if temp_filepath.exists():
+                temp_filepath.unlink()
+                return jsonify({'success': True, 'deleted': True})
+            else:
+                return jsonify({'success': True, 'deleted': False})
+        except Exception as e:
+            return jsonify({'success': True, 'warning': str(e)})
+    
+    # Otherwise, use LOADED_FILE to determine temp file
     filename = current_app.config.get('LOADED_FILE')
     if not filename:
         return jsonify({'success': True})  # No file loaded, nothing to clean
     
-    # Create temp filename with .$$$ extension
-    base_name = os.path.splitext(filename)[0]
-    temp_filename = f"{base_name}.$$$"
-    
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    temp_filepath = datapath / temp_filename
-    
     try:
-        if temp_filepath.exists():
-            temp_filepath.unlink()
-            return jsonify({'success': True, 'deleted': temp_filename})
+        # Use io.observations_file to delete temp file
+        deleted = obs_file.delete_temp_file(filename)
+        if deleted:
+            return jsonify({'success': True, 'deleted': True})
         else:
-            return jsonify({'success': True})
+            return jsonify({'success': True, 'deleted': False})
     except Exception as e:
         # Don't fail if cleanup fails
         return jsonify({'success': True, 'warning': str(e)})
@@ -1810,10 +1785,11 @@ def cleanup_autosave() -> Dict[str, Any]:
 @api_blueprint.route('/config', methods=['GET'])
 def get_config() -> Dict[str, Any]:
     """Get configuration including cloud mode and admin status."""
-    from halo.config import is_cloud_mode
+    from halo.config import is_cloud_mode, get_cloud_server_url
     
     return jsonify({
         'cloud_mode': is_cloud_mode(),
+        'cloud_server_url': get_cloud_server_url(),
         'is_admin': session.get('is_admin', False),
         'authenticated': session.get('authenticated', False),
         'username': session.get('username')
@@ -4879,35 +4855,10 @@ def add_observer() -> Dict[str, Any]:
         data.get('NNS', 'N')
     ]
     
-    # Insert in sorted position (by KK, then by seit)
-    root_path = Path(__file__).parent.parent.parent.parent
-    halobeo_path = root_path / 'resources' / 'halobeo.csv'
-    
+    # Add observer using io module
     try:
-        # Add to in-memory list and sort
-        observers.append(new_row)
-        
-        # Sort by KK (column 0), then by seit (column 3)
-        def sort_key(obs):
-            kk = obs[0]
-            seit_str = obs[3]  # Format: MM/YY
-            # Parse seit to numeric value for sorting
-            try:
-                parts = seit_str.split('/')
-                month = int(parts[0])
-                year = int(parts[1])
-                seit_val = year * 100 + month  # YYMM for sorting
-            except:
-                seit_val = 0
-            return (kk, seit_val)
-        
-        observers.sort(key=sort_key)
+        observers = add_observer_record(new_row, observers, save_to_file=True)
         current_app.config['OBSERVERS'] = observers
-        
-        # Rewrite entire file with sorted data
-        with open(halobeo_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerows(observers)
         
         return jsonify({
             'success': True,
@@ -4994,16 +4945,9 @@ def update_observer(kk: str) -> Dict[str, Any]:
     # Get the first updated entry for response
     first_updated = observers[observer_indices[0]]
     
-    root_path = Path(__file__).parent.parent.parent.parent
-    halobeo_path = root_path / 'resources' / 'halobeo.csv'
-    
     try:
-        # Write updated observers to CSV
-        with open(halobeo_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerows(observers)
-        
-        # Update config with modified list
+        # Save updated observers
+        save_observers(observers)
         current_app.config['OBSERVERS'] = observers
         
         # Update metadata in observation files (if loaded)
@@ -5018,8 +4962,6 @@ def update_observer(kk: str) -> Dict[str, Any]:
                     obs_updated_count += 1
             
             # Mark as dirty if any observations were updated
-            if obs_updated_count > 0:
-                _auto_save_if_cloud()
         
         return jsonify({
             'success': True,
@@ -5246,14 +5188,9 @@ def add_observer_site(kk):
     
     observers.sort(key=sort_key)
     
-    # Write to CSV
+    # Save using io module
     try:
-        root_path = Path(__file__).parent.parent.parent.parent
-        csv_path = root_path / 'resources' / 'halobeo.csv'
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerows(observers)
-        
+        save_observers(observers)
         current_app.config['OBSERVERS'] = observers
         
         return jsonify({
@@ -5342,16 +5279,9 @@ def update_observer_site(kk):
     
     updated_observers.sort(key=sort_key)
     
-    # Write back to CSV
+    # Save using io module
     try:
-        # Use __file__ to get correct project root path
-        root_path = Path(__file__).parent.parent.parent.parent
-        csv_path = root_path / 'resources' / 'halobeo.csv'
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerows(updated_observers)
-        
-        # Update in-memory cache
+        save_observers(updated_observers)
         current_app.config['OBSERVERS'] = updated_observers
         
         return jsonify({
@@ -5400,14 +5330,9 @@ def delete_observer_site(kk):
     if not entry_found:
         return jsonify({'error': 'Site entry not found'}), 404
     
-    # Write to CSV
+    # Save using io module
     try:
-        root_path = Path(__file__).parent.parent.parent.parent
-        csv_path = root_path / 'resources' / 'halobeo.csv'
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerows(new_observers)
-        
+        save_observers(new_observers)
         current_app.config['OBSERVERS'] = new_observers
         
         return jsonify({
@@ -5447,14 +5372,9 @@ def delete_observer():
     # Remove all entries for this observer
     new_observers = [obs for obs in observers if obs[0] != kk]
     
-    # Write to CSV
+    # Save using io module
     try:
-        root_path = Path(__file__).parent.parent.parent.parent
-        csv_path = root_path / 'resources' / 'halobeo.csv'
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerows(new_observers)
-        
+        save_observers(new_observers)
         current_app.config['OBSERVERS'] = new_observers
         
         return jsonify({
@@ -6789,31 +6709,33 @@ def _format_parameter_value(value, param_name, all_params, prefix):
     return value
 
 
-@api_blueprint.route('/language/<lang>', methods=['POST'])
-def set_language(lang: str):
-    """
-    Save language preference to settings.
-    
-    Args:
-        lang: 'de' or 'en'
-        
-    Returns:
-        JSON with success status
-    """
-    from flask import current_app, session
-    from halo.services.settings import Settings
-    from halo.resources.i18n import set_language as i18n_set_language
-    
-    # Validate language
-    if lang not in ('de', 'en'):
-        return jsonify({'success': False, 'error': 'invalid_language'}), 400
-    
-    # Set in session (immediate effect)
-    session['language'] = lang
-    i18n_set_language(lang)
-    
-    # Save to settings file (halo.cfg or halo.KK.cfg)
-    current_app.config['LANGUAGE'] = lang
-    Settings.save_from(current_app.config)
-    
-    return jsonify({'success': True, 'language': lang})
+# OLD DUPLICATE CODE - REMOVED (duplicate route definition)
+# @api_blueprint.route('/language/<lang>', methods=['POST'])
+# def set_language(lang: str):
+#     """
+#     Save language preference to settings.
+#     
+#     Args:
+#         lang: 'de' or 'en'
+#         
+#     Returns:
+#         JSON with success status
+#     """
+#     from flask import current_app, session
+#     from halo.services.settings import Settings
+#     from halo.resources.i18n import set_language as i18n_set_language
+#     
+#     # Validate language
+#     if lang not in ('de', 'en'):
+#         return jsonify({'success': False, 'error': 'invalid_language'}), 400
+#     
+#     # Set in session (immediate effect)
+#     session['language'] = lang
+#     i18n_set_language(lang)
+#     
+#     # Save to settings file (halo.cfg or halo.KK.cfg)
+#     current_app.config['LANGUAGE'] = lang
+#     Settings.save_from(current_app.config)
+#     
+#     return jsonify({'success': True, 'language': lang})
+

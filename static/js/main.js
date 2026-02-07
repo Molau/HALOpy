@@ -65,6 +65,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     sessionStorage.removeItem('deleteDebug');
     sessionStorage.removeItem('loadDebug');
     
+    // Load i18n FIRST - required for all UI operations
+    await loadCurrentLanguage();
+    await loadI18n(currentLanguage);
+
+    // Check if i18n loaded successfully - fail fast if not
+    if (!i18nStrings) {
+        console.error('Failed to load i18n strings');
+        return;  // Stop application
+    }
+    
     // Restore file state metadata from sessionStorage if available
     // Note: We only restore metadata, not observations array
     // Observations are always fetched from server when needed
@@ -78,16 +88,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.haloData.isDirty = metadata.isDirty;
             // Don't restore observations array - it will be fetched from server when needed
             window.haloData.observations = [];
-        } catch (e) {sessionStorage.removeItem('haloData');
+            
+            // If file was loaded before, fetch observations from server
+            if (metadata.isLoaded && metadata.fileName) {
+                try {
+                    const resp = await fetch(`/api/observations`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        // API returns { observations: [...], total: n, limit: n, offset: n }
+                        window.haloData.observations = data.observations || [];
+                        if (window.haloData.observations.length > 0) {
+                            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to restore observations from server:', e);
+                    // Keep observations empty on error
+                    window.haloData.observations = [];
+                }
+            }
+        } catch (e) {
+            sessionStorage.removeItem('haloData');
         }
-    }
-    
-    // Get current language from server session
-    await loadCurrentLanguage();
-    await loadI18n(currentLanguage);
-
-    // Check if i18n loaded successfully - fail fast if not
-    if (!i18nStrings) {return;  // Stop application
     }
 
     // Check for updates FIRST - blocks until user decides
@@ -106,18 +128,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 50);
     }
     
-    // Mark this as an active session (for autosave recovery logic)
-    // This flag prevents the recovery dialog from showing during normal navigation
-    // It will only be absent on first browser startup or after a crash
-    sessionStorage.setItem('activeSession', 'true');
-    
     // Clear file info on startup - but only if sessionStorage didn't restore data
     if (!window.haloData.isLoaded) {
         clearFileInfoDisplay();
     }
     
     // Check for autosave recovery AFTER update check
+    // IMPORTANT: This must be checked BEFORE setting activeSession flag
     await checkAutosaveRecovery();
+    
+    // Mark this as an active session (for autosave recovery logic)
+    // This flag prevents the recovery dialog from showing during normal navigation
+    // Set AFTER checkAutosaveRecovery() so recovery prompt can appear on first load
+    sessionStorage.setItem('activeSession', 'true');
     
     // Check if data is loaded on server and update file info display
     // This also syncs window.haloData with server state
@@ -130,6 +153,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         sessionStorage.removeItem('lastEditLogs');
     }
+    
+    // Check for pending notification (e.g., after select operation)
+    const pendingNotification = sessionStorage.getItem('pendingNotification');
+    if (pendingNotification) {
+        try {
+            const notification = JSON.parse(pendingNotification);
+            showNotification(notification.message, notification.type || 'success', notification.duration || 5000);
+        } catch (e) { /* ignore invalid JSON */ }
+        sessionStorage.removeItem('pendingNotification');
+    }
 });
 
 // Flag to track internal navigation (prevents beforeunload warning for internal links)
@@ -137,6 +170,11 @@ window.isInternalNavigation = false;
 
 // Helper function for internal navigation (sets flag to prevent beforeunload warning)
 window.navigateInternal = function(url) {
+    // Block navigation if warning modal is open
+    if (window.__warningModalOpen) {
+        return;
+    }
+    
     window.isInternalNavigation = true;
     window.location.href = url;
 };
@@ -361,10 +399,6 @@ function handleMenuAction(action) {
             highlightFileMenu();
             showSaveFileDialog();
             break;
-        case 'save-as':
-            highlightFileMenu();
-            showSaveAsDialog();
-            break;
         case 'upload':
             highlightFileMenu();
             showUploadDialog();
@@ -479,7 +513,9 @@ function handleMenuAction(action) {
 // Returns: Promise<boolean> - true if user wants to add another, false otherwise
 function showAddAnotherObservationDialog() {
     return new Promise((resolve) => {
-        const modalHtml = `
+        // Add delay before creating modal to allow previous modal's backdrop to disappear
+        setTimeout(() => {
+            const modalHtml = `
             <div class="modal fade" id="add-another-modal" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
@@ -541,6 +577,7 @@ function showAddAnotherObservationDialog() {
         });
         
         modal.show();
+        }, 300); // 300ms delay to let previous modal backdrop fully disappear
     });
 }
 
@@ -785,20 +822,128 @@ async function showAddObservationDialogNumeric() {
                 // This must come BEFORE auto-fill handling to prevent early returns
                 if (eing.length === 50) {
                     const ee = parseInt(eing.slice(20,22),10);
+                    const g = parseInt(eing.slice(9,10),10);
+                    const v = parseInt(eing.slice(24,25),10);
+                    const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
+                    
                     if (ee === 8) {
-                        // EE 08: Jump to position 31 (start of HO input after '8')
-                        eing = eing.slice(0, 31);
+                        // EE 08: Jump to position 32 (delete last char of HO)
+                        eing = eing.slice(0, 32);
+                        input.value = eing;
+                        renderNumericGuide(eing);
+                        ev.preventDefault();
+                        return;
                     } else if (ee === 9 || ee === 10) {
-                        // EE 09/10: Jump to position 33 (start of HU input)
-                        eing = eing.slice(0, 33);
+                        // EE 09/10: Sectors were auto-filled, jump to end of 8HHHH (position 34)
+                        eing = eing.slice(0, 34);
+                        input.value = eing;
+                        renderNumericGuide(eing);
+                        ev.preventDefault();
+                        return;
+                    } else if (v === 1 && circularHalos.has(ee)) {
+                        // Incomplete circular halo: Sectors were manually entered
+                        // Delete trailing spaces AND the last entered sector character
+                        let pos = 49; // Start at end of sectors (position 49)
+                        // Skip trailing spaces
+                        while (pos >= 35 && eing[pos] === ' ') {
+                            pos--;
+                        }
+                        // Now delete the last non-space character too
+                        if (pos >= 35) {
+                            pos--;
+                        }
+                        eing = eing.slice(0, pos + 1);
+                        input.value = eing;
+                        renderNumericGuide(eing);
+                        ev.preventDefault();
+                        return;
                     } else {
-                        // Other halos: Jump to position 35 (start of sectors)
-                        eing = eing.slice(0, 35);
+                        // Complete halo or non-circular: Sectors (15 chars) + 8//// (5 chars) were auto-filled
+                        // If g=1: Delete last char of GG (manually entered) → position 29
+                        // If g != 1: GG was also auto-filled, delete it and last char of zz → position 27
+                        if (g === 1) {
+                            // g=1: GG was manually entered, delete last digit
+                            eing = eing.slice(0, 29);
+                        } else {
+                            // g=0 or g=2: GG was auto-filled, delete it and last char of zz
+                            eing = eing.slice(0, 27);
+                        }
+                        input.value = eing;
+                        renderNumericGuide(eing);
+                        ev.preventDefault();
+                        return;
                     }
-                    input.value = eing;
-                    renderNumericGuide(eing);
-                    ev.preventDefault();
-                    return;
+                }
+                
+                // Smart backspace from start of sectors (position 35): after manually deleting all sectors
+                // This handles incomplete circular halos where sectors were manually entered
+                if (eing.length === 35) {
+                    const ee = parseInt(eing.slice(20,22),10);
+                    const g = parseInt(eing.slice(9,10),10);
+                    const v = parseInt(eing.slice(24,25),10);
+                    const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
+                    
+                    if (v === 1 && circularHalos.has(ee)) {
+                        // Incomplete circular halo: Sectors were manually entered and now all deleted
+                        // If g=1: Delete last char of GG → position 29
+                        // If g != 1: Delete GG completely and last char of zz → position 27
+                        if (g === 1) {
+                            eing = eing.slice(0, 29);
+                        } else {
+                            eing = eing.slice(0, 27);
+                        }
+                        input.value = eing;
+                        renderNumericGuide(eing);
+                        ev.preventDefault();
+                        return;
+                    }
+                    // For other cases at position 35, fall through to normal backspace
+                }
+                
+                // Smart backspace from start of HU field (position 33): after manually deleting HU for EE 09
+                // For EE 09: 8// is auto-filled, HU was manually entered at position 33-34
+                // For EE 10: 8 is auto-filled, but HO/HU/MD spans 31-36, so position 33 is mid-field
+                if (eing.length === 33) {
+                    const ee = parseInt(eing.slice(20,22),10);
+                    const g = parseInt(eing.slice(9,10),10);
+                    if (ee === 9) {
+                        // EE 09 only: 8// was auto-filled
+                        // If g=1: Delete last char of GG → position 29
+                        // If g != 1: Delete GG and last char of zz → position 27
+                        if (g === 1) {
+                            eing = eing.slice(0, 29);
+                        } else {
+                            eing = eing.slice(0, 27);
+                        }
+                        input.value = eing;
+                        renderNumericGuide(eing);
+                        ev.preventDefault();
+                        return;
+                    }
+                    // For other cases at position 33 (including EE 10), fall through to normal backspace
+                }
+                
+                // Smart backspace from start of HO field (position 31): after manually deleting HO for EE 08/10
+                // For EE 08: 8 is auto-filled, HO was manually entered
+                // For EE 10: 8 is auto-filled, HO/HU/MD were manually entered
+                if (eing.length === 31) {
+                    const ee = parseInt(eing.slice(20,22),10);
+                    const g = parseInt(eing.slice(9,10),10);
+                    if (ee === 8 || ee === 10) {
+                        // EE 08/10: 8 was auto-filled
+                        // If g=1: Delete last char of GG → position 29
+                        // If g != 1: Delete GG and last char of zz → position 27
+                        if (g === 1) {
+                            eing = eing.slice(0, 29);
+                        } else {
+                            eing = eing.slice(0, 27);
+                        }
+                        input.value = eing;
+                        renderNumericGuide(eing);
+                        ev.preventDefault();
+                        return;
+                    }
+                    // For other cases at position 31, fall through to normal backspace
                 }
                 
                 // Check if we're deleting an auto-filled character
@@ -902,7 +1047,7 @@ async function showAddObservationDialogNumeric() {
                 
                 // First validate and add the character the user just typed (async possible)
                 const result = validateNumericProgress(candidate, observerCodes);
-                const handleResult = (res) => {
+                const handleResult = async (res) => {
                     if (!res.ok) {
                         if (res.reset) {
                             eing = '';
@@ -929,90 +1074,91 @@ async function showAddObservationDialogNumeric() {
                     const jj = eing.slice(3,5);
                     const mm = eing.slice(5,7);
                     
-                    // Fetch observer's region for this specific time period via API
-                    fetch(`/api/observers?kk=${kk}&jj=${jj}&mm=${mm}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            const observer = data.observer;
+                    try {
+                        // CRITICAL: await the fetch to prevent race conditions
+                        const response = await fetch(`/api/observers?kk=${kk}&jj=${jj}&mm=${mm}`);
+                        const data = await response.json();
+                        const observer = data.observer;
 
-                            
-                            if (observer) {
-                                // Get region - use GH for main site (g=0), GN for secondary site (g=2)
-                                let gg = g === 0 ? observer.GH : observer.GN;
+                        
+                        if (observer) {
+                            // Get region - use GH for main site (g=0), GN for secondary site (g=2)
+                            let gg = g === 0 ? observer.GH : observer.GN;
 
-                                if (gg !== null && gg !== undefined) {
-                                    gg = String(gg).padStart(2,'0');
+                            if (gg !== null && gg !== undefined) {
+                                gg = String(gg).padStart(2,'0');
 
-                                    // Auto-fill the GG field
-                                    eing = eing + gg;
-                                    autoFilledPositions.add(27);
-                                    autoFilledPositions.add(28);
-                                    input.value = eing;
-                                    renderNumericGuide(eing);
-                                    
-                                    // Auto-fill 8HHHH sun pillar altitude field after GG
-                                    const ee = parseInt(eing.slice(20,22),10);
+                                // Auto-fill the GG field
+                                eing = eing + gg;
+                                autoFilledPositions.add(28);
+                                autoFilledPositions.add(29);
+                                input.value = eing;
+                                renderNumericGuide(eing);
+                                
+                                // Auto-fill 8HHHH sun pillar altitude field after GG
+                                const ee = parseInt(eing.slice(20,22),10);
 
-                                    if (ee === 8) {
-                                        // EE 08: 8HOHU// ? user enters HO (Oberkante) at positions 31-32, HU (Unterkante) at 33-34, then // auto-filled
-                                        eing = eing + '8';
-                                        autoFilledPositions.add(30); // '8' is auto-filled
-                                    } else if (ee === 9) {
-                                        // EE 09: 8//HOHU ? // auto-filled, user enters HO (Oberkante) at 33-34, HU (Unterkante) follows
-                                        eing = eing + '8//';
-                                        autoFilledPositions.add(30); // '8'
-                                        autoFilledPositions.add(31); // '/'
-                                        autoFilledPositions.add(32); // '/'
-                                    } else if (ee === 10) {
-                                        // EE 10: 8HOHUMD ? user enters all 4 digits: HO (31-32), HU (33-34), MD follows
-                                        eing = eing + '8';
-                                        autoFilledPositions.add(30); // '8' is auto-filled
+                                if (ee === 8) {
+                                    // EE 08: 8HOHU// ? user enters HO (Oberkante) at positions 31-32, HU (Unterkante) at 33-34, then // auto-filled
+                                    eing = eing + '8';
+                                    autoFilledPositions.add(30); // '8' is auto-filled
+                                } else if (ee === 9) {
+                                    // EE 09: 8//HOHU ? // auto-filled, user enters HO (Oberkante) at 33-34, HU (Unterkante) follows
+                                    eing = eing + '8//';
+                                    autoFilledPositions.add(30); // '8'
+                                    autoFilledPositions.add(31); // '/'
+                                    autoFilledPositions.add(32); // '/'
+                                } else if (ee === 10) {
+                                    // EE 10: 8HOHUMD ? user enters all 4 digits: HO (31-32), HU (33-34), MD follows
+                                    eing = eing + '8';
+                                    autoFilledPositions.add(30); // '8' is auto-filled
+                                } else {
+                                    // All other EE values: no sun pillar ? 8////
+                                    eing = eing + '8////';
+                                    // Track all 5 positions as auto-filled
+                                    autoFilledPositions.add(30);
+                                    autoFilledPositions.add(31);
+                                    autoFilledPositions.add(32);
+                                    autoFilledPositions.add(33);
+                                    autoFilledPositions.add(34);
+                                }
+                                input.value = eing;
+                                renderNumericGuide(eing);
+                                
+                                // Auto-fill sectors after 8HHHH is complete
+                                // Sectors are only needed for incomplete (V=1) circular halos
+                                // CRITICAL: For EE 08/09/10, don't auto-fill sectors yet - user must enter HO/HU first
+                                const v = parseInt(eing.slice(24,25),10);
+                                const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
+                                
+                                // Only auto-fill sectors if 8HHHH field is COMPLETE (5 chars = position 35)
+                                // For EE 08/09/10: field is NOT complete yet, user needs to enter HO/HU
+                                const is8HHHHComplete = eing.length === 35;
+                                
+                                if (is8HHHHComplete) {
+                                    if (v === 1 && circularHalos.has(ee)) {
+                                        // Incomplete circular halo: user will enter sectors (do nothing)
                                     } else {
-                                        // All other EE values: no sun pillar ? 8////
-                                        eing = eing + '8////';
-                                        // Track all 5 positions as auto-filled
-                                        autoFilledPositions.add(30);
-                                        autoFilledPositions.add(31);
-                                        autoFilledPositions.add(32);
-                                        autoFilledPositions.add(33);
-                                        autoFilledPositions.add(34);
+                                        // Complete halo or non-circular: auto-fill 15 spaces
+                                        eing = eing + '               ';
+                                        input.value = eing;
+                                        renderNumericGuide(eing);
                                     }
-                                    input.value = eing;
-                                    renderNumericGuide(eing);
-                                    
-                                    // Auto-fill sectors after 8HHHH is complete
-                                    // Sectors are only needed for incomplete (V=1) circular halos
-                                    // CRITICAL: For EE 08/09/10, don't auto-fill sectors yet - user must enter HO/HU first
-                                    const v = parseInt(eing.slice(24,25),10);
-                                    const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
-                                    
-                                    // Only auto-fill sectors if 8HHHH field is COMPLETE (5 chars = position 35)
-                                    // For EE 08/09/10: field is NOT complete yet, user needs to enter HO/HU
-                                    const is8HHHHComplete = eing.length === 35;
-                                    
-                                    if (is8HHHHComplete) {
-                                        if (v === 1 && circularHalos.has(ee)) {
-                                            // Incomplete circular halo: user will enter sectors (do nothing)
-                                        } else {
-                                            // Complete halo or non-circular: auto-fill 15 spaces
-                                            eing = eing + '               ';
-                                            input.value = eing;
-                                            renderNumericGuide(eing);
-                                        }
-                                    } else {
-                                    }
+                                } else {
                                 }
                             }
-                        })
-                        .catch(err => {});
+                        }
+                    } catch (err) {
+                        console.error('Failed to fetch observer data:', err);
+                    }
                 };
                 
                 if (result && typeof result.then === 'function') {
-                    result.then(handleResult);
+                    await result.then(handleResult);
                     ev.preventDefault();
                     return;
                 } else {
-                    handleResult(result);
+                    await handleResult(result);
                     ev.preventDefault();
                     return;
                 }
@@ -1023,6 +1169,9 @@ async function showAddObservationDialogNumeric() {
         // Auto-fill 8HHHH sun pillar altitude field after GG (position 29 complete)
         if (eing.length === 29) {
             const ee = parseInt(eing.slice(20,22),10);
+            const v = parseInt(eing.slice(24,25),10);
+            const circularHalos = new Set([1,7,12,31,32,33,34,35,36,40]);
+            
             if (ee === 8) {
                 // EE 08: 8HOHU// ? user enters HO at positions 31-32, HU at 33-34, then // auto-filled
                 candidate = candidate + '8';
@@ -1037,6 +1186,15 @@ async function showAddObservationDialogNumeric() {
                 candidate = candidate + '8////';
                 // Track all 5 positions as auto-filled (will be added to set in validation handler)
                 // Note: These are added in the validation result handler when eing is updated
+                
+                // Since we just auto-filled 8//// (5 chars), we're now at position 35
+                // Check if we need to auto-fill sectors (15 spaces) for non-circular or complete halos
+                if (v === 1 && circularHalos.has(ee)) {
+                    // Incomplete circular halo: user will enter sectors (do nothing)
+                } else {
+                    // Complete halo or non-circular: auto-fill 15 spaces
+                    candidate = candidate + '               ';
+                }
             }
         }
         
@@ -1113,8 +1271,8 @@ async function showAddObservationDialogNumeric() {
                 
                 // If we jumped from position 6 to 28+ (after entering g), GG was auto-filled
                 if (oldLength === 7 && newLength >= 29) {
-                    autoFilledPositions.add(27);
                     autoFilledPositions.add(28);
+                    autoFilledPositions.add(29);
                 }
                 
                 // If we jumped from position 29 to 34 (added 5 chars), check if it's 8////
@@ -1208,11 +1366,12 @@ async function showAddObservationDialogNumeric() {
                         input.value = eing;
                         
                         // Track auto-filled positions
-                        // GG is 2 digits (positions 27-28), track both if auto-filled
-                        if (autoFilledValue.length === 2 && oldLength === 27) {
-                            // This is GG field (2 digits at position 27-28)
-                            autoFilledPositions.add(27);
-                            autoFilledPositions.add(28);} else {
+                        // GG is 2 digits (string indices 28-29), track both if auto-filled
+                        // Only track if we actually auto-filled (jumped from 28 to 30)
+                        if (autoFilledValue.length === 2 && oldLength === 28 && eing.length === 30) {
+                            // This is GG field (2 digits at string indices 28-29)
+                            autoFilledPositions.add(28);
+                            autoFilledPositions.add(29);} else {
                             // Single character auto-fill
                             autoFilledPositions.add(eing.length - 1);
                         }
@@ -1280,6 +1439,7 @@ async function showAddObservationDialogNumeric() {
             // Trigger autosave
             await triggerAutosave();
             
+            saveHandled = true; // Mark save as successful
             modal.hide();
             
             // Show success notification
@@ -1303,7 +1463,13 @@ async function showAddObservationDialogNumeric() {
         }
     });
 
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+    // Cleanup on modal close (only if save wasn't successful)
+    let saveHandled = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!saveHandled) {
+            modalEl.remove();
+        }
+    });
 }
 
 // Menu-based entry (Langeingabe) dialog
@@ -1352,13 +1518,19 @@ async function showAddObservationDialogMenu() {
             // Show success notification
             showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
-            // Ask if user wants to add another observation
-            const addAnother = await showAddAnotherObservationDialog();
-            if (addAnother) {
-                // User clicked Yes - show the add dialog again
-                await showAddObservationDialogMenu();
-            }
-            // If user clicked No, do nothing (modal already closed, stay on current page)
+            // Close the form modal first
+            form.hideModal();
+            
+            // Wait for modal to close, then ask if user wants to add another
+            form.modalElement.addEventListener('hidden.bs.modal', async () => {
+                // Ask if user wants to add another observation
+                const addAnother = await showAddAnotherObservationDialog();
+                if (addAnother) {
+                    // User clicked Yes - show the add dialog again
+                    await showAddObservationDialogMenu();
+                }
+                // If user clicked No, do nothing (modal already closed, stay on current page)
+            }, { once: true });
         } catch (e) {
             showErrorDialog(e.message);
         }
@@ -2025,7 +2197,6 @@ function updateMenuText() {
     updateDropdownItem('select', i18nStrings.file.select);
     updateDropdownItem('merge', i18nStrings.file.merge);
     updateDropdownItem('save', i18nStrings.file.save);
-    updateDropdownItem('save-as', i18nStrings.file.save_as);
     updateDropdownItem('upload', i18nStrings.file.upload);
     updateDropdownItem('download', i18nStrings.file.download);
     
@@ -2196,7 +2367,7 @@ async function showModifySingleObservations(filterState) {
     const filteredObs = await applyFilterToObservations(filterState);
     
     if (filteredObs.length === 0) {
-        showWarningModal(i18nStrings.messages.no_observations);
+        await showWarningModal(i18nStrings.messages.no_observations);
         return;
     }
     
@@ -2246,7 +2417,7 @@ async function showModifyGroupObservations(filterState) {
     const filteredObs = await applyFilterToObservations(filterState);
     
     if (filteredObs.length === 0) {
-        showWarningModal(i18nStrings.messages.no_observations);
+        await showWarningModal(i18nStrings.messages.no_observations);
         return;
     }
     
@@ -2677,7 +2848,7 @@ async function showDeleteSingleObservations(filterState) {
     const filteredObs = await applyFilterToObservations(filterState);
 
     if (filteredObs.length === 0) {
-        showWarningModal(i18nStrings.messages.no_observations);
+        await showWarningModal(i18nStrings.messages.no_observations);
         return;
     }
 
@@ -3149,15 +3320,16 @@ async function showDisplayObservationsDialog() {
     try {
         const response = await fetch('/api/observations?limit=1');
         if (!response.ok) {
-            showWarningModal(i18nStrings.messages.no_data);
+            await showWarningModal(i18nStrings.messages.no_data);
             return;
         }
         const data = await response.json();
         if (!data.total || data.total === 0) {
-            showWarningModal(i18nStrings.messages.no_data);
+            await showWarningModal(i18nStrings.messages.no_data);
             return;
         }
-    } catch (error) {showWarningModal(i18nStrings.messages.no_data);
+    } catch (error) {
+        await showWarningModal(i18nStrings.messages.no_data);
         return;
     }
     
@@ -3176,13 +3348,14 @@ async function showDisplayObservationsDialog() {
                 
                 if (config.mode === 'N') {
                     // Zahleneingaben - show compact list in modal
-                    showDisplayCompactList(filterState);
+                    await showDisplayCompactList(filterState);
                 } else {
                     // Men?eingaben - show detail view one-by-one
-                    showDisplaySingleObservations(filterState);
+                    await showDisplaySingleObservations(filterState);
                 }
-            } catch (error) {// Default to detail view on error
-                showDisplaySingleObservations(filterState);
+            } catch (error) {
+                // Default to detail view on error
+                await showDisplaySingleObservations(filterState);
             }
         },
         () => {
@@ -3198,7 +3371,7 @@ async function showDisplayCompactList(filterState) {
     const filteredObs = await applyFilterToObservations(filterState);
     
     if (filteredObs.length === 0) {
-        showWarningModal(i18nStrings.messages.no_observations);
+        await showWarningModal(i18nStrings.messages.no_observations);
         return;
     }
     
@@ -3478,7 +3651,7 @@ async function showDisplaySingleObservations(filterState) {
     const filteredObs = await applyFilterToObservations(filterState);
     
     if (filteredObs.length === 0) {
-        showWarningModal(i18nStrings.messages.no_observations);
+        await showWarningModal(i18nStrings.messages.no_observations);
         return;
     }
     
@@ -4443,17 +4616,27 @@ async function showSelectDialog() {
             window.haloData.isDirty = true;
             saveHaloDataToSession();
             
+            // Trigger autosave
+            await triggerAutosave();
+            
             // Update UI
             updateFileInfoDisplay(window.haloData.fileName, keptCount);
             
             // Close modal
             modal.hide();
             
-            // Show success notification
+            // Store notification in sessionStorage for display on main page
             const message = i18nStrings.messages.selection_result
                 .replace('{kept}', keptCount)
                 .replace('{deleted}', deletedCount);
-            showNotification(`<strong>✓</strong> ${message}`, 'success', 5000);
+            sessionStorage.setItem('pendingNotification', JSON.stringify({
+                message: `<strong>✓</strong> ${message}`,
+                type: 'success',
+                duration: 5000
+            }));
+            
+            // Navigate back to main page
+            window.navigateInternal('/');
             
         } catch (error) {
             bsLoadingModal.hide();
@@ -4478,84 +4661,42 @@ async function showSelectDialog() {
 
 // Create new file
 async function showNewFileDialog() {
-    const modalHtml = `
-        <div class="modal fade" id="new-file-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${i18nStrings.messages.new_file_title}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>${i18nStrings.messages.new_file_prompt}</p>
-                        <input type="text" id="new-filename" class="form-control">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="ok-new">${i18nStrings.common.ok}</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('new-file-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    
-    const input = document.getElementById('new-filename');
-    modalEl.addEventListener('shown.bs.modal', () => input.focus());
-    
-    // Handle OK button
-    document.getElementById('ok-new').onclick = async () => {
-        const filename = input.value.trim();
-        if (!filename) {
-            showErrorDialog(i18nStrings.messages.please_enter_filename);
+    try {
+        // Use File System Access API for native save dialog
+        const fileHandle = await window.showSaveFilePicker({
+            suggestedName: i18nStrings.messages.new_file_default_name || 'neue_datei.csv',
+            types: [{
+                description: 'CSV Files',
+                accept: {'text/csv': ['.csv']}
+            }]
+        });
+        
+        // Get chosen filename from fileHandle
+        const filename = fileHandle.name;
+        
+        // Create empty file (no header, no content)
+        const writable = await fileHandle.createWritable();
+        await writable.write('');
+        await writable.close();
+        
+        // Update application state (empty observations list)
+        window.haloData.observations = [];
+        window.haloData.fileName = filename;
+        window.haloData.isLoaded = true;
+        window.haloData.isDirty = false;
+        saveHaloDataToSession();
+        
+        // Update file info in header
+        updateFileInfoDisplay(filename, 0);
+        
+        showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', filename)}`, 'success');
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            // User cancelled the file picker
             return;
         }
-        
-        try {
-            const response = await fetch('/api/file/new', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({filename: filename})
-            });
-            
-            const result = await response.json();
-            if (response.ok && result.success) {
-                modal.hide();
-                
-                // Load the newly created file immediately
-                window.haloData.observations = [];
-                window.haloData.fileName = result.filename;
-                window.haloData.isLoaded = true;
-                window.haloData.isDirty = false;
-                saveHaloDataToSession();
-                
-                // Update file info in header
-                updateFileInfoDisplay(window.haloData.fileName, 0);
-                
-                showMessage(result.message, 'success');
-            } else {
-                showErrorDialog(i18nStrings.common.error + ': ' + (result.error));
-            }
-        } catch (error) {
-            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-        }
-    };
-    
-    // Handle Enter key
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('ok-new').click();
-        }
-    });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        clearMenuHighlights();
-        modalEl.remove();
-    });
+        showErrorDialog(i18nStrings.common.error + ': ' + err.message);
+    }
 }
 
 // Save file
@@ -4611,150 +4752,6 @@ async function saveFile() {
                 return;
             }
             throw err;
-        }
-    } catch (error) {
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-    }
-}
-
-// Save as
-async function showSaveAsDialog() {
-    try {
-        const statusResponse = await fetch('/api/file/status');
-        const status = await statusResponse.json();
-        
-        if (!status.filename) {
-            showErrorDialog(i18nStrings.messages.no_file_loaded);
-            return;
-        }
-    } catch (error) {
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-        return;
-    }
-    
-    // Show Bootstrap modal instead of browser prompt
-    const modalHtml = `
-        <div class="modal fade" id="saveas-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${i18nStrings.file.save_as}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <label class="form-label">${i18nStrings.messages.save_as_prompt}</label>
-                        <input type="text" class="form-control" id="saveas-filename" placeholder="${(window.haloData.fileName || 'alle.csv').replace(/\.[^.]+$/, '')}" value="${(window.haloData.fileName || '').replace(/\.[^.]+$/, '')}">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="saveas-ok">${i18nStrings.common.ok}</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('saveas-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    const filenameInput = document.getElementById('saveas-filename');
-    
-    modal.show();
-    
-    // Focus and select filename input
-    setTimeout(() => {
-        filenameInput.focus();
-        filenameInput.select();
-    }, 300);
-    
-    // Handle OK button
-    document.getElementById('saveas-ok').addEventListener('click', async () => {
-        const filename = filenameInput.value.trim();
-        if (!filename) return;
-        
-        modal.hide();
-        await processSaveAs(filename);
-    });
-    
-    // Handle Enter key in input
-    filenameInput.addEventListener('keydown', async (e) => {
-        if (e.key === 'Enter') {
-            const filename = filenameInput.value.trim();
-            if (!filename) return;
-            
-            modal.hide();
-            await processSaveAs(filename);
-        }
-    });
-    
-    // Clean up modal after hiding
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        clearMenuHighlights();
-        modalEl.remove();
-    });
-}
-
-async function processSaveAs(filename) {
-    try {
-        let response = await fetch('/api/file/saveas', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({filename: filename, overwrite: false})
-        });
-        
-        let result = await response.json();
-        
-        if (result.exists) {
-            const overwriteMsg = result.message + ' ' + (i18nStrings.messages.overwrite_confirm);
-            showConfirmDialog(
-                i18nStrings.messages.overwrite_confirm,
-                overwriteMsg,
-                async () => {
-                    // User confirmed - proceed with overwrite
-                    try {
-                        response = await fetch('/api/file/saveas', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({filename: filename, overwrite: true})
-                        });
-                        
-                        result = await response.json();
-                        
-                        if (response.ok && result.success) {
-                            window.haloData.isDirty = false;
-                            if (result.filename) {
-                                window.haloData.fileName = result.filename;
-                            }
-                            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
-                            
-                            // Clean up autosave file
-                            await fetch('/api/file/cleanup_autosave', {method: 'POST'});
-                            
-                            showMessage(result.message, 'success');
-                        } else if (result.error) {
-                            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
-                        }
-                    } catch (error) {
-                        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-                    }
-                }
-            );
-            return;
-        }
-        
-        if (response.ok && result.success) {
-            window.haloData.isDirty = false;
-            if (result.filename) {
-                window.haloData.fileName = result.filename;
-            }
-            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
-            
-            // Clean up autosave file
-            await fetch('/api/file/cleanup_autosave', {method: 'POST'});
-            
-            showMessage(result.message, 'success');
-        } else if (result.error) {
-            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
         }
     } catch (error) {
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);
@@ -4932,34 +4929,44 @@ async function showUploadDialog() {
         const configResponse = await fetch('/api/config');
         const config = await configResponse.json();
         const isCloudMode = config.cloud_mode;
+        const cloudServerUrl = config.cloud_server_url || 'https://halo.online';
         
-        if (isCloudMode) {
-            // Cloud mode: User already authenticated, just select file and upload
-            showUploadFileDialog(config.username);
+        // Check if there are unsaved changes
+        const statusResponse = await fetch('/api/file/status');
+        const status = await statusResponse.json();
+        const isDirty = status.dirty || false;
+        
+        // Warn if unsaved changes exist
+        if (isDirty) {
+            showConfirmDialog(
+                i18nStrings.messages.unsaved_changes_title,
+                i18nStrings.messages.upload_warning_unsaved_changes || 'Sie haben ungespeicherte Änderungen. Möchten Sie nicht erst speichern? Sonst laden Sie eine alte Version hoch.',
+                () => {
+                    // User chose to continue despite unsaved changes
+                    continueUpload(isCloudMode, cloudServerUrl, config.username);
+                }
+            );
         } else {
-            // Local mode: Need file loaded first, then show auth dialog
-            const statusResponse = await fetch('/api/file/status');
-            const status = await statusResponse.json();
-            
-            if (!status.filename) {
-                showErrorDialog(i18nStrings.messages.no_file_loaded);
-                return;
-            }
-            
-            const totalCount = status.count || 0;
-            
-            // Show authentication modal
-            showAuthenticationModal(async (observerKK, password) => {
-                await uploadLocalModeObservations(observerKK, password, totalCount);
-            });
+            // No unsaved changes, proceed directly
+            continueUpload(isCloudMode, cloudServerUrl, config.username);
         }
     } catch (error) {
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        showErrorDialog(i18nStrings.common.error + ': ' + error.message, () => {
+            window.navigateInternal('/');
+        });
     }
 }
 
+function continueUpload(isCloudMode, cloudServerUrl, username) {
+    // Both modes: Show authentication dialog first, then file picker
+    showAuthenticationModal(async (observerKK, password) => {
+        // After authentication, show file picker
+        showUploadFileDialog(observerKK, password, isCloudMode, cloudServerUrl);
+    });
+}
+
 // Upload in cloud mode: Select file from local disk
-async function showUploadFileDialog(observerKK) {
+async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServerUrl) {
     // Create file input dialog
     const modalHtml = `
         <div class="modal fade" id="upload-file-modal" tabindex="-1">
@@ -4983,7 +4990,7 @@ async function showUploadFileDialog(observerKK) {
                             <label class="form-check-label" for="upload-replace">${i18nStrings.upload_download.upload_mode_replace}</label>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer d-flex justify-content-end gap-2">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
                         <button type="button" class="btn btn-primary btn-sm px-3" id="btn-upload-file">${i18nStrings.upload_download.upload_title}</button>
                     </div>
@@ -5011,273 +5018,76 @@ async function showUploadFileDialog(observerKK) {
         setTimeout(() => modalEl.remove(), 300);
         
         // Read CSV file
-        const spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.messages.loading_file);
+        const loadingSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.messages.loading_file);
         
         try {
             const text = await file.text();
-            const observations = parseCSVObservations(text);
             
-            // Hide loading spinner
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
+            // Show uploading message
+            loadingSpinner.modal.hide();
+            setTimeout(() => loadingSpinner.modalEl.remove(), 300);
             
-            // Upload observations
-            await performUploadAuthenticated(observerKK, observations, uploadMode);
+            const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.messages.uploading || 'Datei wird hochgeladen...');
+            
+            // Upload to cloud server
+            const uploadUrl = `${cloudServerUrl}/api/sync/upload`;
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    observerKK: observerKK,
+                    password: password,
+                    csv_content: text,
+                    mode: uploadMode
+                })
+            });
+            
+            uploadSpinner.modal.hide();
+            setTimeout(() => uploadSpinner.modalEl.remove(), 300);
+            
+            if (response.ok) {
+                const result = await response.json();
+                showNotification(
+                    `✓ ${result.count || 0} ${i18nStrings.messages.observations_uploaded || 'Beobachtungen hochgeladen'}`,
+                    'success',
+                    5000
+                );
+                
+                // Return to main page
+                setTimeout(() => {
+                    window.navigateInternal('/');
+                }, 2000);
+            } else {
+                const error = await response.json();
+                showErrorDialog(i18nStrings.common.error + ': ' + (error.error || 'Unknown error'), () => {
+                    window.navigateInternal('/');
+                });
+            }
             
         } catch (error) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+            loadingSpinner.modal.hide();
+            setTimeout(() => loadingSpinner.modalEl.remove(), 300);
+            
+            // Check if it's a network error (server unreachable)
+            if (error.message.includes('fetch') || error.name === 'TypeError') {
+                const serverErrorMsg = i18nStrings.upload_download.server_unreachable_details.replace('{0}', cloudServerUrl);
+                showErrorDialog(
+                    serverErrorMsg,
+                    () => { window.navigateInternal('/'); }
+                );
+            } else {
+                showErrorDialog(i18nStrings.common.error + ': ' + error.message, () => {
+                    window.navigateInternal('/');
+                });
+            }
         }
     });
     
     modal.show();
 }
 
-// Upload in local mode: Use loaded observations
-async function uploadLocalModeObservations(observerKK, password, totalCount) {
-    const isAdmin = observerKK === 'admin';
-    
-    // Step 2: Load observers to get the observer name
-    const observersResponse = await fetch('/api/observers');
-    const observersData = await observersResponse.json();
-    const observers = observersData.observers || [];
-    
-    // Find the observer's name (skip for admin)
-    let observerDisplay = observerKK;
-    if (!isAdmin) {
-        const observer = observers.find(obs => String(obs.KK) === String(observerKK));
-        const observerName = observer ? `${observer.VName || ''} ${observer.NName || ''}`.trim() : '';
-        observerDisplay = observerName ? `${observerKK} - ${observerName}` : observerKK;
-    } else {
-        observerDisplay = 'Admin';
-    }
-    
-    // Step 3: Filter observations by observer KK (skip filter for admin)
-    const allObservationsResponse = await fetch('/api/observations?limit=200000');
-    const allData = await allObservationsResponse.json();
-    const allObservations = allData.observations || [];
-    
-    // Filter for this observer only (admin gets all observations)
-    const filteredObservations = isAdmin 
-        ? allObservations 
-        : allObservations.filter(obs => String(obs.KK) === String(observerKK));
-    const filteredCount = filteredObservations.length;
-    
-    // Check if observer has any observations
-    if (filteredCount === 0) {
-        showErrorDialog(i18nStrings.upload_download.upload_no_observations.replace('{0}', observerDisplay));
-        return;
-    }
-    
-    // Prepare confirmation message
-    let confirmMessage;
-    if (isAdmin || filteredCount === totalCount) {
-        // All observations will be uploaded
-        confirmMessage = i18nStrings.upload_download.upload_confirm.replace('{0}', filteredCount);
-    } else {
-        // Some observations filtered out
-        confirmMessage = i18nStrings.upload_download.upload_confirm_filtered
-            .replace('{0}', filteredCount)
-            .replace('{1}', totalCount)
-            .replace('{2}', observerDisplay);
-    }
-    
-    // Create custom modal with radio buttons for upload mode
-    const modalHtml = `
-        <div class="modal fade" id="upload-confirm-modal" tabindex="-1">
-            <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">${i18nStrings.upload_download.upload_title}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p class="mb-3">${confirmMessage}</p>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="radio" name="upload_mode" id="upload-add" value="add" checked>
-                                    <label class="form-check-label" for="upload-add">${i18nStrings.upload_download.upload_mode_add}</label>
-                                </div>
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="radio" name="upload_mode" id="upload-replace" value="replace">
-                                    <label class="form-check-label" for="upload-replace">${i18nStrings.upload_download.upload_mode_replace}</label>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-upload-confirm">${i18nStrings.common.ok}</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            const uploadModal = new bootstrap.Modal(document.getElementById('upload-confirm-modal'));
-            
-            document.getElementById('btn-upload-confirm').addEventListener('click', async () => {
-                // Get selected upload mode
-                const uploadMode = document.querySelector('input[name="upload_mode"]:checked').value;
-                
-                // Hide modal
-                uploadModal.hide();
-                setTimeout(() => document.getElementById('upload-confirm-modal').remove(), 300);
-                
-                // User confirmed - proceed with upload
-                
-                // Show progress spinner
-                const spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
-                
-                try {
-                    // Upload to server with authentication and mode
-                    const response = await fetch('/api/file/upload', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            observerKK: observerKK,
-                            password: password,
-                            observations: filteredObservations,
-                            mode: uploadMode
-                        })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    // Hide spinner
-                    spinner.modal.hide();
-                    setTimeout(() => spinner.modalEl.remove(), 300);
-                    
-                    if (response.ok && result.success) {
-                        // Success - show toast notification with actual added count
-                        const successMessage = i18nStrings.upload_download.upload_success.replace('{0}', result.count);
-                        showNotification(successMessage, 'success');
-                        
-                        // Reload observations to show updated count
-                        await checkAndDisplayFileInfo();
-                    } else {
-                        showErrorDialog(i18nStrings.common.error + ': ' + result.error);
-                    }
-                } catch (error) {
-                    // Hide spinner on error
-                    spinner.modal.hide();
-                    setTimeout(() => spinner.modalEl.remove(), 300);
-                    showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-                }
-            });
-            
-            // Show modal
-            uploadModal.show();
-        });
-        
-    } catch (error) {
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-    }
-}
-
-// Parse CSV text into observation objects
-function parseCSVObservations(csvText) {
-    const lines = csvText.trim().split('\n');
-    const observations = [];
-    
-    for (const line of lines) {
-        if (!line.trim()) continue;
-        
-        // Parse CSV line - handle quoted fields
-        const fields = [];
-        let currentField = '';
-        let inQuotes = false;
-        
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-                if (inQuotes && line[i + 1] === '"') {
-                    currentField += '"';
-                    i++;
-                } else {
-                    inQuotes = !inQuotes;
-                }
-            } else if (char === ',' && !inQuotes) {
-                fields.push(currentField);
-                currentField = '';
-            } else {
-                currentField += char;
-            }
-        }
-        fields.push(currentField);
-        
-        // Convert to observation object
-        if (fields.length >= 20) {
-            const obs = {
-                KK: parseInt(fields[0]) || -1,
-                O: parseInt(fields[1]) || -1,
-                JJ: parseInt(fields[2]) || -1,
-                MM: parseInt(fields[3]) || -1,
-                TT: parseInt(fields[4]) || -1,
-                g: parseInt(fields[5]) || -1,
-                ZS: parseInt(fields[6]) || -1,
-                ZM: parseInt(fields[7]) || -1,
-                d: parseInt(fields[8]) || -1,
-                DD: parseInt(fields[9]) || -1,
-                N: parseInt(fields[10]) || -1,
-                C: parseInt(fields[11]) || -1,
-                c: parseInt(fields[12]) || -1,
-                EE: parseInt(fields[13]) || -1,
-                H: parseInt(fields[14]) || -1,
-                F: parseInt(fields[15]) || -1,
-                V: parseInt(fields[16]) || -1,
-                f: parseInt(fields[17]) || -1,
-                zz: parseInt(fields[18]) || -1,
-                GG: parseInt(fields[19]) || -1,
-                HO: fields[20] ? parseInt(fields[20]) : -1,
-                HU: fields[21] ? parseInt(fields[21]) : -1,
-                sectors: fields[22] || '',
-                remarks: fields[23] || ''
-            };
-            observations.push(obs);
-        }
-    }
-    
-    return observations;
-}
-
-// Perform upload with authenticated session (cloud mode)
-async function performUploadAuthenticated(observerKK, observations, uploadMode) {
-    const spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
-    
-    try {
-        const response = await fetch('/api/file/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                observerKK: observerKK,
-                password: '', // Empty password - will use session authentication
-                observations: observations,
-                mode: uploadMode,
-                use_session: true
-            })
-        });
-        
-        const result = await response.json();
-        
-        // Hide spinner
-        spinner.modal.hide();
-        setTimeout(() => spinner.modalEl.remove(), 300);
-        
-        if (response.ok && result.success) {
-            const successMessage = i18nStrings.upload_download.upload_success.replace('{0}', result.count);
-            showNotification(successMessage, 'success');
-            
-            // Reload observations to show updated count
-            await checkAndDisplayFileInfo();
-        } else {
-            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
-        }
-    } catch (error) {
-        spinner.modal.hide();
-        setTimeout(() => spinner.modalEl.remove(), 300);
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-    }
-}
+// OLD CODE REMOVED - uploadLocalModeObservations no longer needed
+// Both Local and Cloud mode now use File Picker via showUploadFileDialog()
 
 // Download file from HALO server
 async function showDownloadDialog() {
@@ -5285,25 +5095,27 @@ async function showDownloadDialog() {
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
     const isCloudMode = config.is_cloud;
+    const cloudServerUrl = config.cloud_server_url || 'https://halo.online';
     
     if (isCloudMode) {
         // Cloud mode: use session authentication
-        await downloadCloudMode();
+        await downloadCloudMode(cloudServerUrl);
     } else {
         // Local mode: show authentication dialog first
-        await downloadLocalMode();
+        await downloadLocalMode(cloudServerUrl);
     }
 }
 
-async function downloadCloudMode() {
+async function downloadCloudMode(cloudServerUrl) {
     // Cloud mode: user is already authenticated via session
     // Show file save dialog directly
     let spinner = null;
     try {
         spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
-        // Download from server with session authentication
-        const response = await fetch('/api/file/download', {
+        // Download from cloud server with session authentication
+        const downloadUrl = `${cloudServerUrl}/api/sync/download`;
+        const response = await fetch(downloadUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -5329,67 +5141,98 @@ async function downloadCloudMode() {
             // Success notification
             const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
             showNotification(successMessage, 'success');
-            } else {
-                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
-            }
-        } catch (error) {
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-            }
-            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        } else {
+            showErrorDialog(i18nStrings.common.error + ': ' + result.error, () => {
+                window.navigateInternal('/');
+            });
         }
-    });
+    } catch (error) {
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+        
+        // Check if it's a network error (server unreachable)
+        if (error.message.includes('fetch') || error.name === 'TypeError') {
+            const serverErrorMsg = i18nStrings.upload_download.server_unreachable_details.replace('{0}', cloudServerUrl);
+            showErrorDialog(
+                serverErrorMsg,
+                () => { window.navigateInternal('/'); }
+            );
+        } else {
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message, () => {
+                window.navigateInternal('/');
+            });
+        }
+    }
 }
 
-async function downloadLocalMode() {
-    // Local mode: show authentication dialog with scope selection
-    showDownloadAuthModal(async (observerKK, password, downloadAll) => {
-        let spinner = null;
-        try {
-            spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
-            
-            // Download from server with password authentication
-            const response = await fetch('/api/file/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    observerKK: observerKK,
-                    password: password,
-                    use_session: false,
-                    download_all: downloadAll
-                })
-            });
-            
-            const result = await response.json();
-            
-            // Hide spinner
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-            }
-            
-            if (response.ok && result.success) {
-                // Trigger file save dialog
-                const csvContent = result.csv_content;
-                const defaultFilename = result.is_admin 
-                    ? 'beobachtungen_all.csv'
-                    : `beobachtungen_${result.observer_kk}.csv`;
-                triggerFileSaveDialog(csvContent, defaultFilename);
+async function downloadLocalMode(cloudServerUrl) {
+    // Local mode: show authentication dialog (same as upload)
+    showAuthenticationModal(async (observerKK, password) => {
+        // Show scope selection dialog after authentication
+        showDownloadScopeDialog(async (downloadAll) => {
+            let spinner = null;
+            try {
+                spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
                 
-                // Success notification
-                const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
-                showNotification(successMessage, 'success');
-            } else {
-                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+                // Download from cloud server with password authentication
+                const downloadUrl = `${cloudServerUrl}/api/sync/download`;
+                const response = await fetch(downloadUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        observerKK: observerKK,
+                        password: password,
+                        use_session: false,
+                        download_all: downloadAll
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Hide spinner
+                if (spinner) {
+                    spinner.modal.hide();
+                    setTimeout(() => spinner.modalEl.remove(), 300);
+                }
+                
+                if (response.ok && result.success) {
+                    // Trigger file save dialog
+                    const csvContent = result.csv_content;
+                    const defaultFilename = result.is_admin 
+                        ? 'beobachtungen_all.csv'
+                        : `beobachtungen_${result.observer_kk}.csv`;
+                    triggerFileSaveDialog(csvContent, defaultFilename);
+                    
+                    // Success notification
+                    const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
+                    showNotification(successMessage, 'success');
+                } else {
+                    showErrorDialog(i18nStrings.common.error + ': ' + result.error, () => {
+                        window.navigateInternal('/');
+                    });
+                }
+            } catch (error) {
+                if (spinner) {
+                    spinner.modal.hide();
+                    setTimeout(() => spinner.modalEl.remove(), 300);
+                }
+                
+                // Check if it's a network error (server unreachable)
+                if (error.message.includes('fetch') || error.name === 'TypeError') {
+                    const serverErrorMsg = i18nStrings.upload_download.server_unreachable_details.replace('{0}', cloudServerUrl);
+                    showErrorDialog(
+                        serverErrorMsg,
+                        () => { window.navigateInternal('/'); }
+                    );
+                } else {
+                    showErrorDialog(i18nStrings.common.error + ': ' + error.message, () => {
+                        window.navigateInternal('/');
+                    });
+                }
             }
-        } catch (error) {
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-            }
-            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-        }
+        });
     });
 }
 
@@ -5632,7 +5475,7 @@ function showDownloadScopeDialog(callback) {
                             </label>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer d-flex justify-content-end gap-2">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
                         <button type="button" class="btn btn-primary btn-sm px-3" id="btn-download-scope-ok">${i18nStrings.common.ok}</button>
                     </div>
@@ -5650,107 +5493,6 @@ function showDownloadScopeDialog(callback) {
         const downloadAll = document.getElementById('scope-all').checked;
         modal.hide();
         callback(downloadAll);
-    });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        modalEl.remove();
-    });
-}
-
-function showDownloadAuthModal(callback) {
-    // Create authentication dialog with scope selection for local mode
-    const modalHtml = `
-        <div class="modal fade" id="download-auth-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${i18nStrings.upload_download.download_title}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">${i18nStrings.upload_download.upload_auth_username}</label>
-                            <select class="form-select" id="download-observer-kk">
-                                <option value="Admin">Admin</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">${i18nStrings.upload_download.upload_auth_password}</label>
-                            <input type="password" class="form-control" id="download-password" placeholder="${i18nStrings.upload_download.upload_auth_password}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">${i18nStrings.upload_download.download_scope_label}</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="downloadScope" id="download-scope-own" value="own" checked>
-                                <label class="form-check-label" for="download-scope-own">
-                                    ${i18nStrings.upload_download.download_scope_own}
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="downloadScope" id="download-scope-all" value="all">
-                                <label class="form-check-label" for="download-scope-all">
-                                    ${i18nStrings.upload_download.download_scope_all}
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-download-auth-ok">${i18nStrings.common.ok}</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('download-auth-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    const observerSelect = document.getElementById('download-observer-kk');
-    const passwordInput = document.getElementById('download-password');
-    
-    // Load observers
-    fetch('/api/observers')
-        .then(response => response.json())
-        .then(data => {
-            const observers = data.observers || [];
-            const uniqueObservers = new Map();
-            observers.forEach(obs => {
-                if (obs[0] && !uniqueObservers.has(obs[0])) {
-                    const name = `${obs[2]} ${obs[1]}`.trim() || 'Unbekannt';
-                    uniqueObservers.set(obs[0], name);
-                }
-            });
-            
-            Array.from(uniqueObservers.entries())
-                .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-                .forEach(([kk, name]) => {
-                    const option = document.createElement('option');
-                    option.value = kk;
-                    option.textContent = `${kk} - ${name}`;
-                    observerSelect.appendChild(option);
-                });
-        });
-    
-    modal.show();
-    setTimeout(() => passwordInput.focus(), 500);
-    
-    const handleOk = () => {
-        const observerKK = observerSelect.value;
-        const password = passwordInput.value;
-        const downloadAll = document.getElementById('download-scope-all').checked;
-        
-        if (!password) {
-            passwordInput.focus();
-            return;
-        }
-        
-        modal.hide();
-        callback(observerKK, password, downloadAll);
-    };
-    
-    document.getElementById('btn-download-auth-ok').addEventListener('click', handleOk);
-    passwordInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleOk();
     });
     
     modalEl.addEventListener('hidden.bs.modal', () => {
@@ -5881,7 +5623,8 @@ async function checkAutosaveRecovery() {
             try {
                 await fetch('/api/file/cleanup_autosave', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ temp_file: data.temp_file })
                 });
             } catch (error) {}
             modal.hide();
@@ -5909,7 +5652,10 @@ async function checkAutosaveRecovery() {
                 updateFileInfoDisplay(result.filename, result.count);
                 
                 modal.hide();
-                showMessage(result.message, 'success');
+                
+                // Show success notification
+                const message = `${result.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${result.filename}" ${i18nStrings.messages.loaded}`;
+                showNotification(`<strong>✓</strong> ${message}`, 'success', 5000);
             } catch (error) {
                 showErrorDialog(i18nStrings.messages.autosave_recovery_error + ': ' + error.message);
             }
@@ -6340,39 +6086,46 @@ async function showSaveFileDialog() {
 
 // Show warning modal with custom message
 function showWarningModal(message) {
-    const modalHtml = `
-        <div class="modal fade" id="warning-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${i18nStrings.common.warning}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>${message}</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
+    return new Promise((resolve) => {
+        // Block any navigation while modal is open
+        window.__warningModalOpen = true;
+        
+        // Add a small delay to ensure any previous modal backdrop is fully removed
+        setTimeout(() => {
+            // Generate unique ID to avoid conflicts with other modals
+            const modalId = 'warning-modal-' + Date.now();
+            const modalHtml = `
+            <div class="modal fade" id="${modalId}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">${i18nStrings.common.warning}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>${message}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('warning-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        clearMenuHighlights();
-        modalEl.remove();
+            </div>`;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById(modalId);
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            window.__warningModalOpen = false;
+            modalEl.remove();
+            resolve();
+        });
+        }, 300); // 300ms delay to let previous modal backdrop fully disappear
     });
 }
 
-// ============================================================================
-// STANDARD NOTIFICATION DISPLAY - Decision #019
-// ============================================================================
-// All temporary messages (success, info, warnings) use this standardized format:
-// - Green alert bar at top-center
+// Show notification with custom message and type
 // - Auto-dismisses after 3 seconds
 // - User can manually close with X button
 // - z-index: 9999 (always on top)

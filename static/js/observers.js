@@ -81,7 +81,7 @@ async function loadDropdownData() {
 function populateDropdowns() {
     // Populate observers dropdown
     const kkSelect = document.getElementById('filter-select-kk');
-    kkSelect.innerHTML = `<option value="">${prompt}</option>`;
+    kkSelect.innerHTML = `<option value="">${i18nStrings.messages.select_prompt}</option>`;
     observersList.forEach(obs => {
         // Skip observers with missing data
         if (!obs.KK || !obs.VName || !obs.NName) {

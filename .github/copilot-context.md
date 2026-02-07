@@ -484,6 +484,92 @@
 - **Related Principles**: Applies to all inter-system communication (frontend↔backend, backend↔database)
 - **Impact**: This principle prevents bugs and improves code quality during active development
 
+### Data Handling Architecture - Decision #029
+- **Decision**: 4-Layer Architecture for Observation and Observer Data Handling
+- **Date**: 2026-02-06
+- **Status**: ✓ Approved and Implemented (Layer 2 complete, Layer 3a in progress)
+- **Reference**: See [docs/refactoring/2026-02-06_observations_refactoring_concept.md](../docs/refactoring/2026-02-06_observations_refactoring_concept.md)
+
+**Core Principle**: **ALL data operations MUST use predefined functions from the `io` module. NO data handling outside the `io` module is permitted.**
+
+**Architecture Layers**:
+1. **Layer 1: API Layer** (`src/halo/api/routes.py`)
+   - REST endpoints for frontend communication
+   - Request/response handling
+   - Calls Layer 2 functions
+
+2. **Layer 2: Data Management** (`src/halo/io/observations.py`, `src/halo/io/observers.py`)
+   - **Storage-agnostic business logic**
+   - Works with `List[Observation]` in memory only
+   - Key management, CRUD, sorting, filtering, validation
+   - **100% reusable** for both file and database storage
+   - **Status**: ✓ Implemented and tested (12/12 tests passing)
+
+3. **Layer 3a: File Operations** (`src/halo/io/observations_file.py` - TODO)
+   - CSV file I/O operations
+   - Path management, backup, temp files
+   - **Status**: Planned
+
+4. **Layer 3b: Database Operations** (`src/halo/io/observations_db.py` - TODO)
+   - Database I/O for cloud mode
+   - SQL operations, connection management
+   - **Status**: Planned (for future cloud migration)
+
+**Module Structure**:
+```
+src/halo/io/
+├── __init__.py              # Public API exports
+├── observers.py             # Observer CRUD (Layer 2) ✓ Implemented
+├── observations.py          # Observation CRUD (Layer 2) ✓ Implemented
+├── observations_file.py     # File operations (Layer 3a) - TODO
+├── observations_db.py       # Database operations (Layer 3b) - TODO
+└── csv_handler.py           # Low-level CSV parsing (Layer 4)
+```
+
+**Mandatory Usage Rules**:
+1. ✓ **ALL observation read/write operations MUST use `io.observations.*` functions**
+2. ✓ **ALL observer read/write operations MUST use `io.observers.*` functions**
+3. ✗ **NEVER access CSV files directly outside the `io` module**
+4. ✗ **NEVER implement custom data loading/saving logic in routes or services**
+5. ✓ **Layer 2 functions are storage-agnostic** - no file I/O, no database access
+6. ✓ **Layer 3a/3b functions handle storage** - file or database operations only
+
+**Key Functions** (see detailed documentation in refactoring doc):
+
+**Observations Layer 2** (`io.observations`):
+- `make_observation_key()` - Create 7-tuple key (KK, O, JJ, MM, TT, EE, GG)
+- `add_observation()`, `update_observation()`, `delete_observation()` - CRUD
+- `sort_observations()` - HALO standard sort (J→M→T→ZS→ZM→K→E→GG)
+- `filter_observations()` - Flexible filtering with **kwargs
+- `validate_observation()` - Field validation and dependencies
+- `convert_legacy_observation()` - Legacy format conversion (d=255→0)
+
+**Observers** (`io.observers`):
+- `load_observers()`, `save_observers()` - File I/O
+- `find_observer_records()` - Find records for observer KK
+- `add_observer_record()`, `update_observer_record()`, `delete_observer_record()` - CRUD
+
+**Rationale**:
+- **Separation of Concerns**: Business logic (Layer 2) independent of storage (Layer 3)
+- **Testability**: Layer 2 tests work for both file and database implementations
+- **Cloud Migration**: Easy transition from files to database by swapping Layer 3
+- **Maintainability**: All data operations centralized in one module
+- **Consistency**: Enforced through mandatory usage rules
+
+**Testing**:
+- Layer 2 tests: `tests/io/test_observations_layer2.py` (12/12 passing)
+- Layer 2 tests are **100% reusable** for Layer 3a and 3b
+- Observer tests: `tests/io/test_observers.py`
+- See: `tests/README.md` for test architecture documentation
+
+**Migration Path**:
+- ✓ Phase 1: Observers refactored to use `io.observers` module (completed)
+- ✓ Phase 2: Layer 2 (Data Management) implemented and tested (completed)
+- ⏳ Phase 3: Layer 3a (File Operations) - in progress
+- 🔮 Phase 4: Layer 3b (Database Operations) - future cloud migration
+
+**Impact**: CRITICAL - This architecture enables future cloud database migration while maintaining clean, testable code structure.
+
 ### Internationalization
 - **Decision**: JSON-based i18n with runtime language switching
 - **Rationale**: 
@@ -1344,6 +1430,17 @@ This section tracks all architectural and implementation decisions in chronologi
 - ✓ Decision #011: Server-side data storage and state management (2025-12-24)
 - ✓ Decision #012: Do not use virtual environments (venv) for HALOpy (2025-12-25)
 - ✓ Decision #013: All API endpoints must be verified before use in frontend code (2025-12-29)
+
+### February 2026
+
+**2026-02-06**
+- ✓ Decision #029: 4-Layer Data Handling Architecture for observations and observers
+- ✓ Implemented Layer 2 (Data Management) - storage-agnostic business logic
+- ✓ Created comprehensive test suite for Layer 2 (12/12 tests passing)
+- ✓ Established mandatory rule: ALL data operations MUST use io module functions
+- ✓ Refactored observer operations to use centralized io.observers module
+- ✓ Created test infrastructure in tests/ directory for systematic testing
+- ✓ Documentation: 2026-02-06_observations_refactoring_concept.md
 
 ---
 

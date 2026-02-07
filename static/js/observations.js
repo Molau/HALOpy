@@ -544,8 +544,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filterDialog.removeEventListener('hidden.bs.modal', onModalHidden);
                 
                 const overlay = showLoadingOverlay(i18nStrings.messages.loading);
+                window.currentOverlay = overlay; // Store for access in display functions
                 
-                // Process filters after modal is fully hidden
+                // Process filters after modal is fully hidden - add delay for backdrop cleanup
                 setTimeout(async () => {
                     try {
 
@@ -567,9 +568,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                     } catch (error) {} finally {
                         applySpinner.style.display = 'none';
                         applyBtn.disabled = false;
-                        hideLoadingOverlay(overlay);
+                        if (window.currentOverlay) {
+                            hideLoadingOverlay(window.currentOverlay);
+                            window.currentOverlay = null;
+                        }
                     }
-                }, 50);
+                }, 350); // Increased delay to allow modal backdrop to fully disappear
             }, { once: true });
             
             modal.hide();
@@ -839,7 +843,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         return erg;
     }
     
-    function displayCompactView() {
+    async function displayCompactView() {
         compactView.style.display = 'block';
         detailView.style.display = 'none';
         btnExitObservations.style.display = 'block';
@@ -850,15 +854,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         const maxPage = Math.ceil(filteredObservations.length / pageSize);
         
         if (pageData.length === 0) {
-            showWarningModal(i18nStrings.messages.no_observations);
-            compactTbody.innerHTML = '';
-            btnExitObservations.style.display = 'block';
-            // Hide pagination controls
-            btnFirstPage.style.display = 'none';
-            btnPrevPage.style.display = 'none';
-            btnNextPage.style.display = 'none';
-            btnLastPage.style.display = 'none';
-            compactPageInfo.textContent = '';
+            // Hide overlay BEFORE showing modal to prevent backdrop interference
+            if (window.currentOverlay) {
+                hideLoadingOverlay(window.currentOverlay);
+                window.currentOverlay = null;
+            }
+            await showWarningModal(i18nStrings.messages.no_observations);
+            // Return to main page after user closes warning
+            window.navigateInternal('/');
             return;
         }
         
@@ -881,14 +884,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         pageInfo.textContent = `${i18nStrings.common.row} ${startIndex + 1}-${endIndex} ${ofText} ${filteredObservations.length}`;
     }
     
-    function displayDetailView() {
+    async function displayDetailView() {
         // Hide all views - modal will display the observation
         compactView.style.display = 'none';
         detailView.style.display = 'none';
         btnExitObservations.style.display = 'none';
         
         if (filteredObservations.length === 0) {
-            showWarningModal(i18nStrings.messages.no_observations);
+            // Hide overlay BEFORE showing modal to prevent backdrop interference
+            if (window.currentOverlay) {
+                hideLoadingOverlay(window.currentOverlay);
+                window.currentOverlay = null;
+            }
+            await showWarningModal(i18nStrings.messages.no_observations);
+            // Return to main page after user closes warning
+            window.navigateInternal('/');
             return;
         }
         

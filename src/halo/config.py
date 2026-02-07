@@ -23,8 +23,11 @@ def _has_aws_parameter_store_access():
         # Attempt to read a parameter (we don't need the value, just check access)
         ssm.get_parameter(Name='/halopy/passwords/admin', WithDecryption=True)
         return True
-    except (ImportError, BotoCoreError, ClientError, Exception):
-        # boto3 not available, no AWS credentials, or Parameter Store not accessible
+    except ImportError:
+        # boto3 not available
+        return False
+    except Exception:
+        # Any other error (no AWS credentials, Parameter Store not accessible, etc.)
         return False
 
 
@@ -82,3 +85,19 @@ def is_local_mode():
         bool: True if running locally, False if cloud
     """
     return get_deployment_mode() == 'local'
+
+
+def get_cloud_server_url():
+    """
+    Get the cloud server base URL for upload/download operations.
+    
+    Returns:
+        str: Cloud server URL (e.g., 'https://halo.online')
+    
+    Environment Variable:
+        HALOPY_CLOUD_SERVER_URL: Override default cloud server URL
+    
+    Default:
+        https://halo.online
+    """
+    return os.environ.get('HALOPY_CLOUD_SERVER_URL', 'https://halo.online')
