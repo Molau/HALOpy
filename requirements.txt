@@ -5,6 +5,9 @@
 flask>=3.0.0
 python-dotenv>=1.0.0
 
+# Production WSGI Server
+uwsgi>=2.0.0
+
 # Cloud Authentication (AWS Parameter Store)
 boto3>=1.34.0
 bcrypt>=4.1.0
