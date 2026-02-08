@@ -9,6 +9,9 @@ python-dotenv>=1.0.0
 boto3>=1.34.0
 bcrypt>=4.1.0
 
+# PostgreSQL Database (Cloud Mode)
+psycopg2-binary>=2.9.0
+
 # Graphics and Data Processing
 # Note: matplotlib 3.7.x is the last version with 32-bit Windows wheels for Python 3.11
 matplotlib>=3.7.0,<3.8.0
