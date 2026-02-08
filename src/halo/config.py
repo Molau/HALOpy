@@ -5,6 +5,10 @@ Detects deployment mode (local vs cloud) and provides configuration settings.
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load .env file if present (for cloud deployment configuration)
+load_dotenv()
 
 
 def _has_aws_parameter_store_access():
@@ -42,31 +46,41 @@ def get_deployment_mode():
         str: 'local' or 'cloud'
     
     Detection Order:
-        1. HALOPY_DEPLOYMENT environment variable (manual override)
-        2. Automatic AWS Parameter Store access check
-        3. Default to 'local' if neither applies
+        1. HALOPY_MODE environment variable (primary, from .env file)
+        2. HALOPY_DEPLOYMENT environment variable (legacy, manual override)
+        3. Automatic AWS Parameter Store access check
+        4. Default to 'local' if neither applies
     
     Environment Variable:
-        HALOPY_DEPLOYMENT: Set to 'cloud', 'server', or 'production' for cloud mode.
+        HALOPY_MODE: Set to 'cloud' for cloud mode, 'file' for local mode (recommended)
+        HALOPY_DEPLOYMENT: Set to 'cloud', 'server', or 'production' for cloud mode (legacy)
                           Set to 'local' to force local mode even with AWS access.
     
     Examples:
         Local (default): No environment variable needed, no AWS access
+        Cloud (via .env): Set HALOPY_MODE=cloud in .env file
         Cloud (manual): Set HALOPY_DEPLOYMENT=cloud
         Cloud (auto): AWS Parameter Store accessible (detected automatically)
     """
-    # 1. Check environment variable first (allows manual override)
-    mode = os.environ.get('HALOPY_DEPLOYMENT', '').lower()
+    # 1. Check HALOPY_MODE first (primary configuration method via .env)
+    mode = os.getenv('HALOPY_MODE', '').lower()
+    if mode == 'cloud':
+        return 'cloud'
+    if mode == 'file':
+        return 'local'
+    
+    # 2. Check HALOPY_DEPLOYMENT (legacy compatibility)
+    mode = os.getenv('HALOPY_DEPLOYMENT', '').lower()
     if mode in ['cloud', 'server', 'production']:
         return 'cloud'
     if mode == 'local':
         return 'local'
     
-    # 2. Auto-detect AWS Parameter Store access
+    # 3. Auto-detect AWS Parameter Store access
     if _has_aws_parameter_store_access():
         return 'cloud'
     
-    # 3. Default to local
+    # 4. Default to local
     return 'local'
 
 
@@ -104,3 +118,37 @@ def get_cloud_server_url():
         https://halo.online
     """
     return os.environ.get('HALOPY_CLOUD_SERVER_URL', 'https://halo.online')
+
+
+def get_database_url():
+    """
+    Get PostgreSQL database connection URL for cloud mode.
+    
+    Returns:
+        str or None: Database URL from environment variable, None if not set
+    
+    Environment Variable:
+        DATABASE_URL: PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/db)
+    
+    Example:
+        postgresql://postgres:password@localhost:5432/halodb
+    """
+    return os.getenv('DATABASE_URL')
+
+
+def get_secret_key():
+    """
+    Get Flask secret key for session encryption.
+    
+    Returns:
+        str or None: Secret key from environment variable, None if not set
+    
+    Environment Variable:
+        SECRET_KEY: Random secret key for Flask session encryption
+    
+    Security:
+        - MUST be set in production (cloud mode)
+        - Should be at least 32 bytes (64 hex characters)
+        - Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"
+    """
+    return os.getenv('SECRET_KEY')

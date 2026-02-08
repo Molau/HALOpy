@@ -57,6 +57,9 @@ config.json
 .env.local
 .env.*.local
 
+# Deployment documentation with sensitive server info
+docs/DEPLOYMENT_EC2.md
+
 # Temporary test files
 temp/
 *.$$$
