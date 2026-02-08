@@ -60,49 +60,6 @@ api_blueprint = Blueprint('api', __name__, url_prefix='/api')
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-# ============================================================================
-# Health Check Endpoint
-# ============================================================================
-
-@api_blueprint.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint for monitoring and load balancers.
-    
-    Returns:
-        JSON response with status, database connectivity, and version info.
-        - 200: OK - all systems operational
-        - 503: Service Unavailable - database connection failed
-    """
-    status = {
-        'status': 'ok',
-        'version': current_app.config.get('VERSION', '3.0.0'),
-        'mode': 'cloud' if is_cloud_mode() else 'local'
-    }
-    
-    # Test database connection in cloud mode
-    if is_cloud_mode():
-        try:
-            # Import here to avoid circular dependency issues
-            from halo.io.observations_db import test_connection
-            db_ok = test_connection()
-            status['database'] = 'connected' if db_ok else 'disconnected'
-            
-            if not db_ok:
-                status['status'] = 'degraded'
-                return jsonify(status), 503
-                
-        except Exception as e:
-            status['status'] = 'error'
-            status['database'] = 'error'
-            status['error'] = str(e)
-            return jsonify(status), 503
-    else:
-        status['database'] = 'file-based'
-    
-    return jsonify(status), 200
-
-# ============================================================================
 # Authentication API (Cloud Mode)
 # ============================================================================
 
@@ -386,7 +343,41 @@ def _format_lp8(e: int, ho: int | None, hu: int | None) -> str:
 
 @api_blueprint.route('/health', methods=['GET'])
 def health_check() -> Dict[str, Any]:
-    return jsonify({'status': 'ok', 'version': '3.0.2', 'service': 'HALO API'})
+    """Health check endpoint for monitoring and load balancers.
+    
+    Returns:
+        JSON response with status, database connectivity, and version info.
+        - 200: OK - all systems operational
+        - 503: Service Unavailable - database connection failed
+    """
+    status = {
+        'status': 'ok',
+        'version': current_app.config.get('VERSION', '3.0.2'),
+        'service': 'HALO API',
+        'mode': 'cloud' if is_cloud_mode() else 'local'
+    }
+    
+    # Test database connection in cloud mode
+    if is_cloud_mode():
+        try:
+            # Import here to avoid circular dependency issues
+            from halo.io.observations_db import test_connection
+            db_ok = test_connection()
+            status['database'] = 'connected' if db_ok else 'disconnected'
+            
+            if not db_ok:
+                status['status'] = 'degraded'
+                return jsonify(status), 503
+                
+        except Exception as e:
+            status['status'] = 'error'
+            status['database'] = 'error'
+            status['error'] = str(e)
+            return jsonify(status), 503
+    else:
+        status['database'] = 'file-based'
+    
+    return jsonify(status), 200
 
 
 @api_blueprint.route('/language', methods=['GET'])
