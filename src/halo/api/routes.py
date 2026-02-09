@@ -54,6 +54,11 @@ import halo.io.observations_file as obs_file
 import halo.io.observers as observer_logic
 import halo.io.observers_file as observer_file
 
+# NEW CODE - Layer 3b: Database operations for cloud mode
+import halo.io.observations_db as obs_db
+import halo.io.observers_db as observer_db
+from halo.io import db_connection
+
 api_blueprint = Blueprint('api', __name__, url_prefix='/api')
 
 
@@ -360,9 +365,8 @@ def health_check() -> Dict[str, Any]:
     # Test database connection in cloud mode
     if is_cloud_mode():
         try:
-            # Import here to avoid circular dependency issues
-            from halo.io.observations_db import test_connection
-            db_ok = test_connection()
+            # Test database connection using shared connection module
+            db_ok = db_connection.test_connection()
             status['database'] = 'connected' if db_ok else 'disconnected'
             
             if not db_ok:
@@ -575,7 +579,7 @@ def _spaeter(a, b) -> int:
 
 @api_blueprint.route('/observations', methods=['POST'])
 def add_observation() -> Dict[str, Any]:
-    """Add a new observation to the in-memory list at the correct sorted position (Zahleneingabe)."""
+    """Add a new observation to the in-memory list or database (Zahleneingabe)."""
     
     data = request.get_json() or {}
 
@@ -594,25 +598,38 @@ def add_observation() -> Dict[str, Any]:
         obs.sectors = data.get('sectors', '') or ''
         obs.remarks = data.get('remarks', '') or ''
 
-        observations = current_app.config.get('OBSERVATIONS') or []
-        
-        # Check for duplicate observation using spaeter() comparison
-        for existing in observations:
-            if _spaeter(obs, existing) == 0:
-                # All key fields match - this is a duplicate
+        if is_cloud_mode():
+            # Cloud Mode: Save to database
+            success = obs_db.save_one(obs)
+            if not success:
                 return jsonify({'error': 'duplicate'}), 409
-        
-        # Find correct insertion position using spaeter() comparison
-        insert_pos = len(observations)
-        for i, existing in enumerate(observations):
-            if _spaeter(obs, existing) < 1:  # obs comes before or equal to existing
-                insert_pos = i
-                break
-        
-        observations.insert(insert_pos, obs)
-        current_app.config['OBSERVATIONS'] = observations
+            
+            # Reload from database to update in-memory cache
+            observations = obs_db.load_all()
+            current_app.config['OBSERVATIONS'] = observations
+            
+            return jsonify({'success': True, 'count': len(observations)})
+        else:
+            # Local Mode: In-memory operations
+            observations = current_app.config.get('OBSERVATIONS') or []
+            
+            # Check for duplicate observation using spaeter() comparison
+            for existing in observations:
+                if _spaeter(obs, existing) == 0:
+                    # All key fields match - this is a duplicate
+                    return jsonify({'error': 'duplicate'}), 409
+            
+            # Find correct insertion position using spaeter() comparison
+            insert_pos = len(observations)
+            for i, existing in enumerate(observations):
+                if _spaeter(obs, existing) < 1:  # obs comes before or equal to existing
+                    insert_pos = i
+                    break
+            
+            observations.insert(insert_pos, obs)
+            current_app.config['OBSERVATIONS'] = observations
 
-        return jsonify({'success': True, 'count': len(observations)})
+            return jsonify({'success': True, 'count': len(observations)})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -623,28 +640,47 @@ def delete_observation() -> Dict[str, Any]:
     data = request.get_json() or {}
 
     try:
-        observations = current_app.config.get('OBSERVATIONS') or []
-        
-        # Find observation to delete by matching key fields
-        # Match by: KK, O, JJ, MM, TT, EE, GG (unique identifier)
-        original_obs = None
-        for i, obs in enumerate(observations):
-            if (obs.KK == data.get('KK') and
-                obs.O == data.get('O') and
-                obs.JJ == data.get('JJ') and
-                obs.MM == data.get('MM') and
-                obs.TT == data.get('TT') and
-                obs.EE == data.get('EE') and
-                obs.GG == data.get('GG')):
-                original_obs = i
-                break
-        
-        if original_obs is not None:
-            observations.pop(original_obs)
+        if is_cloud_mode():
+            # Cloud Mode: Delete from database
+            key = (
+                data.get('KK'), data.get('O'), data.get('JJ'),
+                data.get('MM'), data.get('TT'), data.get('EE'), data.get('GG')
+            )
+            success = obs_db.delete_one(key)
+            
+            # Reload from database to update in-memory cache
+            observations = obs_db.load_all()
             current_app.config['OBSERVATIONS'] = observations
-            return jsonify({'success': True, 'deleted': True, 'count': len(observations)})
+            
+            return jsonify({
+                'success': True,
+                'deleted': success,
+                'count': len(observations)
+            })
         else:
-            return jsonify({'success': False, 'deleted': False, 'count': len(observations)})
+            # Local Mode: Delete from in-memory list
+            observations = current_app.config.get('OBSERVATIONS') or []
+            
+            # Find observation to delete by matching key fields
+            # Match by: KK, O, JJ, MM, TT, EE, GG (unique identifier)
+            original_obs = None
+            for i, obs in enumerate(observations):
+                if (obs.KK == data.get('KK') and
+                    obs.O == data.get('O') and
+                    obs.JJ == data.get('JJ') and
+                    obs.MM == data.get('MM') and
+                    obs.TT == data.get('TT') and
+                    obs.EE == data.get('EE') and
+                    obs.GG == data.get('GG')):
+                    original_obs = i
+                    break
+            
+            if original_obs is not None:
+                observations.pop(original_obs)
+                current_app.config['OBSERVATIONS'] = observations
+                return jsonify({'success': True, 'deleted': True, 'count': len(observations)})
+            else:
+                return jsonify({'success': False, 'deleted': False, 'count': len(observations)})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -862,7 +898,7 @@ def get_statistics() -> Dict[str, Any]:
     """
     
     csv_handler = ObservationCSV()
-    data_path = Path(__file__).parent.parent.parent.parent / 'data' / 'ALLE.CSV'
+    data_path = obs_file.get_data_path('ALLE.CSV')
     
     try:
         observations, needs_conversion = csv_handler.read_observations(str(data_path))
@@ -895,7 +931,7 @@ def get_statistics() -> Dict[str, Any]:
 @api_blueprint.route('/files', methods=['GET'])
 def list_files() -> Dict[str, Any]:
     """List available .HAL and .CSV files in data directory"""
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
+    datapath = obs_file.get_data_path()
     if not datapath.exists():
         return jsonify({'error': 'data_directory_not_found'}), 404
     
@@ -930,10 +966,9 @@ def new_file() -> Dict[str, Any]:
     if not filename.lower().endswith('.csv'):
         filename += '.csv'
     
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    filepath = os.path.join(str(datapath), filename)
+    filepath = obs_file.get_data_path(filename)
     
-    if os.path.exists(filepath):
+    if filepath.exists():
         return jsonify({'error': 'file_already_exists'}), 400
     
     try:
@@ -1063,34 +1098,55 @@ def load_file(filename: str) -> Dict[str, Any]:
     """Load observation file from data folder - implements 'Datei -> Laden' from HALO.PAS laden()
     
     Supports both GET and POST methods for convenience.
+    Cloud Mode: Loads from PostgreSQL database instead of file.
     """
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    filepath = datapath / filename
-    
-    if not filepath.exists():
-        return jsonify({'error': 'File not found'}), 404
-    
     try:
-        observations = obs_file.open_file(filename)
-        
-        # Store in app config
-        current_app.config['LOADED_FILE'] = filename
-        current_app.config['OBSERVATIONS'] = observations
-        current_app.config['DIRTY'] = False
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'count': len(observations),
-            'converted': False  # obs_file.open_file() handles legacy conversion internally
-        })
+        if is_cloud_mode():
+            # Cloud Mode: Load from database
+            observations = obs_db.load_all()
+            
+            # Store in app config (filename is ignored in cloud mode)
+            current_app.config['LOADED_FILE'] = 'cloud-database'
+            current_app.config['OBSERVATIONS'] = observations
+            current_app.config['DIRTY'] = False
+            
+            return jsonify({
+                'success': True,
+                'filename': 'PostgreSQL Database',
+                'count': len(observations),
+                'converted': False
+            })
+        else:
+            # Local Mode: Load from file
+            filepath = obs_file.get_data_path(filename)
+            
+            if not filepath.exists():
+                return jsonify({'error': 'File not found'}), 404
+            
+            observations = obs_file.open_file(filename)
+            
+            # Store in app config
+            current_app.config['LOADED_FILE'] = filename
+            current_app.config['OBSERVATIONS'] = observations
+            current_app.config['DIRTY'] = False
+            
+            return jsonify({
+                'success': True,
+                'filename': filename,
+                'count': len(observations),
+                'converted': False  # obs_file.open_file() handles legacy conversion internally
+            })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
 @api_blueprint.route('/file/save', methods=['POST'])
 def save_file() -> Dict[str, Any]:
-    """Save current observations to disk - triggers browser download"""
+    """Save current observations to disk or database.
+    
+    Local Mode: Triggers browser download of CSV file.
+    Cloud Mode: Saves to PostgreSQL database (no download).
+    """
     filename = current_app.config.get('LOADED_FILE')
     if not filename:
         return jsonify({'error': 'No file loaded'}), 400
@@ -1098,25 +1154,38 @@ def save_file() -> Dict[str, Any]:
     observations = current_app.config.get('OBSERVATIONS', [])
     
     try:
-        datapath = Path(__file__).parent.parent.parent.parent / 'data'
-        filepath = datapath / filename
-        obs_file.save_file(observations, filepath)
-        
-        # Read file back for download
-        with open(filepath, 'rb') as f:
-            csv_bytes = f.read()
-        csv_io = io.BytesIO(csv_bytes)
-        csv_io.seek(0)
-        
-        current_app.config['DIRTY'] = False
-        
-        # Return file as download
-        return send_file(
-            csv_io,
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=filename
-        )
+        if is_cloud_mode():
+            # Cloud Mode: Save to database
+            # Note: Individual observations already saved via POST /observations
+            # This endpoint just marks state as clean
+            current_app.config['DIRTY'] = False
+            
+            return jsonify({
+                'success': True,
+                'filename': 'PostgreSQL Database',
+                'count': len(observations),
+                'message': 'Changes saved to database'
+            })
+        else:
+            # Local Mode: Save to file and download
+            filepath = obs_file.get_data_path(filename)
+            obs_file.save_file(observations, filepath)
+            
+            # Read file back for download
+            with open(filepath, 'rb') as f:
+                csv_bytes = f.read()
+            csv_io = io.BytesIO(csv_bytes)
+            csv_io.seek(0)
+            
+            current_app.config['DIRTY'] = False
+            
+            # Return file as download
+            return send_file(
+                csv_io,
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=filename
+            )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1496,33 +1565,63 @@ def upload_observers() -> Dict[str, Any]:
                 if len(obs_record) >= 1 and obs_record[0] != str(authenticated_kk):
                     return jsonify({'error': 'observer_kk_mismatch', 'details': {'expected': authenticated_kk, 'found': obs_record[0]}}), 403
         
-        # Load existing observers (Layer 3a)
-        existing_observers, _ = observer_file.open_file()
-        
-        # Replace mode: Remove all existing records for uploaded observers
-        uploaded_kks = set()
-        for obs_record in observers:
-            if len(obs_record) >= 1:
-                uploaded_kks.add(obs_record[0])
-        
-        # Keep only observers NOT in the upload
-        filtered_observers = [obs for obs in existing_observers if obs[0] not in uploaded_kks]
-        
-        # Add new observers
-        filtered_observers.extend(observers)
-        
-        # Sort (Layer 2)
-        filtered_observers = observer_logic.sort_observers(filtered_observers)
-        
-        # Save to file (Layer 3a)
-        observer_file.save_file(filtered_observers)
-        current_app.config['OBSERVERS'] = filtered_observers
-        
-        return jsonify({
-            'success': True,
-            'count': len(observers),
-            'total_count': len(filtered_observers)
-        })
+        if is_cloud_mode():
+            # Cloud Mode: Save to database
+            # Replace mode: Remove all existing records for uploaded observers
+            uploaded_kks = set()
+            for obs_record in observers:
+                if len(obs_record) >= 1:
+                    uploaded_kks.add(int(obs_record[0]))
+            
+            # Delete existing records for uploaded KKs
+            for kk in uploaded_kks:
+                existing_records = observer_db.load_filtered(kk=kk)
+                for record in existing_records:
+                    # Delete by kk and since (unique key)
+                    observer_db.delete_one(int(record[0]), record[2])
+            
+            # Add new observer records to database
+            for obs_record in observers:
+                observer_db.save_one(obs_record)
+            
+            # Reload from database
+            all_observers = observer_db.load_all()
+            current_app.config['OBSERVERS'] = all_observers
+            
+            return jsonify({
+                'success': True,
+                'count': len(observers),
+                'total_count': len(all_observers)
+            })
+        else:
+            # Local Mode: File-based operations
+            # Load existing observers (Layer 3a)
+            existing_observers, _ = observer_file.open_file()
+            
+            # Replace mode: Remove all existing records for uploaded observers
+            uploaded_kks = set()
+            for obs_record in observers:
+                if len(obs_record) >= 1:
+                    uploaded_kks.add(obs_record[0])
+            
+            # Keep only observers NOT in the upload
+            filtered_observers = [obs for obs in existing_observers if obs[0] not in uploaded_kks]
+            
+            # Add new observers
+            filtered_observers.extend(observers)
+            
+            # Sort (Layer 2)
+            filtered_observers = observer_logic.sort_observers(filtered_observers)
+            
+            # Save to file (Layer 3a)
+            observer_file.save_file(filtered_observers)
+            current_app.config['OBSERVERS'] = filtered_observers
+            
+            return jsonify({
+                'success': True,
+                'count': len(observers),
+                'total_count': len(filtered_observers)
+            })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1555,8 +1654,12 @@ def download_observers() -> Dict[str, Any]:
             if not authenticated_kk and not is_admin:
                 return jsonify({'error': 'Nicht authentifiziert. Bitte neu anmelden.'}), 401
         
-        # Load observers (Layer 3a)
-        all_observers, _ = observer_file.open_file()
+        if is_cloud_mode():
+            # Cloud Mode: Load from database
+            all_observers = observer_db.load_all()
+        else:
+            # Local Mode: Load from file (Layer 3a)
+            all_observers, _ = observer_file.open_file()
         
         if not all_observers:
             return jsonify({'error': 'no_observers'}), 404
@@ -1597,8 +1700,7 @@ def autosave_old() -> Dict[str, Any]:
     base_name = os.path.splitext(filename)[0]
     temp_filename = f"{base_name}.$$$"
     
-    datapath = Path(__file__).parent.parent.parent.parent / 'data'
-    temp_filepath = datapath / temp_filename
+    temp_filepath = obs_file.get_data_path(temp_filename)
     
     try:
         obs_file.create_temp_backup(temp_filename, observations)
@@ -5349,7 +5451,7 @@ def analyze_observations() -> Dict[str, Any]:
         observations = current_app.config.get('OBSERVATIONS', [])
         if not observations:
             csv_handler = ObservationCSV()
-            data_path = Path(__file__).parent.parent.parent.parent / 'data' / 'ALLE.CSV'
+            data_path = obs_file.get_data_path('ALLE.CSV')
             observations, needs_conversion = csv_handler.read_observations(str(data_path))
             # Auto-convert legacy format
             if needs_conversion:

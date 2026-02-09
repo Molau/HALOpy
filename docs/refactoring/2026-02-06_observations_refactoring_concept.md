@@ -66,9 +66,10 @@ src/halo/io/
 
 ### Verantwortlichkeiten:
 - **Storage-agnostisch**: Weiß NICHT ob File oder Database
-- **Business Logic**: Validierung, Sortierung, Duplikate
+- **Business Logic**: Validierung, Duplikat-Prüfung
 - **Format-Konvertierung**: Legacy → Modern
 - **Collection Management**: Add, Update, Delete, Filter, Merge
+- **Sorting**: Nur für In-Memory Collections (Tests) - Layer 3 sortiert beim I/O
 
 ### Funktionen:
 
@@ -96,7 +97,11 @@ def filter_observations(collection: List[Observation],
     """Filter observations by criteria (observer, date range, halo type, etc.)."""
     
 def sort_observations(collection: List[Observation]) -> List[Observation]:
-    """Sort observations by HALO standard: J→M→T→ZS→ZM→K→E→gg."""
+    """Sort observations by HALO standard: J→M→T→ZS→ZM→K→E→gg.
+    
+    NOTE: Only needed for in-memory collections (tests, debugging).
+    Layer 3a (file) sorts on save, Layer 3b (database) sorts via ORDER BY.
+    """
     
 def merge_observations(current: List[Observation], 
                       new: List[Observation], 
@@ -194,38 +199,286 @@ def clean_temp_files(max_age_hours: int = 24) -> int:
 
 ---
 
-## Layer 3b: Database Storage (`observations_db.py`) - ZUKUNFT
+## Layer 3b: Database Storage (`observations_db.py`) - IMPLEMENTATION PLAN
+
+### Status: **PLANNED - 2026-02-09**
 
 ### Verantwortlichkeiten:
-- **Database Connection**: SQLite oder PostgreSQL
-- **CRUD Operations**: Direkt auf DB
-- **Transactions**: Atomare Operationen
-- **Migration**: Von File zu DB
+- **Pure SQL Operations**: CRUD direkt auf PostgreSQL
+- **No Business Logic**: Keine Validierung, Sortierung, Duplikat-Prüfung
+- **Transactions**: Atomare Operationen für Bulk-Import
+- **SQL ORDER BY**: Database übernimmt Sortierung (nicht Python)
 
-### Funktionen (Zukunft):
+### Architektur-Prinzipien:
+
+**WICHTIG:** Connection Management ist NICHT pro Modul!
+- Connection-Funktionen sind **generisch** (wie i18n)
+- Werden in separatem `db_connection.py` Modul implementiert
+- Alle DB-Module nutzen das gleiche Connection-Modul
+
+**Analog zu Layer 3a (File Storage):**
+- Layer 3a hat KEINE business logic (nur I/O)
+- Layer 3b hat KEINE business logic (nur SQL)
+- Beide implementieren gleiche Schnittstelle für Layer 2
+
+---
+
+### Modul-Struktur:
+
+```
+src/halo/io/
+├── db_connection.py          # NEU: Generische DB-Connection (shared)
+│   ├── get_connection()      # Get psycopg2 connection
+│   └── test_connection()     # Test if DB is reachable
+│
+├── observations_db.py         # NEU: Observations DB Operations
+│   ├── load_all()
+│   ├── load_filtered()
+│   ├── save_one()            # INSERT (fails on conflict)
+│   ├── update_one()          # UPDATE (proper SQL UPDATE, not delete+insert!)
+│   ├── delete_one()
+│   ├── save_many()           # Bulk INSERT (transaction)
+│   └── count()
+│
+└── observers_db.py            # NEU: Observers DB Operations
+    ├── load_all()
+    ├── load_filtered()       # Filter by any field (kk, active, region, etc.)
+    ├── save_one()
+    ├── update_one()
+    ├── delete_one()
+    └── count()
+```
+
+---
+
+### Shared Module: `db_connection.py`
+
+**Zweck:** Generisches Connection-Management für alle DB-Operationen
+
+**Funktionen:**
 
 ```python
-def connect_database(connection_string: str) -> DatabaseConnection:
-    """Connect to observation database."""
+def get_connection() -> psycopg2.connection:
+    """
+    Get PostgreSQL database connection.
     
-def get_observations(filters: dict = None) -> List[Observation]:
-    """Get observations from database with optional filters."""
+    - Liest DATABASE_URL aus config.py
+    - Gibt aktive psycopg2.connection zurück
+    - Raises ValueError wenn DATABASE_URL nicht konfiguriert
+    """
+
+def test_connection() -> bool:
+    """
+    Test if database is reachable.
     
-def save_observation(obs: Observation) -> int:
-    """Save single observation, return ID."""
-    
-def update_observation(obs_id: int, obs: Observation) -> bool:
-    """Update observation in database."""
-    
-def delete_observation(obs_id: int) -> bool:
-    """Delete observation from database."""
-    
-def bulk_import(observations: List[Observation]) -> int:
-    """Bulk import observations, return count."""
-    
-def migrate_from_file(filepath: Path) -> int:
-    """Migrate observations from file to database."""
+    - Führt SELECT 1 aus
+    - Returns True bei Erfolg, False bei Fehler
+    - Verwendet get_connection() intern
+    """
 ```
+
+---
+
+### Module: `observations_db.py`
+
+#### Mapping: Python ↔ PostgreSQL
+
+**WICHTIG:** Database-Schema ist bereits festgelegt in `scripts/setup_database.sql`
+
+```python
+# Python Observation Object (uppercase fields):
+obs = Observation(
+    KK=44, O=1, JJ=25, MM=12, TT=31, g=0,
+    ZS=15, ZM=30, d=4, DD=12, N=8, C=2, c=0,
+    EE=22, H=2, F=1, V=2, f=0, zz=0, GG=26,
+    HO=0, HU=0, sectors="3-4-5", remarks="Test"
+)
+
+# PostgreSQL Table (lowercase columns):
+INSERT INTO observations (
+    kk, o, jj, mm, tt, g,
+    zs, zm, d, dd, n, c, cc,
+    ee, h, f, v, ff, zz, gg,
+    pillar, sectors, remarks
+) VALUES (
+    44, 1, 25, 12, 31, 0,
+    15, 30, 4, 12, 8, 2, 0,
+    22, 2, 1, 2, 0, 0, 26,
+    '', '3-4-5', 'Test'
+)
+```
+
+**Pillar Field Mapping:**
+```python
+# Python: Separate HO/HU fields
+obs.HO = 15  # Upper angle
+obs.HU = 20  # Lower angle
+
+# PostgreSQL: Combined pillar string
+pillar = f"8{obs.HO:02d}{obs.HU:02d}"  # "81520"
+```
+
+---
+
+#### Funktionen: `observations_db.py`
+
+**READ Operations:**
+
+```python
+def load_all() -> List[Observation]:
+    """Load all observations, sorted by HALO standard (jj,mm,tt,zs,zm,kk,ee,gg)"""
+
+def load_filtered(**filters) -> List[Observation]:
+    """
+    Load observations with filters (any HALO Key field).
+    
+    Supports: kk, o, jj, mm, tt, g, zs, zm, ee, gg, d, dd, n, c, cc, h, f, v, ff, zz
+    Range filters: jj=(20,25), mm=(1,3)
+    
+    SQL: Dynamic WHERE clause + ORDER BY
+    """
+
+def count() -> int:
+    """Count total observations - SELECT COUNT(*) FROM observations"""
+```
+
+**WRITE Operations:**
+
+```python
+def save_one(obs: Observation) -> bool:
+    """
+    Insert new observation (fails on duplicate key).
+    
+    Returns: True if inserted, False if conflict
+    SQL: INSERT INTO observations ... (no ON CONFLICT)
+    """
+
+def update_one(key: Tuple, obs: Observation) -> bool:
+    """
+    Update existing observation (proper SQL UPDATE, not delete+insert).
+    
+    Args:
+        key: 7-tuple (KK, O, JJ, MM, TT, EE, GG)
+        obs: Updated observation
+    
+    Returns: True if updated, False if not found
+    SQL: UPDATE observations SET ... WHERE kk=? AND o=? AND ...
+    """
+
+def delete_one(key: Tuple) -> bool:
+    """
+    Delete observation by key.
+    
+    Returns: True if deleted, False if not found
+    SQL: DELETE FROM observations WHERE kk=? AND o=? AND ...
+    """
+
+def save_many(observations: List[Observation]) -> int:
+    """
+    Bulk insert with transaction (skips duplicates).
+    
+    Returns: Number of observations inserted
+    SQL: BEGIN; INSERT ...; INSERT ...; COMMIT;
+    """
+```
+
+**Helper Functions:**
+
+```python
+def _observation_to_tuple(obs: Observation) -> Tuple:
+    """Convert Observation to tuple for SQL (uppercase→lowercase, HO/HU→pillar)"""
+
+def _tuple_to_observation(row: Tuple) -> Observation:
+    """Convert DB row to Observation (lowercase→uppercase, pillar→HO/HU)"""
+```
+
+---
+
+### Module: `observers_db.py`
+
+**READ Operations:**
+
+```python
+def load_all() -> List[List[str]]:
+    """Load all observer records, sorted by kk, since"""
+
+def load_filtered(**filters) -> List[List[str]]:
+    """
+    Load observer records with filters.
+    
+    Supports: kk, active, since, first_name, last_name, 
+              primary_site, primary_region, secondary_site, secondary_region
+    String fields: LIKE for partial matching
+    
+    SQL: Dynamic WHERE clause + ORDER BY kk, since
+    """
+
+def count() -> int:
+    """Count total observer records - SELECT COUNT(*) FROM observers"""
+```
+
+**WRITE Operations:**
+
+```python
+def save_one(record: List[str]) -> bool:
+    """
+    Insert new observer record (21 fields).
+    
+    Returns: True if inserted, False if conflict (kk,since)
+    SQL: INSERT INTO observers ...
+    """
+
+def update_one(kk: int, seit: str, record: List[str]) -> bool:
+    """
+    Update existing observer record.
+    
+    Returns: True if updated, False if not found
+    SQL: UPDATE observers SET ... WHERE kk=? AND since=?
+    """
+
+def delete_one(kk: int, seit: str) -> bool:
+    """
+    Delete observer record.
+    
+    Returns: True if deleted, False if not found
+    SQL: DELETE FROM observers WHERE kk=? AND since=?
+    """
+```
+
+---
+
+### Key Design Decisions:
+
+#### 1. ✅ Shared Connection Module
+- **ONE** `db_connection.py` for ALL database operations
+- Avoids code duplication across observations_db and observers_db
+- Consistent error handling and connection management
+
+#### 2. ✅ Proper UPDATE Operations
+- Database Layer 3b uses **SQL UPDATE** (not delete+insert)
+- File Layer 3a uses delete+insert only because of sort-order requirement
+- Database sorting via `ORDER BY` in queries, not in storage
+
+#### 3. ✅ save_one() Fails on Conflict
+- Matches file interface behavior
+- No automatic UPSERT (use update_one() explicitly)
+- Database UNIQUE constraint enforces uniqueness
+
+#### 4. ✅ load_filtered() Supports All HALO Key Fields
+- Generic **kwargs approach
+- Builds dynamic WHERE clause
+- Supports single values and ranges (tuples)
+
+#### 5. ✅ No delete_all()
+- Not needed for normal operations
+- Admin can use SQL directly if needed
+- Reduces risk of accidental data loss
+
+#### 6. ✅ Schema Already Defined
+- Uses existing `scripts/setup_database.sql`
+- Lowercase column names in PostgreSQL
+- Uppercase field names in Python Observation objects
+- Helper functions handle mapping
 
 ---
 
@@ -245,33 +498,30 @@ current_app.config['LOADED_FILE'] = filename
 
 #### Local Mode (File-basiert):
 ```python
-from halo.io.observations import sort_observations, needs_conversion, convert_legacy_format
+from halo.io.observations import needs_conversion, convert_legacy_format
 from halo.io.observations_file import open_file, save_file
 
-# Layer 3a: File I/O
+# Layer 3a: File I/O (already sorted from file)
 observations, filepath = open_file(filename)
 
 # Layer 2: Data Management
 if needs_conversion(observations):
     observations = [convert_legacy_format(obs) for obs in observations]
-    save_file(observations, filepath)  # Convert and save
+    save_file(observations, filepath)  # Convert and save (Layer 3a sorts on save)
 
-observations = sort_observations(observations)
+# Observations are already sorted - no need to sort again
 current_app.config['OBSERVATIONS'] = observations
 current_app.config['LOADED_FILE'] = filename
 ```
 
-#### Cloud Mode (Datenbank - Zukunft):
+#### Cloud Mode (Datenbank):
 ```python
-from halo.io.observations import sort_observations, filter_observations
-from halo.io.observations_db import connect_database, get_observations
+from halo.io import observations_db
 
-# Layer 3b: Database I/O
-db = connect_database(app.config['DATABASE_URL'])
-observations = get_observations()  # Alle laden
+# Layer 3b: Database I/O (already sorted via SQL ORDER BY)
+observations = observations_db.load_all()
 
-# Layer 2: Data Management (gleicher Code!)
-observations = sort_observations(observations)
+# Observations are already sorted - no Layer 2 sorting needed
 current_app.config['OBSERVATIONS'] = observations
 ```
 
@@ -436,10 +686,22 @@ class ObservationStorage(Protocol):
   - Unterstützt backup files (*.bak extension)
   - Path resolution: Absolute oder relativ zu data/
 
-### 🔮 Phase 3: Layer 3b (Database Operations) - TODO
-- Für zukünftige Cloud-Migration
-- SQLite oder PostgreSQL
-- Analog zu Layer 3a, aber mit DB-Backend
+### 🔮 Phase 3: Layer 3b (Database Operations) - ✓ COMPLETED
+- **Datum**: 2026-02-09
+- **Module**: `db_connection.py`, `observations_db.py`, `observers_db.py`
+- **Status**: ✅ Implementation abgeschlossen
+- **Funktionen**:
+  - **db_connection.py**: `get_connection()`, `test_connection()`
+  - **observations_db.py**: `load_all()`, `load_filtered(**filters)`, `save_one()`, `update_one()`, `delete_one()`, `save_many()`, `count()`
+  - **observers_db.py**: `load_all()`, `load_filtered(**filters)`, `save_one()`, `update_one()`, `delete_one()`, `count()`
+- **Design**:
+  - Shared connection module (nicht pro Modul)
+  - Proper SQL UPDATE (nicht delete+insert)
+  - save_one() fails on conflict (kein UPSERT)
+  - load_filtered() mit **kwargs für alle Felder
+  - Sortierung via SQL ORDER BY
+  - Helper functions: _observation_to_tuple(), _tuple_to_observation()
+- **Nächste Schritte**: Integration in routes.py für Cloud Mode
 
 ---
 

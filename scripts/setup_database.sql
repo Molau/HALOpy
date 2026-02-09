@@ -166,20 +166,13 @@ CREATE TRIGGER update_observations_updated_at BEFORE UPDATE ON observations
 -- ============================================================================
 -- CSV Import Commands
 -- ============================================================================
--- IMPORTANT: Clean CSV files before import to remove NULL characters
--- NULL characters before line endings cause "extra data after last expected column" errors
+-- After creating the tables, import CSV data using these commands:
 
--- Step 1: Remove NULL characters from CSV files:
--- sed 's/\x00//g' /home/ubuntu/halopy/observations.csv > /home/ubuntu/halopy/observations_clean.csv
--- sed 's/\x00//g' /home/ubuntu/halopy/halobeo.csv > /home/ubuntu/halopy/halobeo_clean.csv
+-- Import observers (halobeo.csv):
+-- \COPY observers(kk,first_name,last_name,since,active,primary_site,primary_region,primary_lon_deg,primary_lon_min,primary_lon_dir,primary_lat_deg,primary_lat_min,primary_lat_dir,secondary_site,secondary_region,secondary_lon_deg,secondary_lon_min,secondary_lon_dir,secondary_lat_deg,secondary_lat_min,secondary_lat_dir) FROM '/home/ubuntu/halopy/halobeo.csv' WITH (FORMAT csv, DELIMITER ',', NULL '');
 
--- Step 2: Import cleaned CSV files:
-
--- Import observers (halobeo_clean.csv):
--- \COPY observers(kk,first_name,last_name,since,active,primary_site,primary_region,primary_lon_deg,primary_lon_min,primary_lon_dir,primary_lat_deg,primary_lat_min,primary_lat_dir,secondary_site,secondary_region,secondary_lon_deg,secondary_lon_min,secondary_lon_dir,secondary_lat_deg,secondary_lat_min,secondary_lat_dir) FROM '/home/ubuntu/halopy/halobeo_clean.csv' WITH (FORMAT csv, DELIMITER ',', NULL '');
-
--- Import observations (observations_clean.csv):
--- \COPY observations(kk,o,jj,mm,tt,g,zs,zm,d,dd,n,c,cc,ee,h,f,v,ff,zz,gg,pillar,sectors,remarks) FROM '/home/ubuntu/halopy/observations_clean.csv' WITH (FORMAT csv, DELIMITER ',', NULL '', QUOTE '"');
+-- Import observations (adjust field mapping based on your CSV structure):
+-- \COPY observations(kk,o,jj,mm,tt,g,zs,zm,d,dd,n,c,cc,ee,h,f,v,ff,zz,gg,pillar,sectors,remarks) FROM '/home/ubuntu/halopy/observations.csv' WITH (FORMAT csv, DELIMITER ',', NULL '');
 
 -- Note: For fields containing empty strings or special values:
 -- - Use sed/awk to convert empty fields to NULL in CSV before import

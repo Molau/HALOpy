@@ -1,11 +1,14 @@
 """
-I/O layer - File operations for observations and observers
+I/O layer - File and Database operations for observations and observers
 
 Architecture:
 - Layer 2: observers.py, observations.py (Business Logic)
 - Layer 3a: observers_file.py, observations_file.py (File Storage)
-- Layer 3b: observers_db.py, observations_db.py (Database - future)
+- Layer 3b: observers_db.py, observations_db.py (Database Storage)
 """
+
+# Database Connection (shared)
+from . import db_connection
 
 # Observer Layer 2 (Business Logic)
 from .observers import (
@@ -48,7 +51,13 @@ from .observations_file import (
     delete_temp_file
 )
 
+# Layer 3b (Database Storage) - import entire modules
+from . import observations_db
+from . import observers_db
+
 __all__ = [
+    # Database Connection (Layer 3b shared)
+    'db_connection',
     # Observer Layer 2 (Business Logic)
     'sort_observers',
     'find_observer_records',
@@ -79,6 +88,9 @@ __all__ = [
     'create_temp_backup',
     'restore_from_temp',
     'clean_temp_files',
-    'delete_temp_file'
+    'delete_temp_file',
+    # Database modules (Layer 3b)
+    'observations_db',
+    'observers_db'
 ]
 
