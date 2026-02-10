@@ -33,6 +33,8 @@
     "password_placeholder": "Passwort",
     "login_button": "Anmelden",
     "error_invalid_credentials": "Ungültige Anmeldedaten",
+    "error_username_password_required": "Benutzername und Passwort erforderlich",
+    "error_server_unreachable": "Server nicht erreichbar",
     "error_login_failed": "Fehler bei der Anmeldung"
   },
   "common": {

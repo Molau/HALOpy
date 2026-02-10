@@ -32,8 +32,8 @@
     "password_label": "Password",
     "password_placeholder": "Password",
     "login_button": "Login",
-    "error_invalid_credentials": "Invalid credentials",
-    "error_login_failed": "Login error"
+    "error_invalid_credentials": "Invalid credentials",    "error_username_password_required": "Username and password required",
+    "error_server_unreachable": "Server unreachable",    "error_login_failed": "Login error"
   },
   "common": {
     "yes": "Yes",
