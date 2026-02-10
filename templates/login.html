@@ -131,28 +131,40 @@
         console.log('🔍 DEBUG: login-lang-en element:', langEn);
         
         if (langDe) {
-            langDe.addEventListener('click', function() {
+            langDe.addEventListener('click', async function() {
                 console.log('🔍 DEBUG: DE button clicked');
-                fetch('/api/language/de', { method: 'POST' })
-                    .then(response => {
-                        console.log('🔍 DEBUG: DE response:', response.status);
-                        return response;
-                    })
-                    .then(() => window.location.reload());
+                try {
+                    const response = await fetch('/api/language/de', { method: 'POST' });
+                    console.log('🔍 DEBUG: DE response:', response.status, response.ok);
+                    if (response.ok) {
+                        console.log('🔍 DEBUG: Reloading page...');
+                        window.location.reload();
+                    } else {
+                        console.error('🔍 DEBUG: Language switch failed:', response.status);
+                    }
+                } catch (error) {
+                    console.error('🔍 DEBUG: Fetch error:', error);
+                }
             });
         } else {
             console.error('🔍 DEBUG: lang-de button NOT found!');
         }
         
         if (langEn) {
-            langEn.addEventListener('click', function() {
+            langEn.addEventListener('click', async function() {
                 console.log('🔍 DEBUG: EN button clicked');
-                fetch('/api/language/en', { method: 'POST' })
-                    .then(response => {
-                        console.log('🔍 DEBUG: EN response:', response.status);
-                        return response;
-                    })
-                    .then(() => window.location.reload());
+                try {
+                    const response = await fetch('/api/language/en', { method: 'POST' });
+                    console.log('🔍 DEBUG: EN response:', response.status, response.ok);
+                    if (response.ok) {
+                        console.log('🔍 DEBUG: Reloading page...');
+                        window.location.reload();
+                    } else {
+                        console.error('🔍 DEBUG: Language switch failed:', response.status);
+                    }
+                } catch (error) {
+                    console.error('🔍 DEBUG: Fetch error:', error);
+                }
             });
         } else {
             console.error('🔍 DEBUG: lang-en button NOT found!');
