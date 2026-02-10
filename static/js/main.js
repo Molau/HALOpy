@@ -7002,7 +7002,7 @@ window.handleLogout = async function() {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-danger btn-sm px-3" id="logout-confirm-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="logout-confirm-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>

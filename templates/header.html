@@ -31,7 +31,7 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.file') }}</a>
                     <ul class="dropdown-menu">
-                        {% if not g.is_cloud %}
+                        {% if not is_cloud %}
                         <li><a class="dropdown-item" href="#" data-action="new-file">{{ g.i18n.get('file.new_file') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="load">{{ g.i18n.get('file.load') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="select">{{ g.i18n.get('file.select') }}</a></li>
@@ -82,15 +82,15 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.settings') }}</a>
                     <ul class="dropdown-menu">
-                        {% if not g.is_cloud %}
+                        {% if not is_cloud %}
                         <li><a class="dropdown-item" href="#" data-action="settings-fixed-observer">{{ g.i18n.get('settings.fixed_observer') }}</a></li>
+                        <li><a class="dropdown-item" href="#" data-action="settings-startup-file">{{ g.i18n.get('settings.startup_file') }}</a></li>
                         {% endif %}
                         <li><a class="dropdown-item" href="#" data-action="settings-active-observers">{{ g.i18n.get('settings.active_observers') }}</a></li>
-                        <li><a class="dropdown-item" href="#" data-action="settings-startup-file">{{ g.i18n.get('settings.startup_file') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-datum">{{ g.i18n.get('settings.date_default') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-eingabeart">{{ g.i18n.get('settings.input_type') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-ausgabeart">{{ g.i18n.get('settings.output_type') }}</a></li>
-                        {% if g.is_cloud %}
+                        {% if is_cloud %}
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" data-action="settings-change-password">{{ g.i18n.get('settings.change_password') }}</a></li>
                         {% endif %}
