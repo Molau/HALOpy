@@ -4816,10 +4816,10 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
                         </div>
                         <div class="mb-3">
                             <label for="auth-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
-                            <div class="input-group">
-                                <input type="password" class="form-control" id="auth-password" autocomplete="current-password" value="${savedPassword}">
-                                <button class="btn btn-outline-secondary" type="button" id="toggle-password">
-                                    <i class="bi bi-eye" id="password-icon"></i>
+                            <div class="position-relative">
+                                <input type="password" class="form-control pe-5" id="auth-password" autocomplete="current-password" value="${savedPassword}">
+                                <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-password" style="z-index: 10;">
+                                    <i class="bi bi-eye text-secondary" id="password-icon"></i>
                                 </button>
                             </div>
                         </div>

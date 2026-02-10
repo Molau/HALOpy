@@ -130,7 +130,7 @@
         document.getElementById('lang-en').addEventListener('click', function() {
             fetch('/api/language/en', { method: 'POST' })
                 .then(() => window.location.reload());
-        }
+        });
 
         // Login form submission
         document.getElementById('login-form').addEventListener('submit', async (e) => {
