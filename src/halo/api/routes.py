@@ -398,8 +398,6 @@ def set_language(lang: str) -> Dict[str, Any]:
     if lang not in ['de', 'en']:
         return jsonify({'error': 'invalid_language'}), 400
     
-    current_app.logger.info(f"🔍 DEBUG /api/language/{lang}: BEFORE session={dict(session)}")
-    
     # Update session
     session['language'] = lang
     
@@ -408,8 +406,6 @@ def set_language(lang: str) -> Dict[str, Any]:
     
     # Update i18n instance
     set_lang(lang)
-    
-    current_app.logger.info(f"🔍 DEBUG /api/language/{lang}: AFTER session={dict(session)}")
     
     return jsonify({'success': True, 'language': lang})
 

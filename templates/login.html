@@ -132,44 +132,37 @@
         
         if (langDe) {
             langDe.addEventListener('click', async function() {
-                console.log('🔍 DEBUG: DE button clicked');
                 try {
                     const response = await fetch('/api/language/de', { method: 'POST' });
-                    console.log('🔍 DEBUG: DE response:', response.status, response.ok);
                     if (response.ok) {
-                        console.log('🔍 DEBUG: Reloading page...');
                         window.location.reload();
-                    } else {
-                        console.error('🔍 DEBUG: Language switch failed:', response.status);
                     }
                 } catch (error) {
-                    console.error('🔍 DEBUG: Fetch error:', error);
+                    console.error('Language switch failed:', error);
                 }
             });
-        } else {
-            console.error('🔍 DEBUG: lang-de button NOT found!');
         }
         
         if (langEn) {
             langEn.addEventListener('click', async function() {
-                console.log('🔍 DEBUG: EN button clicked');
                 try {
                     const response = await fetch('/api/language/en', { method: 'POST' });
-                    console.log('🔍 DEBUG: EN response:', response.status, response.ok);
                     if (response.ok) {
-                        console.log('🔍 DEBUG: Reloading page...');
                         window.location.reload();
-                    } else {
-                        console.error('🔍 DEBUG: Language switch failed:', response.status);
                     }
                 } catch (error) {
-                    console.error('🔍 DEBUG: Fetch error:', error);
+                    console.error('Language switch failed:', error);
                 }
             });
-        } else {
-            console.error('🔍 DEBUG: lang-en button NOT found!');
         }
 
+        // Error message translations
+        const errorMessages = {
+            'invalid_credentials': '{{ g.i18n.get("login.error_invalid_credentials") }}',
+            'username_password_required': '{{ g.i18n.get("login.error_username_password_required") }}',
+            'server_unreachable': '{{ g.i18n.get("login.error_server_unreachable") }}'
+        };
+        
         // Login form submission
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -191,8 +184,8 @@
                     // Redirect to main page
                     window.location.href = '/';
                 } else {
-                    // Show error message
-                    errorDiv.textContent = data.error;
+                    // Show translated error message
+                    errorDiv.textContent = errorMessages[data.error] || data.error;
                     errorDiv.style.display = 'block';
                 }
             } catch (error) {

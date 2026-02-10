@@ -105,7 +105,6 @@ def create_app(config=None):
         
         # Apply language to i18n system
         current_lang = session.get('language', 'de')
-        print(f"🔍 DEBUG setup_language: path={request.path}, session['language']={session.get('language')}, current_lang={current_lang}")
         set_language(current_lang)
         
         # Store current language in g for easy template access
@@ -154,7 +153,6 @@ def create_app(config=None):
         if not is_cloud_mode():
             # Redirect to main page if not in cloud mode
             return redirect(url_for('index'))
-        print(f"🔍 DEBUG /login: session={dict(session)}, g.language={g.language}, lang()={get_language()}")
         return render_template('login.html')
     
     @app.route('/logout')
