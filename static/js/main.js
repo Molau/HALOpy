@@ -6972,6 +6972,19 @@ async function showHelpDialog() {
                 </div>
             </div>`;
         
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById('help-modal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            clearMenuHighlights();
+            modalEl.remove();
+        });
+        
+    } catch (error) {
+        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+    }
+}
 
 // Logout handler (cloud mode only)
 window.handleLogout = async function() {
@@ -7037,20 +7050,6 @@ window.handleLogout = async function() {
     });
     
     modal.show();
-}
-
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        const modalEl = document.getElementById('help-modal');
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
-        
-    } catch (error) {
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-    }
 }
 
 // Show add observer dialog
