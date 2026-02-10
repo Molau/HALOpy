@@ -115,9 +115,10 @@ def create_app(config=None):
     @app.before_request
     def check_authentication():
         """Check authentication for cloud mode."""
-        # Skip authentication for login page, API login endpoint, and static files
-        if (request.endpoint in ['login', 'api.login', 'static'] or 
-            request.path.startswith('/static/')):
+        # Skip authentication for login page, API login endpoint, language switching, and static files
+        if (request.endpoint in ['login', 'api.login', 'api.set_language', 'api.get_language', 'static'] or 
+            request.path.startswith('/static/') or
+            request.path.startswith('/api/language/')):
             return
         
         # In cloud mode, require authentication
