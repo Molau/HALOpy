@@ -27,7 +27,7 @@
   },
   "login": {
     "title": "HALO",
-    "username_label": "Observer Number (KK) or Admin",
+    "username_label": "Username (KK)",
     "username_placeholder": "e.g. 44",
     "password_label": "Password",
     "password_placeholder": "Password",

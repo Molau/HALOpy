@@ -27,7 +27,7 @@
   },
   "login": {
     "title": "HALO",
-    "username_label": "Beobachternummer (KK) oder Admin",
+    "username_label": "Benutzername (KK)",
     "username_placeholder": "z.B. 44",
     "password_label": "Passwort",
     "password_placeholder": "Passwort",
