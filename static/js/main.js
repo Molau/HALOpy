@@ -6974,7 +6974,7 @@ async function showHelpDialog() {
         
 
 // Logout handler (cloud mode only)
-async function handleLogout() {
+window.handleLogout = async function() {
     // Show confirmation modal
     const modalHtml = `
         <div class="modal fade" id="logout-confirm-modal" tabindex="-1">
