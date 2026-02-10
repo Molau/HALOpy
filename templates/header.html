@@ -102,14 +102,14 @@
                     <a class="nav-link menu-title" href="#" onclick="handleMenuAction('help-text'); return false;">{{ g.i18n.get('menu_titles.help') }}</a>
                 </li>
                 <!-- Logout Menu (cloud mode only) -->
-                {% if g.is_cloud %}
+                {% if is_cloud %}
                 <li class="nav-item">
                     <a class="nav-link menu-title" href="#" onclick="handleMenuAction('logout'); return false;">{{ g.i18n.get('menu_titles.logout') }}</a>
                 </li>
                 {% endif %}
             </ul>
             <div class="ms-auto d-flex align-items-center">
-                <small id="file-info" class="text-muted" {% if not g.is_cloud %}style="display:none;"{% endif %}>
+                <small id="file-info" class="text-muted" {% if not is_cloud %}style="display:none;"{% endif %}>
                     <i class="bi bi-file-earmark-text me-1"></i>
                     <span id="file-name"></span>
                     <span class="mx-2">|</span>
