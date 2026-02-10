@@ -401,6 +401,9 @@ def set_language(lang: str) -> Dict[str, Any]:
     # Update session
     session['language'] = lang
     
+    # Update app config (so it persists across page reloads)
+    current_app.config['LANGUAGE'] = lang
+    
     # Update i18n instance
     set_lang(lang)
     
