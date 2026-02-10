@@ -93,8 +93,8 @@
             <!-- Language switcher buttons (top-right corner) -->
             <div class="language-buttons">
                 <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn {% if lang() == 'de' %}btn-primary{% else %}btn-outline-primary{% endif %}" id="lang-de">DE</button>
-                    <button type="button" class="btn {% if lang() == 'en' %}btn-primary{% else %}btn-outline-primary{% endif %}" id="lang-en">EN</button>
+                    <button type="button" class="btn {% if lang() == 'de' %}btn-primary{% else %}btn-outline-primary{% endif %}" id="login-lang-de">DE</button>
+                    <button type="button" class="btn {% if lang() == 'en' %}btn-primary{% else %}btn-outline-primary{% endif %}" id="login-lang-en">EN</button>
                 </div>
             </div>
             
@@ -121,14 +121,14 @@
 
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}?v={{ static_version }}"></script>
     <script>
-        // Language switching (same as header.html)
+        // Language switching - use login-specific IDs to avoid conflict with background header
         console.log('🔍 DEBUG: Setting up language switchers');
         
-        const langDe = document.getElementById('lang-de');
-        const langEn = document.getElementById('lang-en');
+        const langDe = document.getElementById('login-lang-de');
+        const langEn = document.getElementById('login-lang-en');
         
-        console.log('🔍 DEBUG: lang-de element:', langDe);
-        console.log('🔍 DEBUG: lang-en element:', langEn);
+        console.log('🔍 DEBUG: login-lang-de element:', langDe);
+        console.log('🔍 DEBUG: login-lang-en element:', langEn);
         
         if (langDe) {
             langDe.addEventListener('click', function() {
