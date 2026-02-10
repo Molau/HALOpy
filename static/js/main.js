@@ -518,7 +518,7 @@ function handleMenuAction(action) {
         
         // Logout (cloud mode only)
         case 'logout':
-            handleLogout();
+            window.handleLogout();
             break;
             
         // Exit menu removed
