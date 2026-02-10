@@ -177,6 +177,10 @@
     "help": "Help",
     "logout": "Logout"
   },
+  "logout": {
+    "confirm_title": "Logout",
+    "confirm_message": "Are you sure you want to logout?"
+  },
   "help": {
     "version": "Version",
     "whats_new": "What's New"
@@ -196,15 +200,11 @@
       "upload_auth_username": "Username:",
       "upload_auth_password": "Password:",
       "upload_auth_login": "Login",
-      "upload_confirm": "Do you want to upload {0} observations to the server?",
-      "upload_confirm_filtered": "Do you want to upload {0} from {1} observations for observer {2} to the server?",
-      "upload_no_observations": "No observations found for observer {0}.",
       "upload_mode_add": "Add observations",
       "upload_mode_replace": "Replace all observations",
       "upload_progress": "Uploading...",
       "upload_success": "Successfully uploaded {0} observations",
       "upload_title": "Upload",
-      "download_filename_prompt": "Filename for downloaded observations:",
       "download_progress": "Downloading...",
       "download_success": "Successfully downloaded {0} observations",
       "download_title": "Download",

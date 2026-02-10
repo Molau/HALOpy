@@ -177,6 +177,10 @@
     "help": "Hilfe",
     "logout": "Abmelden"
   },
+  "logout": {
+    "confirm_title": "Abmelden",
+    "confirm_message": "Sind Sie sicher, dass Sie sich abmelden möchten?"
+  },
   "help": {
     "version": "Version",
     "whats_new": "Was ist neu"
@@ -196,15 +200,11 @@
       "upload_auth_username": "Benutzername:",
       "upload_auth_password": "Passwort:",
       "upload_auth_login": "Anmelden",
-      "upload_confirm": "Wollen Sie {0} Beobachtungen an den Server hochladen?",
-      "upload_confirm_filtered": "Wollen Sie {0} von {1} Beobachtungen für Beobachter {2} an den Server hochladen?",
-      "upload_no_observations": "Keine Beobachtungen für Beobachter {0} gefunden.",
       "upload_mode_add": "Beobachtungen hinzufügen",
       "upload_mode_replace": "Alle Beobachtungen ersetzen",
       "upload_progress": "Lade hoch...",
       "upload_success": "Upload von {0} Beobachtungen erfolgreich",
       "upload_title": "Upload",
-      "download_filename_prompt": "Dateiname für heruntergeladene Beobachtungen:",
       "download_progress": "Lade herunter...",
       "download_success": "Download von {0} Beobachtungen erfolgreich",
       "download_title": "Download",

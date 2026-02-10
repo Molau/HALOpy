@@ -6975,31 +6975,68 @@ async function showHelpDialog() {
 
 // Logout handler (cloud mode only)
 async function handleLogout() {
-    try {
-        const configResponse = await fetch('/api/config');
-        const config = await configResponse.json();
-        const apiBase = config.cloud_mode ? '' : config.cloud_server_url;
-        if (!config.cloud_mode && !apiBase) {
-            showErrorDialog(i18nStrings.messages.error_loading);
-            return;
-        }
-        const logoutUrl = apiBase === '' ? '/api/logout' : `${apiBase.replace(/\/$/, '')}/api/logout`;
-        const response = await fetch(logoutUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+    // Show confirmation modal
+    const modalHtml = `
+        <div class="modal fade" id="logout-confirm-modal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${i18nStrings.logout.confirm_title}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>${i18nStrings.logout.confirm_message}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.no}</button>
+                        <button type="button" class="btn btn-danger btn-sm px-3" id="logout-confirm-yes">${i18nStrings.common.yes}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById('logout-confirm-modal');
+    const modal = new bootstrap.Modal(modalEl);
+    
+    // Handle Yes button
+    document.getElementById('logout-confirm-yes').addEventListener('click', async () => {
+        modal.hide();
         
-        if (response.ok) {
-            // Redirect to login page
-            window.location.href = '/login';
-        } else {
-            showErrorDialog(i18nStrings.common.error);
+        try {
+            const configResponse = await fetch('/api/config');
+            const config = await configResponse.json();
+            const apiBase = config.cloud_mode ? '' : config.cloud_server_url;
+            if (!config.cloud_mode && !apiBase) {
+                showErrorDialog(i18nStrings.messages.error_loading);
+                return;
+            }
+            const logoutUrl = apiBase === '' ? '/api/logout' : `${apiBase.replace(/\/$/, '')}/api/logout`;
+            const response = await fetch(logoutUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                // Redirect to login page
+                window.location.href = '/login';
+            } else {
+                showErrorDialog(i18nStrings.common.error);
+            }
+        } catch (error) {
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
         }
-    } catch (error) {
-        showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-    }
+    });
+    
+    // Cleanup modal after close
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        modalEl.remove();
+    });
+    
+    modal.show();
 }
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
