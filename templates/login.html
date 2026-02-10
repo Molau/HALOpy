@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HALOpy Login</title>
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}?v={{ static_version }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/bootstrap-icons.css') }}?v={{ static_version }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='fonts/bootstrap-icons/bootstrap-icons.css') }}?v={{ static_version }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}?v={{ static_version }}" rel="stylesheet">
     <style>
         /* Grayed-out background with header and menu */
@@ -122,15 +122,41 @@
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}?v={{ static_version }}"></script>
     <script>
         // Language switching (same as header.html)
-        document.getElementById('lang-de').addEventListener('click', function() {
-            fetch('/api/language/de', { method: 'POST' })
-                .then(() => window.location.reload());
-        });
+        console.log('🔍 DEBUG: Setting up language switchers');
         
-        document.getElementById('lang-en').addEventListener('click', function() {
-            fetch('/api/language/en', { method: 'POST' })
-                .then(() => window.location.reload());
-        });
+        const langDe = document.getElementById('lang-de');
+        const langEn = document.getElementById('lang-en');
+        
+        console.log('🔍 DEBUG: lang-de element:', langDe);
+        console.log('🔍 DEBUG: lang-en element:', langEn);
+        
+        if (langDe) {
+            langDe.addEventListener('click', function() {
+                console.log('🔍 DEBUG: DE button clicked');
+                fetch('/api/language/de', { method: 'POST' })
+                    .then(response => {
+                        console.log('🔍 DEBUG: DE response:', response.status);
+                        return response;
+                    })
+                    .then(() => window.location.reload());
+            });
+        } else {
+            console.error('🔍 DEBUG: lang-de button NOT found!');
+        }
+        
+        if (langEn) {
+            langEn.addEventListener('click', function() {
+                console.log('🔍 DEBUG: EN button clicked');
+                fetch('/api/language/en', { method: 'POST' })
+                    .then(response => {
+                        console.log('🔍 DEBUG: EN response:', response.status);
+                        return response;
+                    })
+                    .then(() => window.location.reload());
+            });
+        } else {
+            console.error('🔍 DEBUG: lang-en button NOT found!');
+        }
 
         // Login form submission
         document.getElementById('login-form').addEventListener('submit', async (e) => {
