@@ -616,8 +616,12 @@ async function showAddObservationDialog() {
 
 // Numeric entry (Kurzeingabe) dialog
 async function showAddObservationDialogNumeric() {
+    // Get config to check cloud mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
-    if (!window.haloConfig.isCloudMode && !window.haloData.isLoaded) {
+    if (!config.cloud_mode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -1485,8 +1489,12 @@ async function showAddObservationDialogNumeric() {
 
 // Menu-based entry (Langeingabe) dialog
 async function showAddObservationDialogMenu() {
+    // Get config to check cloud mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
-    if (!window.haloConfig.isCloudMode && !window.haloData.isLoaded) {
+    if (!config.cloud_mode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -3880,8 +3888,12 @@ async function showStartupFileDialog() {
 
 // Select observations (Selektieren)
 async function showSelectDialog() {
+    // Get config to check cloud mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
-    if (!window.haloConfig.isCloudMode && !window.haloData.fileName) {
+    if (!config.cloud_mode && !window.haloData.fileName) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -6022,8 +6034,12 @@ async function continueLoadFile() {
 
 // Merge files - Datei -> Verbinden
 async function showMergeFileDialog() {
+    // Get config to check cloud mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    
     // Check if a file is loaded (Local Mode only - Cloud Mode doesn't support file merge)
-    if (!window.haloConfig.isCloudMode && !window.haloData.fileName) {
+    if (!config.cloud_mode && !window.haloData.fileName) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
