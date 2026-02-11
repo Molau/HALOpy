@@ -125,10 +125,6 @@ def create_app(config=None):
             if not session.get('authenticated', False):
                 # Redirect to login page
                 return redirect(url_for('login'))
-            
-            # Set FIXED_OBSERVER from session for cloud mode
-            if session.get('observer_kk'):
-                app.config['FIXED_OBSERVER'] = session.get('observer_kk')
     
     @app.context_processor
     def inject_i18n():

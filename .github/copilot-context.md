@@ -26,6 +26,85 @@
 
 ---
 
+## Deployment Modes - CRITICAL ARCHITECTURE
+
+HALOpy supports two fundamentally different deployment modes with distinct behavior:
+
+### Cloud Mode (is_cloud_mode() = True)
+- **Authentication**: REQUIRED - Users must log in with username/password
+- **User Isolation**: Each user sees ONLY their own observations (enforced by `session['observer_kk']`)
+  - **Exception**: Admin user has `session['observer_kk'] = None` and can access ALL observations
+- **Data Storage**: PostgreSQL database (direct DB access, NO file operations)
+- **Data Access**: ALWAYS direct database queries (no caching in app.config)
+- **Fixed Observer**: 
+  - Regular users: Automatically set from login - `session['observer_kk'] = KK` (security enforcement)
+  - Admin user: `session['observer_kk'] = None` (full access to all observations)
+- **File Functions**: DISABLED - No "new file", "open file", "save file" (database-only)
+- **Analysis**: User can access ALL observations for analysis (KK filter NOT mandatory)
+- **Performance**: Must use SQL filtering (`obs_db.load_filtered()`) - never load entire database
+  - **Exception**: Admin can use `obs_db.load_all()` when `session['observer_kk']` is None
+- **Multi-User**: Multiple concurrent users on same server instance
+- **State Storage**: Use `session` (per-user) - NEVER use `app.config` for user-specific data
+
+### Local Mode (is_cloud_mode() = False)
+- **Authentication**: NONE - No login required
+- **User Access**: Full access to ALL loaded observations
+- **Data Storage**: CSV files in local filesystem
+- **Data Access**: File-based - load into `app.config['OBSERVATIONS']` cache
+- **Fixed Observer**: OPTIONAL UI filter in `app.config['FIXED_OBSERVER']` (user preference)
+- **File Functions**: ENABLED - Full file operations (new, open, save, merge)
+- **Analysis**: Full access to all loaded observations
+- **Performance**: In-memory operations on loaded data
+- **Multi-User**: Single user (but may have multiple browser tabs)
+- **State Storage**: Use `app.config` for application state (safe for single user)
+
+### Critical Implementation Rules
+
+**DO in Cloud Mode:**
+- ✓ Read user's KK from `session.get('observer_kk')` (set on login)
+- ✓ Use `obs_db.load_filtered(kk=...)` for SQL filtering (regular users)
+- ✓ Use `obs_db.load_all()` ONLY when `session.get('observer_kk')` is None (admin)
+- ✓ Always query database directly (no caching)
+- ✓ Enforce KK filter for observation display (except admin)
+- ✓ Allow unrestricted access for analysis functions
+
+**DON'T in Cloud Mode:**
+- ✗ Store user data in `app.config` (shared across all users)
+- ✗ Use `obs_db.load_all()` (performance disaster with 100K+ records)
+- ✗ Cache observations in memory
+- ✗ Enable file operations
+
+**DO in Local Mode:**
+- ✓ Use `app.config['OBSERVATIONS']` to cache loaded file
+- ✓ Use `app.config['FIXED_OBSERVER']` for optional UI filter
+- ✓ Enable all file operations (new, open, save, merge)
+- ✓ Cache data in memory after loading
+
+**DON'T in Local Mode:**
+- ✗ Require authentication
+- ✗ Restrict user to specific KK (full access is expected)
+- ✗ Use database operations
+
+### Mode Detection
+
+```python
+from halo.config import is_cloud_mode
+
+if is_cloud_mode():
+    # Cloud Mode: database operations, enforce user isolation
+    fixed_observer = session.get('observer_kk')  # None for admin, KK for regular users
+    if fixed_observer:
+        observations = obs_db.load_filtered(kk=int(fixed_observer))  # Regular user: filtered
+    else:
+        observations = obs_db.load_all()  # Admin: full access
+else:
+    # Local Mode: file operations, optional filter
+    observations = current_app.config.get('OBSERVATIONS', [])
+    fixed_observer = current_app.config.get('FIXED_OBSERVER')  # Optional UI filter
+```
+
+---
+
 ## Core Principles
 
 ### 0. Git Restore Safety Rule - Decision #028
