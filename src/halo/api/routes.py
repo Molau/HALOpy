@@ -800,8 +800,11 @@ def filter_observations() -> Dict[str, Any]:
             # Build filter dict for load_filtered()
             sql_filters = {}
             
+            print(f"🔍 DEBUG: Filter request - filter_type={filter_type}, action={action}")
+            
             if filter_type == 'KK':
                 sql_filters['kk'] = int(params.get('value'))
+                print(f"🔍 DEBUG: KK filter - value={sql_filters['kk']}")
             elif filter_type == 'MM':
                 sql_filters['mm'] = int(params.get('month'))
                 sql_filters['jj'] = int(params.get('year')) % 100
@@ -829,11 +832,17 @@ def filter_observations() -> Dict[str, Any]:
             
             # Use SQL filtering when possible, fall back to load_all() for complex filters
             if sql_filters:
+                print(f"🔍 DEBUG: Using SQL filtering with filters={sql_filters}")
+                import time
+                start_time = time.time()
                 matching_obs = obs_db.load_filtered(**sql_filters)
+                elapsed = time.time() - start_time
+                print(f"🔍 DEBUG: SQL filtering returned {len(matching_obs)} observations in {elapsed:.3f}s")
                 # For Cloud-Mode with SQL filtering, we already have filtered results
                 # No need to filter again in Python
                 all_obs = None  # Not needed
             else:
+                print(f"🔍 DEBUG: Using load_all() for complex filter")
                 # Complex filters (ZZ, SH) need Python filtering
                 observations = obs_db.load_all()
                 all_obs = observations
