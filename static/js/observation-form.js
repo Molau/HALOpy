@@ -109,19 +109,9 @@ class ObservationForm {
         
         if ((mode === 'edit' || mode === 'delete' || mode === 'view') && observation) {
             this.populateFields(observation);
-            // Apply field dependencies/constraints after loading observation
+            // In edit/delete/view mode: Don't apply dependencies - just display the existing values
             setTimeout(() => {
-                // Trigger dependencies in correct order (same as add mode)
-                // O-Trigger: sets d, and cascades to N, C, c
-                this.manageFieldDependencies('o');
-                // KK/MM/JJ-Trigger: sets g, cascades to GG
-                this.manageFieldDependencies('kk');
-                this.manageFieldDependencies('mm');
-                // EE-Trigger: sets HO, HU, sectors
-                this.manageFieldDependencies('ee');
-                this.manageFieldDependencies('v');
-                
-                // THEN disable all fields in edit/delete/view mode - user must click "Yes" to edit
+                // ONLY disable all fields in edit/delete/view mode - user must click "Yes" to edit
                 this.disableAllFields();
             }, 0);
         } else if (mode === 'add') {
@@ -804,11 +794,17 @@ class ObservationForm {
                                 const gg = parseInt(data.observer.GH);  // Parse to int to remove leading zero
                                 // GG constrained to single value (HBOrt)
                                 setOptionStates(this.fields.gg, ggOpts, [gg.toString()]);
-                                this.fields.gg.value = gg;
+                                // Don't overwrite GG if editing and value already populated
+                                if (!this.originalObservation || this.fields.gg.value === '') {
+                                    this.fields.gg.value = gg;
+                                }
                                 this.fieldConstraints.GG = [gg.toString()];
                             } else {
                                 setOptionStates(this.fields.gg, ggOpts, ['']);
-                                this.fields.gg.value = '';
+                                // Don't overwrite GG if editing and value already populated
+                                if (!this.originalObservation || this.fields.gg.value === '') {
+                                    this.fields.gg.value = '';
+                                }
                                 this.fieldConstraints.GG = [''];
                             }
                         }
@@ -848,11 +844,17 @@ class ObservationForm {
                                 const gg = parseInt(data.observer.GN);  // Parse to int to remove leading zero
                                 // GG constrained to single value (NBOrt)
                                 setOptionStates(this.fields.gg, ggOpts, [gg.toString()]);
-                                this.fields.gg.value = gg;
+                                // Don't overwrite GG if editing and value already populated
+                                if (!this.originalObservation || this.fields.gg.value === '') {
+                                    this.fields.gg.value = gg;
+                                }
                                 this.fieldConstraints.GG = [gg.toString()];
                             } else {
                                 setOptionStates(this.fields.gg, ggOpts, ['']);
-                                this.fields.gg.value = '';
+                                // Don't overwrite GG if editing and value already populated
+                                if (!this.originalObservation || this.fields.gg.value === '') {
+                                    this.fields.gg.value = '';
+                                }
                                 this.fieldConstraints.GG = [''];
                             }
                         }
