@@ -796,82 +796,144 @@ def filter_observations() -> Dict[str, Any]:
         
         # Layer 3: Get observations from storage
         if is_cloud_mode():
-            # Cloud Mode: Read from database (Layer 3b)
-            observations = obs_db.load_all()
+            # Cloud Mode: Use SQL filtering for performance (Layer 3b)
+            # Build filter dict for load_filtered()
+            sql_filters = {}
+            
+            if filter_type == 'KK':
+                sql_filters['kk'] = int(params.get('value'))
+            elif filter_type == 'MM':
+                sql_filters['mm'] = int(params.get('month'))
+                sql_filters['jj'] = int(params.get('year')) % 100
+            elif filter_type == 'TT':
+                sql_filters['tt'] = int(params.get('day'))
+                sql_filters['mm'] = int(params.get('month'))
+                sql_filters['jj'] = int(params.get('year')) % 100
+            elif filter_type == 'JJ':
+                sql_filters['jj'] = int(params.get('value')) % 100
+            elif filter_type in ['GG', 'O', 'EE', 'DD', 'N', 'C', 'H', 'F', 'V']:
+                sql_filters[filter_type.lower()] = int(params.get('value'))
+            elif filter_type == 'ZZ':
+                # Time range - convert to minutes
+                from_hour = int(params.get('from_hour'))
+                from_minute = int(params.get('from_minute'))
+                to_hour = int(params.get('to_hour'))
+                to_minute = int(params.get('to_minute'))
+                from_time = from_hour * 60 + from_minute
+                to_time = to_hour * 60 + to_minute
+                # Note: ZZ requires special handling - we'll filter in Python for this case
+                sql_filters = None  # Fall back to load_all() for complex filters
+            elif filter_type == 'SH':
+                # Solar altitude requires calculation - must filter in Python
+                sql_filters = None  # Fall back to load_all() for complex filters
+            
+            # Use SQL filtering when possible, fall back to load_all() for complex filters
+            if sql_filters:
+                matching_obs = obs_db.load_filtered(**sql_filters)
+                # For Cloud-Mode with SQL filtering, we already have filtered results
+                # No need to filter again in Python
+                all_obs = None  # Not needed
+            else:
+                # Complex filters (ZZ, SH) need Python filtering
+                observations = obs_db.load_all()
+                all_obs = observations
+                matching_obs = []  # Will be populated below
         else:
             # Local Mode: Read from in-memory cache
             observations = current_app.config.get('OBSERVATIONS', [])
             if not observations:
                 return jsonify({'error': 'no_observations_loaded'}), 400
+            all_obs = observations
+            matching_obs = []  # Will be populated below
         
-        # Load observers for SH filtering
+        # Load observers for SH filtering (needed for both modes when SH is used)
         observers_list = current_app.config.get('OBSERVERS', [])
         
-        # Filter observations based on type
-        matching_obs = []
-        
-        if filter_type == 'KK':
-            value = int(params.get('value'))
-            matching_obs = [obs for obs in observations if obs.KK == value]
+        # Python-side filtering (only for Local Mode or complex Cloud-Mode filters)
+        if not (is_cloud_mode() and sql_filters):
+            # Need to apply Python filtering
+            observations = all_obs
             
-        elif filter_type == 'MM':
-            month = int(params.get('month'))
-            year = int(params.get('year'))
-            year_2digit = year % 100  # Convert to 2-digit
-            matching_obs = [obs for obs in observations if obs.MM == month and obs.JJ == year_2digit]
-            
-        elif filter_type == 'TT':
-            day = int(params.get('day'))
-            month = int(params.get('month'))
-            year = int(params.get('year'))
-            year_2digit = year % 100  # Convert to 2-digit
-            matching_obs = [obs for obs in observations if obs.TT == day and obs.MM == month and obs.JJ == year_2digit]
-            
-        elif filter_type == 'ZZ':
-            from_hour = int(params.get('from_hour'))
-            from_minute = int(params.get('from_minute'))
-            to_hour = int(params.get('to_hour'))
-            to_minute = int(params.get('to_minute'))
-            from_time = from_hour * 60 + from_minute
-            to_time = to_hour * 60 + to_minute
-            for obs in observations:
-                if obs.ZS is not None and obs.ZS != -1 and obs.ZM is not None and obs.ZM != -1:
-                    obs_time = obs.ZS * 60 + obs.ZM
-                    if from_time <= obs_time <= to_time:
+            if filter_type == 'KK':
+                value = int(params.get('value'))
+                matching_obs = [obs for obs in observations if obs.KK == value]
+                
+            elif filter_type == 'MM':
+                month = int(params.get('month'))
+                year = int(params.get('year'))
+                year_2digit = year % 100  # Convert to 2-digit
+                matching_obs = [obs for obs in observations if obs.MM == month and obs.JJ == year_2digit]
+                
+            elif filter_type == 'TT':
+                day = int(params.get('day'))
+                month = int(params.get('month'))
+                year = int(params.get('year'))
+                year_2digit = year % 100  # Convert to 2-digit
+                matching_obs = [obs for obs in observations if obs.TT == day and obs.MM == month and obs.JJ == year_2digit]
+                
+            elif filter_type == 'ZZ':
+                from_hour = int(params.get('from_hour'))
+                from_minute = int(params.get('from_minute'))
+                to_hour = int(params.get('to_hour'))
+                to_minute = int(params.get('to_minute'))
+                from_time = from_hour * 60 + from_minute
+                to_time = to_hour * 60 + to_minute
+                for obs in observations:
+                    if obs.ZS is not None and obs.ZS != -1 and obs.ZM is not None and obs.ZM != -1:
+                        obs_time = obs.ZS * 60 + obs.ZM
+                        if from_time <= obs_time <= to_time:
+                            matching_obs.append(obs)
+                            
+            elif filter_type == 'SH':
+                sh_from = int(params.get('from', -90))
+                sh_to = int(params.get('to', 90))
+                sh_time = params.get('sh_time', 'mean')
+                for obs in observations:
+                    altitude = _calculate_observation_solar_altitude(obs, observers_list, sh_time)
+                    if altitude is not None and sh_from <= altitude <= sh_to:
                         matching_obs.append(obs)
+            
+            elif filter_type == 'JJ':
+                # Year - convert 4-digit to 2-digit
+                value = int(params.get('value'))
+                year_2digit = value % 100
+                matching_obs = [obs for obs in observations if obs.JJ == year_2digit]
                         
-        elif filter_type == 'SH':
-            sh_from = int(params.get('from', -90))
-            sh_to = int(params.get('to', 90))
-            sh_time = params.get('sh_time', 'mean')
-            for obs in observations:
-                altitude = _calculate_observation_solar_altitude(obs, observers_list, sh_time)
-                if altitude is not None and sh_from <= altitude <= sh_to:
-                    matching_obs.append(obs)
-        
-        elif filter_type == 'JJ':
-            # Year - convert 4-digit to 2-digit
-            value = int(params.get('value'))
-            year_2digit = value % 100
-            matching_obs = [obs for obs in observations if obs.JJ == year_2digit]
-                    
-        else:
-            # Simple value match for other parameters (GG, O, EE, DD, N, C, H, F, V)
-            value = int(params.get('value'))
-            attr = filter_type
-            for obs in observations:
-                obs_value = getattr(obs, attr, None)
-                if obs_value == value:
-                    matching_obs.append(obs)
+            else:
+                # Simple value match for other parameters (GG, O, EE, DD, N, C, H, F, V)
+                value = int(params.get('value'))
+                attr = filter_type
+                for obs in observations:
+                    obs_value = getattr(obs, attr, None)
+                    if obs_value == value:
+                        matching_obs.append(obs)
         
         # Apply action (keep or delete)
-        if action == 'keep':
+        # For Cloud-Mode with SQL filtering, we need to get total count for delete action
+        if is_cloud_mode() and sql_filters and action == 'delete':
+            # Need total count for delete calculation
+            total_count = obs_db.count()
+            kept_count = total_count - len(matching_obs)
+            deleted_count = len(matching_obs)
+            # For delete action with SQL filter, we need to get all OTHER observations
+            # This is complex - for now, fall back to loading all
+            # TODO: Optimize delete action with NOT IN query
+            all_observations = obs_db.load_all()
+            filtered_obs = [obs for obs in all_observations if obs not in matching_obs]
+        elif action == 'keep':
             filtered_obs = matching_obs
-        else:  # action == 'delete'
+        else:  # action == 'delete' (Local-Mode or Python-filtered)
             filtered_obs = [obs for obs in observations if obs not in matching_obs]
         
-        kept_count = len(filtered_obs)
-        deleted_count = len(observations) - kept_count
+        # Calculate counts
+        if not (is_cloud_mode() and sql_filters and action == 'delete'):
+            # Normal case: calculate from filtered results
+            kept_count = len(filtered_obs)
+            if is_cloud_mode() and sql_filters:
+                # For Cloud-Mode SQL filtering with keep action, need total for deleted count
+                deleted_count = obs_db.count() - kept_count
+            else:
+                deleted_count = len(observations) - kept_count
         
         # Convert observations to dicts for JSON response
         filtered_dicts = []
