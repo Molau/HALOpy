@@ -696,20 +696,15 @@ class ObservationForm {
             const jjValue = this.fields.jj.value;
             const mmValue = this.fields.mm.value;
             
-            console.log("🔍 DEBUG: KK/MM/JJ dependency check:", { kkValue, jjValue, mmValue, triggerField });
-            
             const kk = kkValue === '' ? -1 : parseInt(kkValue);
             const jj = jjValue === '' ? -1 : parseInt(jjValue);
             const mm = mmValue === '' ? -1 : parseInt(mmValue);
-            
-            console.log("🔍 DEBUG: Parsed values:", { kk, jj, mm });
             
             const gOpts = Array.from(this.fields.g.options);
             const oldGValue = this.fields.g.value;
 
             let gValid;
             if (mm === -1 || jj === -1 || kk === -1) {
-                console.log("🔍 DEBUG: One of KK/MM/JJ is -1, setting g to disabled");
                 // Any of MM, JJ, KK not set: g must be -1
                 gValid = [''];
                 
@@ -724,7 +719,6 @@ class ObservationForm {
                     this.manageFieldDependencies('g');
                 }
             } else {
-                console.log("🔍 DEBUG: All KK/MM/JJ are set, checking observer activity");
                 // MM>-1 AND JJ>-1 AND KK>-1: Check if observer was active at this date
                 
                 // Async check for observer activity

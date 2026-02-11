@@ -67,6 +67,10 @@ def load_filtered(**filters) -> List[List[str]]:
     - primary_site, primary_region: Primary site (str, LIKE partial match)
     - secondary_site, secondary_region: Secondary site (str, LIKE partial match)
     - geographic_region: Geographic region (str, exact match)
+    - standort: Site search (str, searches both primary_site and secondary_site)
+    - region: Region search (int, searches both primary_region and secondary_region)
+    - latest_only: If True, returns only latest record per KK (bool)
+    - jj, mm: Year/Month for date-based validity filtering (int)
     
     Args:
         **filters: Field name → value
@@ -84,11 +88,24 @@ def load_filtered(**filters) -> List[List[str]]:
         >>> # Observers in region 'Nord'
         >>> records = load_filtered(geographic_region='Nord')
         
-        >>> # Search by name
-        >>> records = load_filtered(last_name='Schmidt')
+        >>> # Search by site name
+        >>> records = load_filtered(standort='Berlin')
+        
+        >>> # Latest records only
+        >>> records = load_filtered(latest_only=True)
+        
+        >>> # Observer valid for specific date
+        >>> records = load_filtered(kk=44, jj=26, mm=3)
     """
     if not filters:
         return load_all()
+    
+    # Handle special complex filters first
+    latest_only = filters.pop('latest_only', False)
+    standort = filters.pop('standort', None)
+    region = filters.pop('region', None)
+    jj = filters.pop('jj', None)
+    mm = filters.pop('mm', None)
     
     with get_connection() as conn:
         with conn.cursor() as cursor:
@@ -96,10 +113,41 @@ def load_filtered(**filters) -> List[List[str]]:
             where_clauses = []
             params = []
             
+            # Handle site search (both primary_site and secondary_site)
+            if standort:
+                where_clauses.append("(primary_site LIKE %s OR secondary_site LIKE %s)")
+                params.extend([f"%{standort}%", f"%{standort}%"])
+            
+            # Handle region search (both primary_region and secondary_region)
+            if region:
+                where_clauses.append("(primary_region = %s OR secondary_region = %s)")
+                params.extend([region, region])
+            
+            # Handle date-based validity filtering
+            if jj is not None and mm is not None:
+                # Calculate seit value for observation date
+                # Handle century boundary (YEAR_MIN = 1980, so YEAR_MIN-1900 = 80)
+                year = jj
+                if jj < 80:  # Years 00-79 are 2000-2079
+                    year += 100
+                obs_seit = mm + 13 * year
+                
+                # Convert database since (MM/YY format) to seit value for comparison
+                where_clauses.append("""
+                    (CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                     CASE 
+                         WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < 80 
+                         THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
+                         ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                     END) <= %s
+                """)
+                params.append(obs_seit)
+            
             # Fields that use LIKE for partial matching
             like_fields = {'first_name', 'last_name', 'primary_site', 'primary_region', 
                           'secondary_site', 'secondary_region'}
             
+            # Handle remaining standard filters
             for field, value in filters.items():
                 if field in like_fields:
                     # Partial match with LIKE
@@ -110,17 +158,27 @@ def load_filtered(**filters) -> List[List[str]]:
                     where_clauses.append(f"{field} = %s")
                     params.append(value)
             
-            where_sql = " AND ".join(where_clauses)
-            
-            query = f"""
-                SELECT kk, active, since, first_name, last_name,
-                       primary_site, primary_region, primary_longitude, primary_latitude, primary_altitude,
-                       secondary_site, secondary_region, secondary_longitude, secondary_latitude, secondary_altitude,
-                       geographic_region, publication_rights, institution, address, email, phone
-                FROM observers
-                WHERE {where_sql}
-                ORDER BY kk, since
-            """
+            # Build query
+            if where_clauses:
+                where_sql = " AND ".join(where_clauses)
+                query = f"""
+                    SELECT kk, active, since, first_name, last_name,
+                           primary_site, primary_region, primary_longitude, primary_latitude, primary_altitude,
+                           secondary_site, secondary_region, secondary_longitude, secondary_latitude, secondary_altitude,
+                           geographic_region, publication_rights, institution, address, email, phone
+                    FROM observers
+                    WHERE {where_sql}
+                    ORDER BY kk, since
+                """
+            else:
+                query = """
+                    SELECT kk, active, since, first_name, last_name,
+                           primary_site, primary_region, primary_longitude, primary_latitude, primary_altitude,
+                           secondary_site, secondary_region, secondary_longitude, secondary_latitude, secondary_altitude,
+                           geographic_region, publication_rights, institution, address, email, phone
+                    FROM observers
+                    ORDER BY kk, since
+                """
             
             cursor.execute(query, params)
             rows = cursor.fetchall()
@@ -130,6 +188,31 @@ def load_filtered(**filters) -> List[List[str]]:
             for row in rows:
                 record = [str(value) if value is not None else "" for value in row]
                 records.append(record)
+            
+            # Handle latest_only filter (done in Python for simplicity)
+            if latest_only:
+                latest_records = {}
+                for record in records:
+                    kk = record[0]
+                    since = record[2]
+                    
+                    # Parse seit (MM/YY) to compare dates
+                    try:
+                        month, year = map(int, since.split('/'))
+                        # Convert to full year
+                        full_year = year + (2000 if year < 80 else 1900)
+                        date_key = (full_year, month)
+                        
+                        if kk not in latest_records or date_key > latest_records[kk][1]:
+                            latest_records[kk] = (record, date_key)
+                    except (ValueError, AttributeError):
+                        # If date parsing fails, keep the record
+                        if kk not in latest_records:
+                            latest_records[kk] = (record, (0, 0))
+                
+                records = [rec_tuple[0] for rec_tuple in latest_records.values()]
+                # Re-sort by kk
+                records.sort(key=lambda x: x[0])
             
             return records
 

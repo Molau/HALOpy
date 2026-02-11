@@ -330,6 +330,28 @@ def delete_one(key: Tuple) -> bool:
             return affected_rows > 0
 
 
+def delete_all_for_observer(kk: str) -> int:
+    """
+    Delete all observations for a specific observer (used for upload replace mode).
+    
+    Args:
+        kk: Observer code (2-digit string, e.g., "44")
+        
+    Returns:
+        Number of rows deleted
+        
+    Example:
+        >>> count = delete_all_for_observer("44")
+        >>> print(f"Deleted {count} observations for observer 44")
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM observations WHERE kk=%s", (kk,))
+            affected_rows = cursor.rowcount
+            conn.commit()
+            return affected_rows
+
+
 def save_many(observations: List[Observation]) -> int:
     """
     Bulk insert observations with transaction (skips duplicates).

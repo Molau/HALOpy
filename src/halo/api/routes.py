@@ -1289,27 +1289,29 @@ def save_file() -> Dict[str, Any]:
 @api_blueprint.route('/file/upload', methods=['POST'])
 def upload_file() -> Dict[str, Any]:
     """
-    Upload observations to cloud server (all.csv).
+    Upload observations - works in both Cloud and Local mode.
+    
+    BOTH MODES:
+    - Only authenticated observer's data OR admin can upload all
+    - Always uses replace mode: deletes existing data before upload
+    
+    Cloud Mode: Deletes from database, inserts into database
+    Local Mode: Deletes from loaded file, inserts into loaded file
     
     Request body:
         {
             "observerKK": "44",
-            "password": "password",
+            "password": "password",      # Local Mode only
             "observations": [...],
-            "mode": "add" or "replace"
+            "use_session": true/false    # Cloud Mode: true, Local Mode: false
         }
-    
-    Modes:
-        - add: Add observations to existing all.csv
-        - replace: Delete all observations of this observer first, then add new ones
     """
     
     data = request.get_json()
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
     new_observations_data = data.get('observations', [])
-    mode = data.get('mode', 'add')  # 'add' or 'replace'
-    use_session = data.get('use_session', False)  # Use session authentication
+    use_session = data.get('use_session', False)  # True in Cloud Mode
     
     if not observer_kk:
         return jsonify({'error': 'observer_kk_required'}), 400
@@ -1317,43 +1319,44 @@ def upload_file() -> Dict[str, Any]:
     if not new_observations_data:
         return jsonify({'error': 'no_observations_to_upload'}), 400
     
-    # Authenticate user
+    # Authenticate user (BOTH MODES)
     is_admin = False
+    authenticated_kk = None
+    
     if use_session:
-        # Use session authentication (cloud mode - already logged in)
+        # Cloud Mode: session authentication
         if not session.get('authenticated', False):
-            return jsonify({'error': 'Not authenticated'}), 401
+            return jsonify({'error': 'not_authenticated'}), 401
         
-        # Check if user is admin
         is_admin = session.get('is_admin', False)
+        authenticated_kk = session.get('observer_kk')  # None for admin
         
         # Verify that session user matches requested observerKK (unless admin)
-        if not is_admin:
-            session_kk = session.get('observer_kk', '')
-            if str(session_kk) != str(observer_kk):
-                return jsonify({'error': 'Cannot upload observations for different observer'}), 403
+        if not is_admin and str(authenticated_kk) != str(observer_kk):
+            return jsonify({'error': 'upload_kk_mismatch'}), 403
     else:
-        # Use password authentication (local mode)
+        # Local Mode: password authentication
         if not password:
-            return jsonify({'error': 'Password required'}), 400
+            return jsonify({'error': 'password_required'}), 400
         
         auth_service = AuthService()
         is_valid, user_info = auth_service.verify_password(observer_kk, password)
         
         if not is_valid:
-            return jsonify({'error': 'Invalid credentials'}), 401
+            return jsonify({'error': 'invalid_credentials'}), 401
         
-        # Check if authenticated user is admin
         is_admin = user_info.get('is_admin', False)
+        authenticated_kk = observer_kk if not is_admin else None
     
     try:
         # Convert observation dicts to Observation objects
-        # SECURITY: Filter to only include observations matching the authenticated user's KK
-        # EXCEPTION: Admin can upload observations for any observer
+        # SECURITY: Filter to only include observations matching authenticated user's KK
+        # EXCEPTION: Admin can upload all observations
         new_observations = []
         filtered_out_count = 0
+        
         for obs_dict in new_observations_data:
-            # Admin can upload all observations, regular users only their own
+            # Admin can upload all, regular users only their own
             if not is_admin and str(obs_dict.get('KK')) != str(observer_kk):
                 filtered_out_count += 1
                 continue
@@ -1366,52 +1369,77 @@ def upload_file() -> Dict[str, Any]:
             obs.remarks = obs_dict.get('remarks', '') or ''
             new_observations.append(obs)
         
-        # Check if any observations remain after filtering
         if not new_observations:
             return jsonify({
-                'error': 'No valid observations to upload (all observations filtered out)',
+                'error': 'no_valid_observations',
                 'filtered_out': filtered_out_count
             }), 400
         
-        # Load current observations from all.csv
-        current_observations = current_app.config.get('OBSERVATIONS', [])
-        
-        if mode == 'replace':
-            # Delete all observations of this observer
-            current_observations = [
-                obs for obs in current_observations 
-                if str(obs.KK) != str(observer_kk)
-            ]
-        
-        # Add new observations (avoiding duplicates)
-        existing_keys = set()
-        for obs in current_observations:
-            key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
-            existing_keys.add(key)
-        
-        added_count = 0
-        for obs in new_observations:
-            key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
-            if key not in existing_keys:
-                current_observations.append(obs)
-                existing_keys.add(key)
-                added_count += 1
-        
-        # Sort observations using spaeter()
-        current_observations = sorted(current_observations, key=cmp_to_key(_spaeter))
-        
-        # Update config and save
-        current_app.config['OBSERVATIONS'] = current_observations
-        
-        return jsonify({
-            'success': True,
-            'count': added_count,
-            'total_count': len(current_observations),
-            'mode': mode
-        })
+        # REPLACE MODE: Delete all existing observations of this observer first
+        if is_cloud_mode():
+            # Cloud Mode: Delete from database, then insert new
+            if is_admin:
+                # Admin uploads: Delete ALL KKs present in upload, then insert
+                kks_in_upload = set(str(obs.KK) for obs in new_observations)
+                for kk in kks_in_upload:
+                    obs_db.delete_all_for_observer(kk)
+            else:
+                # Regular user: Delete only their KK
+                obs_db.delete_all_for_observer(str(observer_kk))
+            
+            # Insert new observations into database
+            added_count = 0
+            for obs in new_observations:
+                success = obs_db.save_one(obs)
+                if success:
+                    added_count += 1
+            
+            return jsonify({
+                'success': True,
+                'count': added_count,
+                'filtered_out': filtered_out_count
+            })
+        else:
+            # Local Mode: Delete from memory, insert new, save file
+            current_observations = current_app.config.get('OBSERVATIONS', [])
+            
+            if is_admin:
+                # Admin uploads: Delete ALL KKs present in upload
+                kks_in_upload = set(str(obs.KK) for obs in new_observations)
+                current_observations = [
+                    obs for obs in current_observations
+                    if str(obs.KK) not in kks_in_upload
+                ]
+            else:
+                # Regular user: Delete only their KK
+                current_observations = [
+                    obs for obs in current_observations
+                    if str(obs.KK) != str(observer_kk)
+                ]
+            
+            # Add new observations
+            current_observations.extend(new_observations)
+            
+            # Sort using HALO sort order (Local Mode uses Python _spaeter)
+            current_observations = sorted(current_observations, key=cmp_to_key(_spaeter))
+            
+            # Save to file and update config
+            filename = current_app.config.get('LOADED_FILE')
+            if filename:
+                obs_file.save_file(current_observations, filename)
+            
+            current_app.config['OBSERVATIONS'] = current_observations
+            current_app.config['DIRTY'] = False
+            
+            return jsonify({
+                'success': True,
+                'count': len(new_observations),
+                'total_count': len(current_observations),
+                'filtered_out': filtered_out_count
+            })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'upload_failed', 'details': str(e)}), 500
 
 
 @api_blueprint.route('/file/download', methods=['POST'])
@@ -4675,7 +4703,6 @@ def get_observers() -> Dict[str, Any]:
         mm: Month (1-12) for observation date filtering
     """
     
-    observers = current_app.config.get('OBSERVERS', [])
     filter_type = request.args.get('filter_type', 'none')
     filter_value = request.args.get('filter_value', '')
     latest_only = request.args.get('latest_only', 'true').lower() == 'true'
@@ -4690,45 +4717,106 @@ def get_observers() -> Dict[str, Any]:
             jj = int(jj_param)
             mm = int(mm_param)
             
-            # Handle century boundary for observation year (same as _parse_seit)
-            # Years 00-((YEAR_MIN-1900)-1) are treated as 2000-20xx, so add 100 to year
-            if jj < (YEAR_MIN-1900):
-                jj += 100
-            
-            # Calculate seit value for observation date: month + 13 × year
-            obs_seit = mm + 13 * jj
-            
-            # Find all records for this observer
-            kk_records = [obs for obs in observers if obs[0] == kk_param]
+            # Use database filtering for date-based observer lookup
+            if is_cloud_mode():
+                kk_records = observer_db.load_filtered(kk=kk_param, jj=jj, mm=mm)
+            else:
+                # Local Mode: Find all records for this observer
+                observers = current_app.config.get('OBSERVERS', [])
+                kk_records = [obs for obs in observers if obs[0] == kk_param]
+                
+                # Handle century boundary for observation year (same as _parse_seit)
+                # Years 00-((YEAR_MIN-1900)-1) are treated as 2000-20xx, so add 100 to year
+                if jj < (YEAR_MIN-1900):
+                    jj += 100
+                
+                # Calculate seit value for observation date: month + 13 × year
+                obs_seit = mm + 13 * jj
+                kk_records = [obs for obs in kk_records if obs[3] and _parse_seit(obs[3]) <= obs_seit]
             
             if kk_records:
-                # Find the latest record where seit <= observation date
-                valid_records = [obs for obs in kk_records if obs[3] and _parse_seit(obs[3]) <= obs_seit]
+                if is_cloud_mode():
+                    # Database already filtered to valid records, take the latest one
+                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs[2])) if kk_records else None
+                else:
+                    # Find the latest record where seit <= observation date
+                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs[3])) if kk_records else None
                 
-                for i, obs in enumerate(kk_records):
-                    parsed_seit = _parse_seit(obs[3]) if obs[3] else None
-                
-                if valid_records:
-                    # Get the record with the latest seit value
-                    latest_record = max(valid_records, key=lambda obs: _parse_seit(obs[3]))
-                    
-                    # Return single observer with GH and GN
-                    result = {
-                        'KK': latest_record[0],
-                        'VName': latest_record[1],
-                        'NName': latest_record[2],
-                        'seit': latest_record[3],
-                        'aktiv': latest_record[4],
-                        'HbOrt': latest_record[5],
-                        'GH': latest_record[6],
-                        'GN': latest_record[14]
-                    }
+                if latest_record:
+                    # Return single observer with GH and GN (adjust indices for DB vs CSV)
+                    if is_cloud_mode():
+                        result = {
+                            'KK': latest_record[0],
+                            'VName': latest_record[3],
+                            'NName': latest_record[4],
+                            'seit': latest_record[2],
+                            'aktiv': latest_record[1],
+                            'HbOrt': latest_record[5],
+                            'GH': latest_record[6],
+                            'GN': latest_record[15]
+                        }
+                    else:
+                        result = {
+                            'KK': latest_record[0],
+                            'VName': latest_record[1],
+                            'NName': latest_record[2],
+                            'seit': latest_record[3],
+                            'aktiv': latest_record[4],
+                            'HbOrt': latest_record[5],
+                            'GH': latest_record[6],
+                            'GN': latest_record[14]
+                        }
                     return jsonify({'observer': result})
             
             # If no matching record found, return empty
             return jsonify({'observer': None})
         except (ValueError, IndexError) as e:
             return jsonify({'error': f'Invalid parameters: {e}'}), 400
+    
+    # Get observers based on deployment mode and filters
+    if is_cloud_mode():
+        # Cloud Mode: Use database filtering directly
+        if filter_type == 'kk' and filter_value:
+            observers = observer_db.load_filtered(kk=int(filter_value), latest_only=latest_only)
+        elif filter_type == 'site' and filter_value:
+            observers = observer_db.load_filtered(standort=filter_value, latest_only=latest_only)
+        elif filter_type == 'region' and filter_value:
+            observers = observer_db.load_filtered(region=int(filter_value), latest_only=latest_only)
+        else:
+            observers = observer_db.load_filtered(latest_only=latest_only)
+        
+        # Convert to dict format for JSON (DB format)
+        result = []
+        for obs in observers:
+            if len(obs) >= 21:
+                result.append({
+                    'KK': obs[0],
+                    'aktiv': obs[1],
+                    'seit': obs[2],
+                    'VName': obs[3],
+                    'NName': obs[4],
+                    'HbOrt': obs[5],
+                    'HbReg': obs[6],
+                    'HbLon': obs[7],
+                    'HbLat': obs[8],
+                    'HbHoehe': obs[9],
+                    'NbOrt': obs[10],
+                    'NbReg': obs[11],
+                    'NbLon': obs[12],
+                    'NbLat': obs[13],
+                    'NbHoehe': obs[14],
+                    'GH': obs[15],
+                    'Publ': obs[16],
+                    'Institut': obs[17],
+                    'Anschrift': obs[18],
+                    'Email': obs[19],
+                    'Telefon': obs[20]
+                })
+        
+        return jsonify({'observers': result})
+    else:
+        # Local Mode: Load observers from app config (CSV) and filter in Python
+        observers = current_app.config.get('OBSERVERS', [])
     
     if filter_type == 'none':
         # Return all observers
@@ -4814,19 +4902,18 @@ def get_observers() -> Dict[str, Any]:
 def get_observers_list() -> Dict[str, Any]:
     """Get list of unique observers (KK + Name) for dropdown."""
     
-    
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        observers = observer_db.load_filtered(latest_only=True)  # Only latest records per KK
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Get unique observers by KK
     unique_observers = {}
     for obs in observers:
-        # Skip entries that don't have enough columns
-        if len(obs) < 21:
-            continue
-            
         kk = obs[0]
-        vname = obs[1] if len(obs) > 1 and obs[1] else ''
-        nname = obs[2] if len(obs) > 2 and obs[2] else ''
+        vname = obs[1] if obs[1] else ''  # VName
+        nname = obs[2] if obs[2] else ''  # NName
         
         # Skip if KK is empty or both names are empty
         if not kk or (not vname and not nname):
@@ -4878,17 +4965,17 @@ def _parse_seit(seit_str: str) -> int:
 def get_observer_regions() -> Dict[str, Any]:
     """Get list of unique geographic regions for dropdown."""
     
-    
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        observers = observer_db.load_filtered()  # All observer records
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Get unique regions
     regions = set()
     for obs in observers:
-        # Skip entries that don't have enough columns
-        if len(obs) < 21:
-            continue
-        regions.add(int(obs[6]))  # GH - primary region
-        regions.add(int(obs[14]))  # GN - secondary region
+        regions.add(int(obs[6]))   # HbReg - Hauptbeobachtungsort Region
+        regions.add(int(obs[12]))  # NbReg - Nebenbeobachtungsort Region
     
     # Get region names from i18n (no fallbacks)
     i18n = g.i18n if hasattr(g, 'i18n') else get_i18n()
@@ -4939,25 +5026,29 @@ def add_observer() -> Dict[str, Any]:
     required_fields = ['KK', 'VName', 'NName', 'seit_month', 'seit_year', 'active']
     for field in required_fields:
         if field not in data or data[field] == '':
-            return jsonify({'error': f'Missing required field: {field}'}), 400
+            return jsonify({'error': 'missing_required_field', 'field': field}), 400
     
     # Validate KK format (must be 2-digit string between 01 and 99)
     kk = str(data['KK']).zfill(2)
     try:
         kk_int = int(kk)
         if kk_int < 1 or kk_int > 99:
-            return jsonify({'error': 'KK must be between 01 and 99'}), 400
+            return jsonify({'error': 'invalid_kk_range'}), 400
     except ValueError:
-        return jsonify({'error': 'Invalid KK format'}), 400
+        return jsonify({'error': 'invalid_kk_format'}), 400
     
     # Check if KK already exists (don't allow any duplicate KK at all)
-    observers = current_app.config.get('OBSERVERS', [])
+    if is_cloud_mode():
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
+    
     seit_str = f"{int(data['seit_month']):02d}/{int(data['seit_year']) % 100:02d}"
     
     # Check if this KK already exists (any observer with this KK)
     for obs in observers:
         if obs[0] == kk:
-            return jsonify({'error': f'Observer code {kk} already exists'}), 400
+            return jsonify({'error': 'observer_code_exists', 'kk': kk}), 400
     
     # Build the CSV row
     # Format: KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
@@ -4987,16 +5078,19 @@ def add_observer() -> Dict[str, Any]:
     
     # Add observer using io module
     try:
-        # Add record (Layer 2)
-        observers = observer_logic.add_observer_record(new_row, observers)
-        
-        # Save to file (Layer 3a)
-        observer_file.save_file(observers)
-        current_app.config['OBSERVERS'] = observers
+        if is_cloud_mode():
+            # Cloud Mode: Direct SQL INSERT
+            success = observer_db.save_one(new_row)
+            if not success:
+                return jsonify({'error': 'observer_site_exists', 'kk': kk, 'seit': seit_str}), 400
+        else:
+            # Local Mode: Add record (Layer 2) + Save to file (Layer 3a)
+            observers = observer_logic.add_observer_record(new_row, observers)
+            observer_file.save_file(observers)
+            current_app.config['OBSERVERS'] = observers
         
         return jsonify({
             'success': True,
-            'message': 'Observer added successfully',
             'observer': {
                 'KK': kk,
                 'VName': new_row[1],
@@ -5005,7 +5099,7 @@ def add_observer() -> Dict[str, Any]:
             }
         })
     except Exception as e:
-        return jsonify({'error': f'Failed to save observer: {str(e)}'}), 500
+        return jsonify({'error': 'observer_save_failed', 'details': str(e)}), 500
 
 
 @api_blueprint.route('/observers/<kk>', methods=['PUT'])
@@ -5030,85 +5124,135 @@ def update_observer(kk: str) -> Dict[str, Any]:
     required_fields = ['VName', 'NName']
     for field in required_fields:
         if field not in data or data[field] == '':
-            return jsonify({'error': f'Missing required field: {field}'}), 400
+            return jsonify({'error': 'missing_required_field', 'field': field}), 400
     
-    # Find all observer entries in halobeo.csv with this KK
-    observers = current_app.config.get('OBSERVERS', [])
-    observer_indices = []
-    for idx, obs in enumerate(observers):
-        if obs[0] == kk:
-            observer_indices.append(idx)
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
     
-    if not observer_indices:
-        return jsonify({'error': f'Observer {kk} not found'}), 404
-    
-    # Update VName and NName for all entries with this KK
-    updated_count = 0
-    for idx in observer_indices:
-        old_observer = observers[idx]
-        # Keep all data unchanged except VName and NName
-        observers[idx] = [
-            kk,  # KK (unchanged)
-            data.get('VName', '')[:15],  # VName (updated)
-            data.get('NName', '')[:15],  # NName (updated)
-            old_observer[3],  # seit (unchanged)
-            old_observer[4],  # active (unchanged)
-            old_observer[5],  # HbOrt (unchanged)
-            old_observer[6],  # GH (unchanged)
-            old_observer[7],  # HLG (unchanged)
-            old_observer[8],  # HLM (unchanged)
-            old_observer[9],  # HOW (unchanged)
-            old_observer[10],  # HBG (unchanged)
-            old_observer[11],  # HBM (unchanged)
-            old_observer[12],  # HNS (unchanged)
-            old_observer[13],  # NbOrt (unchanged)
-            old_observer[14],  # GN (unchanged)
-            old_observer[15],  # NLG (unchanged)
-            old_observer[16],  # NLM (unchanged)
-            old_observer[17],  # NOW (unchanged)
-            old_observer[18],  # NBG (unchanged)
-            old_observer[19],  # NBM (unchanged)
-            old_observer[20]   # NNS (unchanged)
-        ]
-        updated_count += 1
-    
-    # Get the first updated entry for response
-    first_updated = observers[observer_indices[0]]
+    # Find all observer entries with this KK
+    if not observers or len(observers) == 0:
+        return jsonify({'error': 'observer_not_found', 'kk': kk}), 404
     
     try:
-        # Sort (Layer 2)
-        observers = observer_logic.sort_observers(observers)
-        
-        # Save to file (Layer 3a)
-        observer_file.save_file(observers)
-        current_app.config['OBSERVERS'] = observers
-        
-        # Update metadata in observation files (if loaded)
-        observations = current_app.config.get('OBSERVATIONS', [])
-        if observations:
-            obs_updated_count = 0
-            for obs in observations:
-                # Check if observation belongs to this observer
-                if getattr(obs, 'KK', None) == kk:
-                    obs.VName = first_updated[1]
-                    obs.NName = first_updated[2]
-                    obs_updated_count += 1
+        if is_cloud_mode():
+            # Cloud Mode: True SQL UPDATE (no delete+insert needed)
+            updated_count = 0
+            for obs in observers:
+                # Build updated record (21 fields) with new VName/NName
+                updated_record = [
+                    kk,                               # 0: KK
+                    obs[1],                           # 1: aktiv (unchanged)
+                    obs[2],                           # 2: seit (unchanged)
+                    data.get('VName', '')[:15],       # 3: VName (UPDATED)
+                    data.get('NName', '')[:15],       # 4: NName (UPDATED)
+                    obs[5],                           # 5: HbOrt (unchanged)
+                    obs[6],                           # 6: HbReg (unchanged)
+                    obs[7],                           # 7: HLG (unchanged)
+                    obs[8],                           # 8: HLM (unchanged)
+                    obs[9],                           # 9: HOW (unchanged)
+                    obs[10],                          # 10: HBG (unchanged)
+                    obs[11],                          # 11: HBM (unchanged)
+                    obs[12],                          # 12: HNS (unchanged)
+                    obs[13],                          # 13: NbOrt (unchanged)
+                    obs[14],                          # 14: NbReg (unchanged)
+                    obs[15],                          # 15: NLG (unchanged)
+                    obs[16],                          # 16: NLM (unchanged)
+                    obs[17],                          # 17: NOW (unchanged)
+                    obs[18],                          # 18: NBG (unchanged)
+                    obs[19],                          # 19: NBM (unchanged)
+                    obs[20]                           # 20: NNS (unchanged)
+                ]
+                
+                success = observer_db.update_one(kk, obs[2], updated_record)  # obs[2] = seit
+                if success:
+                    updated_count += 1
             
-            # Mark as dirty if any observations were updated
-        
-        return jsonify({
-            'success': True,
-            'message': f'Observer {kk} updated successfully ({updated_count} entries)',
-            'observer': {
-                'KK': kk,
-                'VName': first_updated[1],
-                'NName': first_updated[2],
-                'seit': first_updated[3],
-                'active': int(first_updated[4])
-            }
-        })
+            # Get updated record for response
+            updated_observers = observer_db.load_filtered(kk=kk)
+            first_updated = updated_observers[0] if updated_observers else None
+            
+            return jsonify({
+                'success': True,
+                'observer': {
+                    'KK': kk,
+                    'VName': first_updated[3] if first_updated else '',
+                    'NName': first_updated[4] if first_updated else '',
+                    'seit': first_updated[2] if first_updated else '',
+                    'active': int(first_updated[1]) if first_updated else 0
+                }
+            })
+        else:
+            # Local Mode: Update all entries with delete+insert pattern
+            observer_indices = []
+            for idx, obs in enumerate(observers):
+                if obs[0] == kk:
+                    observer_indices.append(idx)
+            
+            updated_count = 0
+            for idx in observer_indices:
+                old_observer = observers[idx]
+                # Keep all data unchanged except VName and NName
+                observers[idx] = [
+                    kk,  # KK (unchanged)
+                    data.get('VName', '')[:15],  # VName (updated)
+                    data.get('NName', '')[:15],  # NName (updated)
+                    old_observer[3],  # seit (unchanged)
+                    old_observer[4],  # active (unchanged)
+                    old_observer[5],  # HbOrt (unchanged)
+                    old_observer[6],  # GH (unchanged)
+                    old_observer[7],  # HLG (unchanged)
+                    old_observer[8],  # HLM (unchanged)
+                    old_observer[9],  # HOW (unchanged)
+                    old_observer[10],  # HBG (unchanged)
+                    old_observer[11],  # HBM (unchanged)
+                    old_observer[12],  # HNS (unchanged)
+                    old_observer[13],  # NbOrt (unchanged)
+                    old_observer[14],  # GN (unchanged)
+                    old_observer[15],  # NLG (unchanged)
+                    old_observer[16],  # NLM (unchanged)
+                    old_observer[17],  # NOW (unchanged)
+                    old_observer[18],  # NBG (unchanged)
+                    old_observer[19],  # NBM (unchanged)
+                    old_observer[20]   # NNS (unchanged)
+                ]
+                updated_count += 1
+            
+            # Get the first updated entry for response
+            first_updated = observers[observer_indices[0]]
+            
+            # Sort (Layer 2)
+            observers = observer_logic.sort_observers(observers)
+            
+            # Save to file (Layer 3a)
+            observer_file.save_file(observers)
+            current_app.config['OBSERVERS'] = observers
+            
+            # Update metadata in observation files (if loaded)
+            observations = current_app.config.get('OBSERVATIONS', [])
+            if observations:
+                obs_updated_count = 0
+                for obs in observations:
+                    # Check if observation belongs to this observer
+                    if getattr(obs, 'KK', None) == kk:
+                        obs.VName = first_updated[1]
+                        obs.NName = first_updated[2]
+                        obs_updated_count += 1
+            
+            return jsonify({
+                'success': True,
+                'observer': {
+                    'KK': kk,
+                    'VName': first_updated[1],
+                    'NName': first_updated[2],
+                    'seit': first_updated[3],
+                    'active': int(first_updated[4])
+                }
+            })
     except Exception as e:
-        return jsonify({'error': f'Failed to update observer: {str(e)}'}), 500
+        return jsonify({'error': 'observer_update_failed', 'details': str(e)}), 500
 
 
 @api_blueprint.route('/observers/<kk>/sites', methods=['GET'])
@@ -5119,7 +5263,13 @@ def get_observer_sites(kk):
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
     
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        # Cloud Mode: Query database directly for this specific observer
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        # Local Mode: Load observers from app config (CSV)
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Find all entries for this observer
     # Observers are lists: [KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS]
@@ -5199,7 +5349,13 @@ def check_observer_active(kk):
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
     
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        # Cloud Mode: Query database directly for this specific observer
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        # Local Mode: Load observers from app config (CSV)
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Convert jj to 4-digit year for comparison
     year_4digit = jj_to_full_year(jj)
@@ -5247,15 +5403,18 @@ def add_observer_site(kk):
                        'HNS', 'HLG', 'HLM', 'HOW', 'GH']
     for field in required_fields:
         if field not in data:
-            return jsonify({'error': f'Missing required field: {field}'}), 400
+            return jsonify({'error': 'missing_required_field', 'field': field}), 400
     
     # Convert seit_month/seit_year to seit format (MM/YY)
     seit = f"{int(data['seit_month']):02d}/{int(data['seit_year']) % 100:02d}"
     
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Find an existing entry for this observer to get VName/NName
-    # Observers are stored as lists: [KK, VName, NName, seit, active, ...]
     existing = None
     for obs in observers:
         if obs[0] == kk:  # obs[0] is KK
@@ -5263,12 +5422,12 @@ def add_observer_site(kk):
             break
     
     if not existing:
-        return jsonify({'error': 'Observer not found'}), 404
+        return jsonify({'error': 'observer_not_found', 'kk': kk}), 404
     
     # Check if entry with this seit already exists
     for obs in observers:
         if obs[0] == kk and obs[3] == seit:  # obs[0]=KK, obs[3]=seit
-            return jsonify({'error': 'Entry with this date already exists'}), 400
+            return jsonify({'error': 'site_date_exists', 'kk': kk, 'seit': seit}), 400
     
     # Create new CSV row
     # Format: KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
@@ -5296,38 +5455,37 @@ def add_observer_site(kk):
         data.get('NNS', '')                      # 20: NNS (N_NS)
     ]
     
-    # Add to list
-    observers.append(new_row)
-    
-    # Sort observers by KK, then by seit (convert MM/YY to YYMM for proper sorting)
-    def sort_key(obs):
-        kk_val = obs[0]  # obs[0] is KK
-        seit = obs[3]    # obs[3] is seit
-        if seit and '/' in seit:
-            parts = seit.split('/')
-            if len(parts) == 2:
-                month = int(parts[0])
-                year = int(parts[1])
-                # Convert to full year using (YEAR_MIN-1900)
-                full_year = jj_to_full_year(year)
-                # Create sortable value: YYYYMM
-                return (kk_val, full_year * 100 + month)
-        return (kk_val, 0)
-    
-    observers.sort(key=sort_key)
-    
     # Save using io module
     try:
-        # Sort (Layer 2)
-        observers = observer_logic.sort_observers(observers)
-        
-        # Save to file (Layer 3a)
-        observer_file.save_file(observers)
-        current_app.config['OBSERVERS'] = observers
+        if is_cloud_mode():
+            # Cloud Mode: Direct SQL INSERT
+            success = observer_db.save_one(new_row)
+            if not success:
+                return jsonify({'error': 'site_date_exists', 'seit': seit}), 400
+        else:
+            # Local Mode: Add to list, sort, and save
+            observers.append(new_row)
+            
+            # Sort observers by KK, then by seit
+            def sort_key(obs):
+                kk_val = obs[0]
+                seit = obs[3]
+                if seit and '/' in seit:
+                    parts = seit.split('/')
+                    if len(parts) == 2:
+                        month = int(parts[0])
+                        year = int(parts[1])
+                        full_year = jj_to_full_year(year)
+                        return (kk_val, full_year * 100 + month)
+                return (kk_val, 0)
+            
+            observers.sort(key=sort_key)
+            observers = observer_logic.sort_observers(observers)
+            observer_file.save_file(observers)
+            current_app.config['OBSERVERS'] = observers
         
         return jsonify({
             'success': True,
-            'message': 'Site added successfully',
             'site': {
                 'KK': new_row[0],
                 'seit': new_row[3],
@@ -5335,7 +5493,7 @@ def add_observer_site(kk):
             }
         })
     except Exception as e:
-        return jsonify({'error': f'Failed to add site: {str(e)}'}), 500
+        return jsonify({'error': 'site_add_failed', 'details': str(e)}), 500
 
 
 @api_blueprint.route('/observers/<kk>/sites', methods=['PUT'])
@@ -5346,81 +5504,121 @@ def update_observer_site(kk):
     
     data = request.get_json()
     if not data:
-        return jsonify({'error': 'No data provided'}), 400
+        return jsonify({'error': 'no_data_provided'}), 400
     
     # Get originalSeit from request body
     seit = data.get('originalSeit')
     if not seit:
-        return jsonify({'error': 'Original seit parameter required'}), 400
+        return jsonify({'error': 'original_seit_required'}), 400
     
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Find the entry to update
     entry_found = False
-    updated_observers = []
     
-    for obs in observers:
-        if obs[0] == kk and obs[3] == seit:  # obs[0]=KK, obs[3]=seit
-            entry_found = True
-            # Create new seit value from updated data
+    try:
+        if is_cloud_mode():
+            # Cloud Mode: True SQL UPDATE (no delete+insert)
+            matching_obs = None
+            for obs in observers:
+                if obs[0] == kk and obs[3] == seit:
+                    matching_obs = obs
+                    entry_found = True
+                    break
+            
+            if not entry_found:
+                return jsonify({'error': 'Site entry not found'}), 404
+            
+            # Create new seit value
             new_seit = f"{str(data['seit_month']).zfill(2)}/{str(data['seit_year']).zfill(2)}"
             
-            # Build updated row
+            # Build complete updated row (21 fields)
             updated_row = [
-                kk,  # 0: KK
-                data.get('VName', obs[1] if len(obs) > 1 else ''),  # 1: VName
-                data.get('NName', obs[2] if len(obs) > 2 else ''),  # 2: NName
-                new_seit,  # 3: seit
-                str(data.get('active', 1)),  # 4: active
-                data.get('HbOrt', ''),  # 5: HbOrt
-                data.get('GH', ''),  # 6: GH
-                str(data.get('HLG', 0)),  # 7: HLG
-                str(data.get('HLM', 0)),  # 8: HLM
-                data.get('HOW', 'O'),  # 9: HOW
-                str(data.get('HBG', 0)),  # 10: HBG
-                str(data.get('HBM', 0)),  # 11: HBM
-                data.get('HNS', 'N'),  # 12: HNS
-                data.get('NbOrt', ''),  # 13: NbOrt
-                data.get('GN', ''),  # 14: GN
-                str(data.get('NLG', 0)),  # 15: NLG
-                str(data.get('NLM', 0)),  # 16: NLM
-                data.get('NOW', 'O'),  # 17: NOW
-                str(data.get('NBG', 0)),  # 18: NBG
-                str(data.get('NBM', 0)),  # 19: NBM
-                data.get('NNS', 'N')  # 20: NNS
+                kk,
+                data.get('VName', matching_obs[1]),
+                data.get('NName', matching_obs[2]),
+                new_seit,
+                str(data.get('active', 1)),
+                data.get('HbOrt', ''),
+                data.get('GH', ''),
+                str(data.get('HLG', 0)),
+                str(data.get('HLM', 0)),
+                data.get('HOW', 'O'),
+                str(data.get('HBG', 0)),
+                str(data.get('HBM', 0)),
+                data.get('HNS', 'N'),
+                data.get('NbOrt', ''),
+                data.get('GN', ''),
+                str(data.get('NLG', 0)),
+                str(data.get('NLM', 0)),
+                data.get('NOW', 'O'),
+                str(data.get('NBG', 0)),
+                str(data.get('NBM', 0)),
+                data.get('NNS', 'N')
             ]
-            updated_observers.append(updated_row)
+            
+            success = observer_db.update_one(kk, seit, updated_row)
+            if not success:
+                return jsonify({'error': 'site_update_failed', 'kk': kk, 'seit': seit}), 500
+            
+            return jsonify({'success': True})
         else:
-            updated_observers.append(obs)
-    
-    if not entry_found:
-        return jsonify({'error': 'Site entry not found'}), 404
-    
-    # Sort by KK and then by date
-    def sort_key(obs):
-        kk_val = obs[0]
-        seit_parts = obs[3].split('/')
-        month = int(seit_parts[0])
-        year = int(seit_parts[1])
-        full_year = jj_to_full_year(year)
-        return (kk_val, full_year * 100 + month)
-    
-    updated_observers.sort(key=sort_key)
-    
-    # Save using io module
-    try:
-        # Sort (Layer 2)
-        updated_observers = observer_logic.sort_observers(updated_observers)
-        
-        # Save to file (Layer 3a)
-        observer_file.save_file(updated_observers)
-        current_app.config['OBSERVERS'] = updated_observers
-        
-        return jsonify({
-            'success': True
-        })
+            # Local Mode: Delete+insert pattern
+            updated_observers = []
+            for obs in observers:
+                if obs[0] == kk and obs[3] == seit:
+                    entry_found = True
+                    new_seit = f"{str(data['seit_month']).zfill(2)}/{str(data['seit_year']).zfill(2)}"
+                    updated_row = [
+                        kk,
+                        data.get('VName', obs[1] if len(obs) > 1 else ''),
+                        data.get('NName', obs[2] if len(obs) > 2 else ''),
+                        new_seit,
+                        str(data.get('active', 1)),
+                        data.get('HbOrt', ''),
+                        data.get('GH', ''),
+                        str(data.get('HLG', 0)),
+                        str(data.get('HLM', 0)),
+                        data.get('HOW', 'O'),
+                        str(data.get('HBG', 0)),
+                        str(data.get('HBM', 0)),
+                        data.get('HNS', 'N'),
+                        data.get('NbOrt', ''),
+                        data.get('GN', ''),
+                        str(data.get('NLG', 0)),
+                        str(data.get('NLM', 0)),
+                        data.get('NOW', 'O'),
+                        str(data.get('NBG', 0)),
+                        str(data.get('NBM', 0)),
+                        data.get('NNS', 'N')
+                    ]
+                    updated_observers.append(updated_row)
+                else:
+                    updated_observers.append(obs)
+            
+            if not entry_found:
+                return jsonify({'error': 'site_entry_not_found', 'kk': kk, 'seit': original_seit}), 404
+            
+            def sort_key(obs):
+                kk_val = obs[0]
+                seit_parts = obs[3].split('/')
+                month = int(seit_parts[0])
+                year = int(seit_parts[1])
+                full_year = jj_to_full_year(year)
+                return (kk_val, full_year * 100 + month)
+            
+            updated_observers.sort(key=sort_key)
+            updated_observers = observer_logic.sort_observers(updated_observers)
+            observer_file.save_file(updated_observers)
+            current_app.config['OBSERVERS'] = updated_observers
+            
+            return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'error': f'Failed to update site: {str(e)}'}), 500
+        return jsonify({'error': 'site_update_failed', 'details': str(e)}), 500
 
 
 @api_blueprint.route('/observers/<kk>/sites', methods=['DELETE'])
@@ -5433,46 +5631,51 @@ def delete_observer_site(kk):
     # Get seit from request body
     data = request.get_json()
     if not data:
-        return jsonify({'error': 'No data provided'}), 400
+        return jsonify({'error': 'no_data_provided'}), 400
     
     seit = data.get('seit')
     if not seit:
-        return jsonify({'error': 'seit parameter required'}), 400
+        return jsonify({'error': 'seit_required'}), 400
     
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Count how many entries exist for this observer
-    observer_entries = [obs for obs in observers if obs[0] == kk]  # obs[0] is KK
+    observer_entries = [obs for obs in observers if obs[0] == kk]
     
     if len(observer_entries) <= 1:
-        return jsonify({'error': 'Cannot delete the last site entry'}), 400
+        return jsonify({'error': 'cannot_delete_last_site', 'kk': kk}), 400
     
-    # Find and remove the entry
-    entry_found = False
-    new_observers = []
-    for obs in observers:
-        if obs[0] == kk and obs[3] == seit:  # obs[0]=KK, obs[3]=seit
-            entry_found = True
-            continue
-        new_observers.append(obs)
-    
-    if not entry_found:
-        return jsonify({'error': 'Site entry not found'}), 404
-    
-    # Save using io module
+    # Delete the entry
     try:
-        # Sort (Layer 2)
-        new_observers = observer_logic.sort_observers(new_observers)
+        if is_cloud_mode():
+            # Cloud Mode: Direct SQL DELETE
+            success = observer_db.delete_one(kk, seit)
+            if not success:
+                return jsonify({'error': 'site_not_found', 'kk': kk, 'seit': seit}), 404
+        else:
+            # Local Mode: Filter out entry and save
+            entry_found = False
+            new_observers = []
+            for obs in observers:
+                if obs[0] == kk and obs[3] == seit:
+                    entry_found = True
+                    continue
+                new_observers.append(obs)
+            
+            if not entry_found:
+                return jsonify({'error': 'site_not_found', 'kk': kk, 'seit': seit}), 404
+            
+            new_observers = observer_logic.sort_observers(new_observers)
+            observer_file.save_file(new_observers)
+            current_app.config['OBSERVERS'] = new_observers
         
-        # Save to file (Layer 3a)
-        observer_file.save_file(new_observers)
-        current_app.config['OBSERVERS'] = new_observers
-        
-        return jsonify({
-            'success': True
-        })
+        return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'error': f'Failed to delete site: {str(e)}'}), 500
+        return jsonify({'error': 'site_delete_failed', 'details': str(e)}), 500
 
 
 @api_blueprint.route('/observers', methods=['DELETE'])
@@ -5482,43 +5685,55 @@ def delete_observer():
     # Get KK from request body
     data = request.get_json()
     if not data:
-        return jsonify({'error': 'No data provided'}), 400
+        return jsonify({'error': 'no_data_provided'}), 400
     
     kk = data.get('KK')
     if not kk:
-        return jsonify({'error': 'KK parameter required'}), 400
+        return jsonify({'error': 'kk_required'}), 400
     
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
     
-    observers = current_app.config.get('OBSERVERS', [])
+    # Get observers based on deployment mode
+    if is_cloud_mode():
+        observers = observer_db.load_filtered(kk=kk)
+    else:
+        observers = current_app.config.get('OBSERVERS', [])
     
     # Find all entries for this observer
     observer_entries = [obs for obs in observers if obs[0] == kk]
     
     if not observer_entries:
-        return jsonify({'error': 'Observer not found'}), 404
+        return jsonify({'error': 'observer_not_found', 'kk': kk}), 404
     
-    # Remove all entries for this observer
-    new_observers = [obs for obs in observers if obs[0] != kk]
-    
-    # Save using io module
+    # Delete all entries
     try:
-        # No need to sort after deleting all records for one observer
-        # But we do it for consistency
-        new_observers = observer_logic.sort_observers(new_observers)
-        
-        # Save to file (Layer 3a)
-        observer_file.save_file(new_observers)
-        current_app.config['OBSERVERS'] = new_observers
-        
-        return jsonify({
-            'success': True,
-            'message': f'Observer {kk} deleted successfully',
-            'deleted_count': len(observer_entries)
-        })
+        if is_cloud_mode():
+            # Cloud Mode: Delete all entries for this KK
+            deleted_count = 0
+            for obs in observer_entries:
+                seit = obs[3]  # obs[3] = seit
+                success = observer_db.delete_one(kk, seit)
+                if success:
+                    deleted_count += 1
+            
+            return jsonify({
+                'success': True,
+                'deleted_count': deleted_count
+            })
+        else:
+            # Local Mode: Filter out all entries for this KK
+            new_observers = [obs for obs in observers if obs[0] != kk]
+            new_observers = observer_logic.sort_observers(new_observers)
+            observer_file.save_file(new_observers)
+            current_app.config['OBSERVERS'] = new_observers
+            
+            return jsonify({
+                'success': True,
+                'deleted_count': len(observer_entries)
+            })
     except Exception as e:
-        return jsonify({'error': f'Failed to delete observer: {str(e)}'}), 500
+        return jsonify({'error': 'observer_delete_failed', 'details': str(e)}), 500
 
 
 @api_blueprint.route('/analysis', methods=['POST'])

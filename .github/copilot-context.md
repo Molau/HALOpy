@@ -215,6 +215,41 @@ else:
 - **Related**: This complements Decision #026 (Code Modification Policy) and Decision #027 (No Automated String Replacement)
 - **Enforcement**: Code reviews must check for inline imports before approval
 
+### 0b. Cloud Mode Data Access Pattern - Decision #031
+- **Date**: 2026-02-11 (Updated)
+- **Status**: ✓ Approved
+- **Core Rule**: Cloud Mode MUST use direct database queries, Local Mode MAY use memory caching
+- **Cloud Mode Pattern**:
+  - ✗ **NEVER** cache observers/observations in `app.config` or memory
+  - ✓ **ALWAYS** use direct database queries: `observer_db.load_filtered(kk=kk)`, `obs_db.load_filtered(**filters)`
+  - ✓ **ALWAYS** query only the data needed (filtered queries, not `load_all()`)
+  - ✓ Database handles filtering, sorting, and pagination
+  - ✓ **TRUE UPDATE operations**: Use SQL UPDATE, not delete+insert
+- **Local Mode Pattern**:
+  - ✓ **ALLOWED** to cache CSV data in `app.config['OBSERVATIONS']`, `app.config['OBSERVERS']`
+  - ✓ File-based operations load data into memory once, then work with cached data
+  - ✓ Memory operations for filtering, sorting (Python functions)
+  - ✓ **UPDATE = Delete + Insert**: Required to maintain sort order in CSV files
+- **Update Operations Difference**:
+  - **Cloud Mode**: `UPDATE observers SET field=value WHERE kk=? AND since=?` (efficient, no sorting needed)
+  - **Local Mode**: Delete old record + Insert new record (maintains CSV sort order)
+- **Implementation Rules**:
+  1. ✓ **app.py Cloud Mode**: `app.config['OBSERVERS'] = []` (keep empty)
+  2. ✓ **API routes Cloud Mode**: Use `observer_db.load_filtered()` not `current_app.config.get('OBSERVERS')`
+  3. ✓ **app.py Local Mode**: `app.config['OBSERVERS'] = observer_file.load()`
+  4. ✓ **API routes Local Mode**: Use `current_app.config.get('OBSERVERS')` from cache
+  5. ✗ **NEVER** mix patterns: Cloud Mode routes must NOT use `app.config` caches
+  6. ✓ **Cloud Mode WRITE ops**: Use SQL UPDATE/INSERT/DELETE directly
+  7. ✓ **Local Mode WRITE ops**: Use delete+insert pattern for updates
+- **Detection Pattern**: `if is_cloud_mode(): use database; else: use app.config`
+- **Rationale**:
+  - **Cloud Scalability**: Direct DB queries handle large datasets efficiently
+  - **Memory Efficiency**: No need to cache entire database in memory
+  - **Real-time Data**: Always current data without cache invalidation complexity
+  - **Multi-User**: Each request gets latest data without shared state issues
+  - **Performance**: SQL UPDATE faster than delete+insert, no sorting overhead
+- **Impact**: CRITICAL - Prevents memory bloat and ensures scalable cloud deployment
+
 ### 1. Code Modification Policy - Decision #026
 - **Date**: 2026-01-25
 - **Status**: ✓ Approved

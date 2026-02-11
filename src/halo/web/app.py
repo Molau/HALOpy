@@ -19,6 +19,7 @@ from halo.resources import get_current_language, get_i18n, set_language, get_str
 from halo.services.settings import Settings
 import halo.io.observations_file as obs_file
 import halo.io.observers_file as observer_file
+import halo.io.observers_db as observer_db
 
 
 def create_app(config=None):
@@ -44,7 +45,7 @@ def create_app(config=None):
     )
     
     # Load configuration
-    app.config.update({
+    base_config = {
         'SECRET_KEY': 'dev-secret-key-change-in-production',
         'JSON_AS_ASCII': False,  # Support Unicode characters (umlauts)
         'INPUT_MODE': 'N',  # Default: N=Number entry, M=Menu entry
@@ -54,11 +55,16 @@ def create_app(config=None):
         'DATE_DEFAULT_YEAR': 2026,  # Year for constant mode
         'LOADED_FILE': None,
         'OBSERVATIONS': [],
-        'OBSERVERS': [],  # Observer metadata from halobeo.csv
         'ACTIVE_OBSERVERS_ONLY': False,  # Setting: filter to active observers only
         'DIRTY': False,  # Track unsaved changes
         'UPDATE_REPO': 'Molau/Halo',  # GitHub repository for auto-updates
-    })
+    }
+    
+    # Add OBSERVERS only in Local Mode (Cloud Mode must use database directly)
+    if not is_cloud_mode():
+        base_config['OBSERVERS'] = []  # Observer metadata from halobeo.csv (Local Mode only)
+    
+    app.config.update(base_config)
     
     if config:
         app.config.update(config)
@@ -88,9 +94,15 @@ def create_app(config=None):
             except Exception as e:
                 pass
     
-    # Load observer metadata from resources/halobeo.csv (Layer 3a)
-    observers, _ = observer_file.open_file()
-    app.config['OBSERVERS'] = observers
+    # Load observer metadata
+    if is_cloud_mode():
+        # Cloud Mode: Don't cache observers - access database directly in each API call
+        # NO FALLBACK: If code tries to access app.config['OBSERVERS'], it should fail explicitly
+        pass  # Keep OBSERVERS undefined to catch incorrect usage
+    else:
+        # Local Mode: Load observers from resources/halobeo.csv (Layer 3a)
+        observers, _ = observer_file.open_file()
+        app.config['OBSERVERS'] = observers
     
     @app.before_request
     def setup_language():

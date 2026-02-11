@@ -4663,7 +4663,6 @@ async function showSelectDialog() {
             }
             
             // Send to server for filtering
-            console.log('🔍 DEBUG FRONTEND: Sending filter request:', filterParams);
             const startTime = performance.now();
             const filterResponse = await fetch('/api/observations/filter', {
                 method: 'POST',
@@ -4671,7 +4670,6 @@ async function showSelectDialog() {
                 body: JSON.stringify(filterParams)
             });
             const elapsed = performance.now() - startTime;
-            console.log(`🔍 DEBUG FRONTEND: Filter response received in ${elapsed.toFixed(0)}ms, status=${filterResponse.status}`);
             
             if (!filterResponse.ok) {
                 const error = await filterResponse.json();
@@ -4682,11 +4680,6 @@ async function showSelectDialog() {
             }
             
             const filterResult = await filterResponse.json();
-            console.log('🔍 DEBUG FRONTEND: Filter result:', {
-                kept: filterResult.kept_count,
-                deleted: filterResult.deleted_count,
-                observations: filterResult.filtered_observations?.length
-            });
             const filteredObs = filterResult.filtered_observations || [];
             const keptCount = filterResult.kept_count || 0;
             const deletedCount = filterResult.deleted_count || 0;
