@@ -113,13 +113,18 @@ class Settings:
 
     @staticmethod
     def save_from(app_config: Dict[str, Any], root_path: Path) -> None:
-        # In cloud mode, get observer KK from FIXED_OBSERVER
+        # Cloud Mode: get observer KK from session (set on login, per-user)
+        # Local Mode: get observer KK from app_config (optional UI filter)
         observer_kk = None
         if is_cloud_mode():
-            observer_kk = app_config.get('FIXED_OBSERVER', '')
+            from flask import session
+            observer_kk = session.get('observer_kk', '')
             if not observer_kk:
                 # No observer set yet (before login) - skip saving config
                 return
+        else:
+            # Local Mode: Read optional fixed observer from app_config
+            observer_kk = app_config.get('FIXED_OBSERVER', '')
         
         cfg_file = Settings._cfg_path(root_path, observer_kk)
         rows = [

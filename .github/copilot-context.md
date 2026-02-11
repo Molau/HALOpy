@@ -39,6 +39,7 @@ HALOpy supports two fundamentally different deployment modes with distinct behav
 - **Fixed Observer**: 
   - Regular users: Automatically set from login - `session['observer_kk'] = KK` (security enforcement)
   - Admin user: `session['observer_kk'] = None` (full access to all observations)
+- **Config Files**: Per-user config files - `halo.44.cfg` for KK=44, `halo.admin.cfg` for admin
 - **File Functions**: DISABLED - No "new file", "open file", "save file" (database-only)
 - **Analysis**: User can access ALL observations for analysis (KK filter NOT mandatory)
 - **Performance**: Must use SQL filtering (`obs_db.load_filtered()`) - never load entire database
@@ -74,6 +75,7 @@ HALOpy supports two fundamentally different deployment modes with distinct behav
 - ✗ Use `obs_db.load_all()` (performance disaster with 100K+ records)
 - ✗ Cache observations in memory
 - ✗ Enable file operations
+- ✗ Use autosave/recovery (*.$$$ files) - database is source of truth
 
 **DO in Local Mode:**
 - ✓ Use `app.config['OBSERVATIONS']` to cache loaded file
