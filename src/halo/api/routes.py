@@ -5205,6 +5205,9 @@ def check_observer_active(kk):
     year_4digit = jj_to_full_year(jj)
     check_date = year_4digit * 100 + mm
     
+    print(f"🔍 DEBUG Observer Activity: KK={kk}, mm={mm}, jj={jj}")
+    print(f"🔍 DEBUG: year_4digit={year_4digit}, check_date={check_date}")
+
     # Find all site entries for this observer where seit <= check_date
     matching_records = []
     for obs in observers:
@@ -5216,21 +5219,31 @@ def check_observer_active(kk):
             seit_year_4digit = jj_to_full_year(seit_year)
             seit_date = seit_year_4digit * 100 + seit_month
             
+            print(f"🔍 DEBUG: Found observer record: seit={obs[3]}, seit_year_4digit={seit_year_4digit}, seit_date={seit_date}, aktiv={obs[4]}")
+            
             # Only consider records where seit <= check_date
             if seit_date <= check_date:
                 matching_records.append((seit_date, obs))
-    
+                print(f"🔍 DEBUG: ✓ Record INCLUDED (seit_date {seit_date} <= check_date {check_date})")
+            else:
+                print(f"🔍 DEBUG: ✗ Record EXCLUDED (seit_date {seit_date} > check_date {check_date})")
+
     # No matching records found
     if not matching_records:
+        print(f"🔍 DEBUG: ✗ NO matching records found for KK={kk} at date={check_date}")
         return jsonify({'active': False})
-    
+
     # Find the record with the LATEST seit date (most recent before or at check_date)
     matching_records.sort(key=lambda x: x[0], reverse=True)
     latest_record = matching_records[0][1]
     
+    print(f"🔍 DEBUG: Latest matching record: seit={latest_record[3]}, aktiv={latest_record[4]}")
+
     # Check if that record is active (aktiv=1)
     is_active = int(latest_record[4]) == 1
     
+    print(f"🔍 DEBUG: Final result: is_active={is_active}")
+
     return jsonify({'active': is_active})
 
 

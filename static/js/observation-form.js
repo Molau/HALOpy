@@ -710,14 +710,19 @@ class ObservationForm {
             let gValid;
             if (mm === -1 || jj === -1 || kk === -1) {
                 console.log("🔍 DEBUG: One of KK/MM/JJ is -1, setting g to disabled");
-
+                // Any of MM, JJ, KK not set: g must be -1
+                gValid = [''];
                 
+                setOptionStates(this.fields.g, gOpts, gValid);
+                this.fieldConstraints.g = gValid;
+
                 // If current g value is not valid, set to first valid value and trigger g
                 if (!gValid.includes(oldGValue)) {
                     this.fields.g.value = gValid[0];
                     this.manageFieldDependencies('g');
                 } else {
                     this.manageFieldDependencies('g');
+                }
                 }
             } else {
                 console.log("🔍 DEBUG: All KK/MM/JJ are set, checking observer activity");
