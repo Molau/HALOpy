@@ -494,20 +494,41 @@ def get_observations() -> Dict[str, Any]:
 
     # Layer 3: Get observations from storage
     if is_cloud_mode():
-        # Cloud Mode: Read from database (Layer 3b)
-        observations = obs_db.load_all()
+        # Cloud Mode: Use SQL pagination for performance (Layer 3b)
+        fixed_observer = current_app.config.get('FIXED_OBSERVER')
+        
+        # Get total count first (with Fixed Observer filter if set)
+        if fixed_observer:
+            total = obs_db.count(kk=int(fixed_observer))
+        else:
+            total = obs_db.count()
+        
+        # Apply pagination directly in SQL query
+        if limit <= 0:
+            # Fetch all from offset
+            if fixed_observer:
+                paginated = obs_db.load_filtered(kk=int(fixed_observer), limit=None, offset=offset)
+            else:
+                paginated = obs_db.load_filtered(limit=None, offset=offset)
+        else:
+            # Fetch limited results from offset
+            if fixed_observer:
+                paginated = obs_db.load_filtered(kk=int(fixed_observer), limit=limit, offset=offset)
+            else:
+                paginated = obs_db.load_filtered(limit=limit, offset=offset)
+        
         loaded_file = None
     else:
         # Local Mode: Read from in-memory data (Layer 3a via app.config)
         observations = current_app.config.get('OBSERVATIONS') or []
         loaded_file = current_app.config.get('LOADED_FILE')
-
-    total = len(observations)
-    # Support limit <= 0 meaning "fetch all" from the current offset
-    if limit <= 0:
-        paginated = observations[offset:]
-    else:
-        paginated = observations[offset:offset + limit]
+        
+        total = len(observations)
+        # Support limit <= 0 meaning "fetch all" from the current offset
+        if limit <= 0:
+            paginated = observations[offset:]
+        else:
+            paginated = observations[offset:offset + limit]
 
     result = {
         'total': total,
