@@ -3367,9 +3367,9 @@ async function showDisplayObservationsDialog() {
         spinnerInfo.modalEl.addEventListener('hidden.bs.modal', () => {
             spinnerInfo.modalEl.remove();
         });
-    
-    // Show filter dialog with callbacks
-    filterDialog.show(
+        
+        // Show filter dialog with callbacks
+        filterDialog.show(
         async (filterState) => {
             // onApply callback - filters have been applied
             // Check INPUT_MODE to decide display format
@@ -3394,6 +3394,12 @@ async function showDisplayObservationsDialog() {
 
         }
     );
+    } catch (error) {
+        // Hide spinner on error
+        spinnerInfo.modal.hide();
+        spinnerInfo.modalEl.remove();
+        showErrorDialog(i18nStrings.messages.error_loading_data);
+    }
 }
 
 // Show compact list of observations in modal (Kurzausgabe - number format)
