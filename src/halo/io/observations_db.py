@@ -16,6 +16,7 @@ except ImportError:
 
 from typing import List, Optional, Tuple
 from halo.models.types import Observation
+from halo.models.constants import YEAR_CUTOFF
 from halo.io.db_connection import get_connection
 
 
@@ -106,13 +107,15 @@ def load_all() -> List[Observation]:
     """
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT kk, o, jj, mm, tt, g,
                        zs, zm, d, dd, n, c, cc,
                        ee, h, f, v, ff, zz, gg,
                        pillar, sectors, remarks
                 FROM observations
-                ORDER BY jj, mm, tt, zs, zm, kk, ee, gg
+                ORDER BY 
+                    CASE WHEN jj >= {YEAR_CUTOFF} THEN jj + 1900 ELSE jj + 2000 END,
+                    mm, tt, zs, zm, kk, ee, gg
             """)
             
             rows = cursor.fetchall()
