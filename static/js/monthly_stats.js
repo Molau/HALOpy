@@ -976,7 +976,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }, 500);
                 } catch (error) {
                     console.error('Error printing chart:', error);
-                    showErrorDialog('Fehler beim Drucken des Diagramms');
+                    showErrorDialog(i18nStrings.errors.chart_print_failed);
                 }
             };
         }
@@ -1004,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     URL.revokeObjectURL(url);
                 } catch (error) {
                     console.error('Error saving chart:', error);
-                    showErrorDialog('Fehler beim Speichern des Diagramms');
+                    showErrorDialog(i18nStrings.errors.chart_save_failed);
                 }
             };
         }
@@ -1032,7 +1032,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }, 500);
                 } catch (error) {
                     console.error('Error printing chart:', error);
-                    showErrorDialog('Fehler beim Drucken des Diagramms');
+                    showErrorDialog(i18nStrings.errors.chart_print_failed);
                 }
             };
         }
@@ -1060,7 +1060,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     URL.revokeObjectURL(url);
                 } catch (error) {
                     console.error('Error saving chart:', error);
-                    showErrorDialog('Fehler beim Speichern des Diagramms');
+                    showErrorDialog(i18nStrings.errors.chart_save_failed);
                 }
             };
         }
@@ -1134,7 +1134,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             })
             .catch(error => {
                 console.error('Error saving bar chart:', error);
-                showErrorDialog('Fehler beim Speichern des Diagramms');
+                showErrorDialog(i18nStrings.errors.chart_save_failed);
             });
     }
 
@@ -1163,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             })
             .catch(error => {
                 console.error('Error saving chart:', error);
-                showErrorDialog('Fehler beim Speichern des Diagramms');
+                showErrorDialog(i18nStrings.errors.chart_save_failed);
             });
     }
 

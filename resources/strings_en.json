@@ -153,7 +153,15 @@
     "fill_at_least_one_field": "Please fill at least one field",
     "select_prompt": "Please select",
     "select_observer": "Select Observer",
-    "filter_value_required": "Please enter a filter value!"
+    "filter_value_required": "Please enter a filter value!",
+    "observer_list_load_failed": "Could not load observer list",
+    "bulk_update_failed": "Error updating observations",
+    "chart_print_failed": "Error printing chart",
+    "chart_save_failed": "Error saving chart",
+    "markdown_save_failed": "Error saving markdown file",
+    "unknown_error": "Unknown error",
+    "chart_print_failed": "Error printing chart",
+    "chart_save_failed": "Error saving chart"
   },
   "filter_dialog": {
     "title": "Filter Criteria",
@@ -236,6 +244,7 @@
     "modify_groups": "Observation Groups",
     "modify_groups_title": "Modify Observation Groups",
     "group_modify_info": "Only filled fields will be changed for all filtered observations.",
+    "bulk_modify_success": "observations were successfully modified.",
     "input_pattern": "KKOJJ MMTTg ZZZZd DDNCc EEHFV fzzGG 8HHHH Sectors         Remarks",
     "input_incomplete": "Input incomplete or invalid.",
     "error_adding": "Error adding observation",

@@ -298,7 +298,7 @@ async function loadObserverCodes() {
     // Load simplified observer list (just KK codes for initial validation)
     // Observer activity is checked via API endpoint when needed (g-field)
     const resp = await fetch('/api/observers/list');
-    if (!resp.ok) throw new Error('Konnte Beobachterliste nicht laden');
+    if (!resp.ok) throw new Error(i18nStrings.errors?.observer_list_load_failed || 'Could not load observer list');
     const data = await resp.json();
     const observers = data.observers || [];
     
@@ -2863,14 +2863,14 @@ async function processBulkUpdate(filteredObs, updates) {
         } else {}
         
 
-        showMessage(`${filteredObs.length} Beobachtungen wurden erfolgreich ge?ndert.`, 'success');
+        showMessage(`${filteredObs.length} ${i18nStrings.observations.bulk_modify_success}`, 'success');
         
         // Reload the page to refresh all displays
         setTimeout(() => {
             window.location.reload();
         }, 1500);
         
-    } catch (error) {showErrorDialog('Fehler beim Aktualisieren der Beobachtungen: ' + error.message);
+    } catch (error) {showErrorDialog(`${i18nStrings.errors.bulk_update_failed}: ${error.message}`);
     }
 }
 
@@ -2964,12 +2964,17 @@ async function showDeleteSingleObservations(filterState) {
                 
                 await triggerAutosave();
 
+                // Store notification in sessionStorage for display on main page
                 const msg = `${i18nStrings.common.observation} ${i18nStrings.common.deleted}`;
-                showMessage(msg, 'success');
+                sessionStorage.setItem('pendingNotification', JSON.stringify({
+                    message: `<strong>✓</strong> ${msg}`,
+                    type: 'success',
+                    duration: 3000
+                }));
                 
-                // Continue to next observation
+                // Continue to next observation (longer delay to let message show)
                 currentIndex += 1;
-                setTimeout(() => showNextObservation(), 1500);
+                setTimeout(() => showNextObservation(), 2500);
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
                 window.navigateInternal('/');
             }
@@ -3417,11 +3422,14 @@ async function showDisplayObservationsDialog() {
         const filterDialog = new FilterDialog();
         await filterDialog.initialize();
         
-        // Hide spinner
+        // Hide and immediately remove spinner (don't wait for hidden.bs.modal event)
         spinnerInfo.modal.hide();
-        spinnerInfo.modalEl.addEventListener('hidden.bs.modal', () => {
-            spinnerInfo.modalEl.remove();
-        });
+        // Remove immediately to prevent re-showing when other modals close
+        setTimeout(() => {
+            if (spinnerInfo.modalEl && spinnerInfo.modalEl.parentNode) {
+                spinnerInfo.modalEl.remove();
+            }
+        }, 100);
         
         // Show filter dialog with callbacks
         filterDialog.show(
@@ -5190,7 +5198,7 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
                 }, 2000);
             } else {
                 const error = await response.json();
-                showErrorDialog(i18nStrings.common.error + ': ' + (error.error || 'Unknown error'), () => {
+                showErrorDialog(i18nStrings.common.error + ': ' + (error.error || i18nStrings.errors.unknown_error), () => {
                     window.navigateInternal('/');
                 });
             }
@@ -7514,7 +7522,7 @@ async function showAddObserverDialog(formData = null) {
                     modal.hide();
                     modalEl.addEventListener('hidden.bs.modal', () => {
                         modalEl.remove();
-                        showErrorDialog(i18nStrings.observers.error_kk_exists || result.error, () => {
+                        showErrorDialog(i18nStrings.observers.error_kk_exists, () => {
                             showAddObserverDialog(formData);
                         });
                     }, { once: true });
