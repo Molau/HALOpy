@@ -151,7 +151,9 @@ def load_filtered(**filters) -> List[Observation]:
     if not filters:
         return load_all()
     
-    print(f"🔍 DEBUG load_filtered: filters={filters}")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 DEBUG load_filtered: filters={filters}")
     
     with get_connection() as conn:
         with conn.cursor() as cursor:
@@ -174,7 +176,7 @@ def load_filtered(**filters) -> List[Observation]:
             
             where_sql = " AND ".join(where_clauses)
             
-            print(f"🔍 DEBUG load_filtered: WHERE {where_sql}, params={params}")
+            logger.info(f"🔍 DEBUG load_filtered: WHERE {where_sql}, params={params}")
             
             query = f"""
                 SELECT kk, o, jj, mm, tt, g,
@@ -188,7 +190,7 @@ def load_filtered(**filters) -> List[Observation]:
             
             cursor.execute(query, params)
             rows = cursor.fetchall()
-            print(f"🔍 DEBUG load_filtered: Query returned {len(rows)} rows")
+            logger.info(f"🔍 DEBUG load_filtered: Query returned {len(rows)} rows")
             observations = [_tuple_to_observation(row) for row in rows]
             
             return observations

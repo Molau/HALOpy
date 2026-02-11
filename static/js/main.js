@@ -3358,9 +3358,8 @@ async function showDisplayObservationsDialog() {
             }
         }
         
-        // Initialize filter dialog
+        // Initialize filter dialog (no data loading needed upfront)
         const filterDialog = new FilterDialog();
-        await filterDialog.initialize();
         
         // Hide spinner
         spinnerInfo.modal.hide();
@@ -4596,11 +4595,15 @@ async function showSelectDialog() {
             }
             
             // Send to server for filtering
+            console.log('🔍 DEBUG FRONTEND: Sending filter request:', filterParams);
+            const startTime = performance.now();
             const filterResponse = await fetch('/api/observations/filter', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(filterParams)
             });
+            const elapsed = performance.now() - startTime;
+            console.log(`🔍 DEBUG FRONTEND: Filter response received in ${elapsed.toFixed(0)}ms, status=${filterResponse.status}`);
             
             if (!filterResponse.ok) {
                 const error = await filterResponse.json();
@@ -4611,6 +4614,11 @@ async function showSelectDialog() {
             }
             
             const filterResult = await filterResponse.json();
+            console.log('🔍 DEBUG FRONTEND: Filter result:', {
+                kept: filterResult.kept_count,
+                deleted: filterResult.deleted_count,
+                observations: filterResult.filtered_observations?.length
+            });
             const filteredObs = filterResult.filtered_observations || [];
             const keptCount = filterResult.kept_count || 0;
             const deletedCount = filterResult.deleted_count || 0;
