@@ -151,10 +151,6 @@ def load_filtered(**filters) -> List[Observation]:
     if not filters:
         return load_all()
     
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"🔍 DEBUG load_filtered: filters={filters}")
-    
     with get_connection() as conn:
         with conn.cursor() as cursor:
             # Build WHERE clause dynamically
@@ -176,8 +172,6 @@ def load_filtered(**filters) -> List[Observation]:
             
             where_sql = " AND ".join(where_clauses)
             
-            logger.info(f"🔍 DEBUG load_filtered: WHERE {where_sql}, params={params}")
-            
             query = f"""
                 SELECT kk, o, jj, mm, tt, g,
                        zs, zm, d, dd, n, c, cc,
@@ -185,12 +179,13 @@ def load_filtered(**filters) -> List[Observation]:
                        pillar, sectors, remarks
                 FROM observations
                 WHERE {where_sql}
-                ORDER BY jj, mm, tt, zs, zm, kk, ee, gg
+                ORDER BY 
+                    CASE WHEN jj >= {YEAR_CUTOFF} THEN jj + 1900 ELSE jj + 2000 END,
+                    mm, tt, zs, zm, kk, ee, gg
             """
             
             cursor.execute(query, params)
             rows = cursor.fetchall()
-            logger.info(f"🔍 DEBUG load_filtered: Query returned {len(rows)} rows")
             observations = [_tuple_to_observation(row) for row in rows]
             
             return observations

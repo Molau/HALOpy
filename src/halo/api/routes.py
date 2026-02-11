@@ -500,8 +500,8 @@ def get_observations() -> Dict[str, Any]:
         else:
             observations = obs_db.load_all()
         
-        # Sort observations using HALO standard sort order (J → M → T → ZS → ZM → K → E → GG)
-        observations = sorted(observations, key=cmp_to_key(_spaeter))
+        # Database already returns sorted observations (ORDER BY in SQL)
+        # No Python sorting needed
         
         # Apply pagination in Python (since SQL pagination not yet implemented)
         total = len(observations)
@@ -844,12 +844,14 @@ def filter_observations() -> Dict[str, Any]:
             # Use SQL filtering when possible, fall back to load_all() for complex filters
             if sql_filters:
                 matching_obs = obs_db.load_filtered(**sql_filters)
+                # Database already returns sorted observations (ORDER BY in SQL)
                 # For Cloud-Mode with SQL filtering, we already have filtered results
                 # No need to filter again in Python
                 all_obs = None  # Not needed
             else:
                 # Complex filters (ZZ, SH) need Python filtering
                 observations = obs_db.load_all()
+                # Database already returns sorted observations (ORDER BY in SQL)
                 all_obs = observations
                 matching_obs = []  # Will be populated below
         else:
@@ -1194,6 +1196,7 @@ def load_file(filename: str) -> Dict[str, Any]:
         if is_cloud_mode():
             # Cloud Mode: Load from database
             observations = obs_db.load_all()
+            # Database already returns sorted observations (ORDER BY in SQL)
             
             # Store in app config (filename is ignored in cloud mode)
             current_app.config['LOADED_FILE'] = 'cloud-database'

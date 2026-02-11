@@ -67,6 +67,7 @@ HALOpy supports two fundamentally different deployment modes with distinct behav
 - ✓ Always query database directly (no caching)
 - ✓ Enforce KK filter for observation display (except admin)
 - ✓ Allow unrestricted access for analysis functions
+- ✓ **Database sorts observations** - ORDER BY in SQL (never use Python _spaeter() in Cloud Mode)
 
 **DON'T in Cloud Mode:**
 - ✗ Store user data in `app.config` (shared across all users)
@@ -79,6 +80,7 @@ HALOpy supports two fundamentally different deployment modes with distinct behav
 - ✓ Use `app.config['FIXED_OBSERVER']` for optional UI filter
 - ✓ Enable all file operations (new, open, save, merge)
 - ✓ Cache data in memory after loading
+- ✓ **Python sorts observations** - use _spaeter() function for HALO sort order (J→M→T→ZS→ZM→K→E→GG)
 
 **DON'T in Local Mode:**
 - ✗ Require authentication
