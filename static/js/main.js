@@ -2519,11 +2519,11 @@ async function showGroupModifyDialogMenu(filteredObs) {
         return `<option value="${obs.KK}">${obs.KK} - ${obs.VName} ${obs.NName}</option>`;
     }).join('');
     
-    // Build year options (1980-2079)
+    // Build year options (0-99: 80-99=1980-1999, 0-79=2000-2079)
     const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = (YEAR_MIN-1900) + i; // 80-179
-        const displayYear = year < (YEAR_MIN-1900) ? 2000 + year : 1900 + year;
-        return `<option value="${year}">${displayYear}</option>`;
+        const jj = (YEAR_MIN-1900 + i) % 100;  // 0-99
+        const displayYear = jj < (YEAR_MIN-1900) ? 2000 + jj : 1900 + jj;
+        return `<option value="${jj}">${displayYear}</option>`;
     }).join('');
     
     const modalHtml = `

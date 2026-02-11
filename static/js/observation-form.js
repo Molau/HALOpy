@@ -192,11 +192,11 @@ class ObservationForm {
             return `<option value="${obs.KK}" ${selected}>${obs.KK} - ${obs.VName || ''} ${obs.NName || ''}</option>`;
         }).join('');
         
-        // Build year options (YEAR_MIN-YEAR_MAX)
+        // Build year options (0-99: 80-99=1980-1999, 0-79=2000-2079)
         const yearOptions = Array.from({length: 100}, (_, i) => {
-            const year = (YEAR_MIN - 1900) + i;
-            const displayYear = year < YEAR_MIN-1900 ? 2000 + year : 1900 + year;
-            return `<option value="${year}">${displayYear}</option>`;
+            const jj = (YEAR_MIN - 1900 + i) % 100;  // 0-99
+            const displayYear = jj < (YEAR_MIN - 1900) ? 2000 + jj : 1900 + jj;
+            return `<option value="${jj}">${displayYear}</option>`;
         }).join('');
         
         const modalHtml = `
@@ -731,14 +731,10 @@ class ObservationForm {
                 fetch(`/api/observers/${kk}/active?mm=${mm}&jj=${jj}`)
                     .then(response => response.json())
                     .then(data => {
-                        console.log("🔍 DEBUG: Observer activity response:", data);
-
                         if (data.active) {
-                            console.log("🔍 DEBUG: Observer was active, enabling g field");
                             // Observer was active: g can be -1..2
                             gValid = ['', '0', '1', '2'];
                         } else {
-                            console.log("🔍 DEBUG: Observer was not active, disabling g field");
                             // Observer was not active: g must be -1
                             gValid = [''];
                         }
@@ -1448,10 +1444,10 @@ class ObservationForm {
         // Convert KK to 2-digit string with leading zero to match option values
         this.fields.kk.value = obs.KK !== undefined && obs.KK !== null && obs.KK !== '' ? String(obs.KK).padStart(2, '0') : '';
         this.fields.o.value = obs.O || '';
-        // Year: CSV stores 0-99, dropdown uses 80-179 (80-99=1980-1999, 0-79=2000-2079)
+        // Year: CSV stores 0-99, form displays 0-99
         if (obs.JJ !== undefined && obs.JJ !== null && obs.JJ !== '') {
             const jj = parseInt(obs.JJ);
-            this.fields.jj.value = jj < (YEAR_MIN - 1900) ? jj + 100 : jj;  // 5 -> 105 (2005), 95 -> 95 (1995)
+            this.fields.jj.value = jj;  // Use JJ directly (0-99)
         } else {
             this.fields.jj.value = '';
         }
