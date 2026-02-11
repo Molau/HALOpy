@@ -500,6 +500,9 @@ def get_observations() -> Dict[str, Any]:
         else:
             observations = obs_db.load_all()
         
+        # Sort observations using HALO standard sort order (J → M → T → ZS → ZM → K → E → GG)
+        observations = sorted(observations, key=cmp_to_key(_spaeter))
+        
         # Apply pagination in Python (since SQL pagination not yet implemented)
         total = len(observations)
         if limit <= 0:
@@ -811,11 +814,8 @@ def filter_observations() -> Dict[str, Any]:
             # Build filter dict for load_filtered()
             sql_filters = {}
             
-            current_app.logger.info(f"🔍 DEBUG FILTER: filter_type={filter_type}, action={action}, params={params}")
-            
             if filter_type == 'KK':
                 sql_filters['kk'] = int(params.get('value'))
-                current_app.logger.info(f"🔍 DEBUG FILTER: KK filter - value={sql_filters['kk']}")
             elif filter_type == 'MM':
                 sql_filters['mm'] = int(params.get('month'))
                 sql_filters['jj'] = int(params.get('year')) % 100
@@ -843,17 +843,11 @@ def filter_observations() -> Dict[str, Any]:
             
             # Use SQL filtering when possible, fall back to load_all() for complex filters
             if sql_filters:
-                current_app.logger.info(f"🔍 DEBUG FILTER: Using SQL filtering with filters={sql_filters}")
-                import time
-                start_time = time.time()
                 matching_obs = obs_db.load_filtered(**sql_filters)
-                elapsed = time.time() - start_time
-                current_app.logger.info(f"🔍 DEBUG FILTER: SQL filtering returned {len(matching_obs)} observations in {elapsed:.3f}s")
                 # For Cloud-Mode with SQL filtering, we already have filtered results
                 # No need to filter again in Python
                 all_obs = None  # Not needed
             else:
-                current_app.logger.info(f"🔍 DEBUG FILTER: Using load_all() for complex filter")
                 # Complex filters (ZZ, SH) need Python filtering
                 observations = obs_db.load_all()
                 all_obs = observations
