@@ -43,6 +43,11 @@ window.haloData = {
     isDirty: false
 };
 
+// Global config (loaded once at startup)
+window.haloConfig = {
+    cloud_mode: false
+};
+
 // Helper function to save haloData metadata to sessionStorage
 // Note: We only save metadata (fileName, isLoaded, isDirty, count), NOT the observations array
 // For large files (200k+ observations), storing all data exceeds browser storage limits
@@ -87,6 +92,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load i18n FIRST - required for all UI operations
     await loadCurrentLanguage();
     await loadI18n(currentLanguage);
+
+    // Load config (cloud mode flag)
+    try {
+        const configResponse = await fetch('/api/config');
+        if (configResponse.ok) {
+            const config = await configResponse.json();
+            window.haloConfig.cloud_mode = config.cloud_mode;
+        }
+    } catch (e) {
+        console.error('Failed to load config:', e);
+    }
 
     // Check if i18n loaded successfully - fail fast if not
     if (!i18nStrings) {
@@ -206,7 +222,7 @@ window.addEventListener('beforeunload', (event) => {
         return;
     }
     
-    // Check if there are unsaved changes
+    // Check if there are unsaved changes (isDirty always false in Cloud Mode)
     if (window.haloData && window.haloData.isDirty) {
         // Modern browsers ignore custom messages for security reasons
         // They show their own generic "unsaved changes" dialog
@@ -1445,9 +1461,9 @@ async function showAddObservationDialogNumeric() {
             
             const addedObs = await resp.json();
             
-            // Add to observations array and set dirty flag
+            // Add to observations array and set dirty flag (Local Mode only)
             window.haloData.observations.push(addedObs);
-            window.haloData.isDirty = true;
+            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
             saveHaloDataToSession();  // Sync to sessionStorage
             updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
             
@@ -1525,9 +1541,9 @@ async function showAddObservationDialogMenu() {
             
             const addedObs = await resp.json();
             
-            // Add to observations array and set dirty flag
+            // Add to observations array and set dirty flag (Local Mode only)
             window.haloData.observations.push(addedObs);
-            window.haloData.isDirty = true;
+            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
             saveHaloDataToSession();
             updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
             
@@ -2810,7 +2826,7 @@ async function processBulkUpdate(filteredObs, updates) {
         if (obsResponse.ok) {
             const data = await obsResponse.json();
             window.haloData.observations = data.observations;
-            window.haloData.isDirty = true;
+            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
 
             updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
         } else {}
@@ -2907,7 +2923,7 @@ async function showDeleteSingleObservations(filterState) {
                     window.haloData.observations = data.observations;
                 }
 
-                window.haloData.isDirty = true;
+                if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
                 updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
                 
                 // Save to sessionStorage to persist dirty flag
@@ -3290,8 +3306,8 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
             sessionStorage.setItem('lastEditLogs', logs.join('\n'));
 
             
-            // Set dirty flag
-            window.haloData.isDirty = true;
+            // Set dirty flag (Local Mode only)
+            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
             updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
             
             // Trigger autosave
@@ -4671,7 +4687,7 @@ async function showSelectDialog() {
             
             // Update local data
             window.haloData.observations = filteredObs;
-            window.haloData.isDirty = true;
+            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
             saveHaloDataToSession();
             
             // Trigger autosave
@@ -5685,6 +5701,15 @@ function showMessage(text, type = 'info') {
 
 // Auto-save helper function
 async function triggerAutosave() {
+    // Get config to check cloud mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    
+    // Skip autosave in Cloud Mode - database saves immediately
+    if (config.cloud_mode) {
+        return;
+    }
+    
     try {
         const response = await fetch('/api/file/autosave', {
             method: 'POST',
@@ -5701,6 +5726,15 @@ async function triggerAutosave() {
 
 // Check for autosave recovery on startup
 async function checkAutosaveRecovery() {
+    // Get config to check cloud mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    
+    // Skip autosave recovery in Cloud Mode - database is the source of truth
+    if (config.cloud_mode) {
+        return;
+    }
+    
     try {
         // Skip autosave recovery if we already have observations loaded in memory
         if (window.haloData.isLoaded && window.haloData.observations.length > 0) {
@@ -5778,7 +5812,7 @@ async function checkAutosaveRecovery() {
                 window.haloData.observations = result.observations || [];
                 window.haloData.fileName = result.filename;
                 window.haloData.isLoaded = true;
-                window.haloData.isDirty = true;  // Mark as dirty since restored from temp
+                if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;  // Mark as dirty since restored from temp (Local Mode only)
                 saveHaloDataToSession();  // Sync to sessionStorage
                 
                 updateFileInfoDisplay(result.filename, result.count);
@@ -6120,9 +6154,9 @@ async function continueMergeFile() {
             
             const data = await obsResponse.json();
             window.haloData.observations = data.observations;
-            // Mark as dirty only if at least one observation was added
+            // Mark as dirty only if at least one observation was added (Local Mode only)
             const addedCount = result.added_count || 0;
-            if (addedCount > 0) {
+            if (addedCount > 0 && !window.haloConfig.cloud_mode) {
                 window.haloData.isDirty = true;
             }
             saveHaloDataToSession();
