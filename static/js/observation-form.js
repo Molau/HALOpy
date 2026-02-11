@@ -1450,7 +1450,8 @@ class ObservationForm {
         }
         this.fields.mm.value = obs.MM || '';
         this.fields.tt.value = obs.TT || '';
-        this.fields.g.value = obs.g !== undefined && obs.g !== null ? obs.g : (obs.G || '');
+        // g can be 0 (valid for primary site), so check explicitly for null/undefined
+        this.fields.g.value = (obs.g !== undefined && obs.g !== null) ? obs.g : '';
         this.fields.zs.value = obs.ZS !== -1 && obs.ZS !== null ? obs.ZS : '';
         this.fields.zm.value = obs.ZM !== -1 && obs.ZM !== null ? obs.ZM : '';
         this.fields.d.value = obs.d !== -1 && obs.d !== null ? obs.d : '-1';
@@ -1464,7 +1465,8 @@ class ObservationForm {
         this.fields.v.value = obs.V !== -1 && obs.V !== null ? obs.V : '-1';
         this.fields.f.value = obs.f !== -1 && obs.f !== null ? obs.f : '-1';
         this.fields.zz.value = obs.zz !== -1 && obs.zz !== 99 && obs.zz !== null ? obs.zz : (obs.zz === 99 ? '99' : '-1');
-        this.fields.gg.value = obs.GG || '';
+        // GG can be 0 (valid region code), so check explicitly for null/undefined
+        this.fields.gg.value = (obs.GG !== undefined && obs.GG !== null) ? obs.GG : '';
         this.fields.ho.value = obs.HO !== -1 && obs.HO !== 0 && obs.HO !== null ? obs.HO : (obs.HO === 0 ? '0' : '-1');
         this.fields.hu.value = obs.HU !== -1 && obs.HU !== 0 && obs.HU !== null ? obs.HU : (obs.HU === 0 ? '0' : '-1');
         this.fields.hu.value = obs.HU !== -1 && obs.HU !== 0 && obs.HU !== null ? String(obs.HU).padStart(2, '0') : (obs.HU === 0 ? '00' : '-1');
