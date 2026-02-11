@@ -159,9 +159,7 @@
     "chart_print_failed": "Error printing chart",
     "chart_save_failed": "Error saving chart",
     "markdown_save_failed": "Error saving markdown file",
-    "unknown_error": "Unknown error",
-    "chart_print_failed": "Error printing chart",
-    "chart_save_failed": "Error saving chart"
+    "unknown_error": "Unknown error"
   },
   "filter_dialog": {
     "title": "Filter Criteria",

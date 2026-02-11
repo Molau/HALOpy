@@ -723,7 +723,6 @@ class ObservationForm {
                 } else {
                     this.manageFieldDependencies('g');
                 }
-                }
             } else {
                 console.log("🔍 DEBUG: All KK/MM/JJ are set, checking observer activity");
                 // MM>-1 AND JJ>-1 AND KK>-1: Check if observer was active at this date

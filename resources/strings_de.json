@@ -161,9 +161,7 @@
     "chart_print_failed": "Fehler beim Drucken des Diagramms",
     "chart_save_failed": "Fehler beim Speichern des Diagramms",
     "markdown_save_failed": "Fehler beim Speichern der Markdown-Datei",
-    "unknown_error": "Unbekannter Fehler",
-    "chart_print_failed": "Fehler beim Drucken des Diagramms",
-    "chart_save_failed": "Fehler beim Speichern des Diagramms"
+    "unknown_error": "Unbekannter Fehler"
   },
   "filter_dialog": {
     "title": "Auswahlkriterien",
