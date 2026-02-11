@@ -3358,8 +3358,9 @@ async function showDisplayObservationsDialog() {
             }
         }
         
-        // Initialize filter dialog (no data loading needed upfront)
+        // Initialize filter dialog
         const filterDialog = new FilterDialog();
+        await filterDialog.initialize();
         
         // Hide spinner
         spinnerInfo.modal.hide();
