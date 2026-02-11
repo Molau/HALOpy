@@ -988,6 +988,9 @@ def get_statistics() -> Dict[str, Any]:
         - halo_types_distribution
         - regions_distribution
     """
+    # TODO: CLOUD MODE - Replace file loading with obs_db.get_statistics()
+    # This should use SQL aggregate functions (COUNT, MIN, MAX, GROUP BY)
+    # instead of loading all observations into memory
     
     csv_handler = ObservationCSV()
     data_path = obs_file.get_data_path('ALLE.CSV')
@@ -1571,8 +1574,11 @@ def update_file_status() -> Dict[str, Any]:
 
 @api_blueprint.route('/file/autosave', methods=['POST'])
 def autosave() -> Dict[str, Any]:
-    """Auto-save current observations to .$$$ temp file"""
+    """Auto-save current observations to .$$$ temp file (Local Mode only)"""
     
+    # Cloud Mode: Database saves immediately, no autosave needed
+    if is_cloud_mode():
+        return jsonify({'success': True, 'skipped': 'cloud_mode'})
     
     filename = current_app.config.get('LOADED_FILE')
     if not filename:
@@ -1835,7 +1841,12 @@ def check_autosave() -> Dict[str, Any]:
 
 @api_blueprint.route('/file/restore_autosave', methods=['POST'])
 def restore_autosave() -> Dict[str, Any]:
-    """Restore observations from .$$$ autosave file"""
+    """Restore observations from .$$$ autosave file (Local Mode only)"""
+    
+    # Cloud Mode: No autosave files to restore
+    if is_cloud_mode():
+        return jsonify({'error': 'Not available in cloud mode'}), 400
+    
     data = request.get_json() or {}
     temp_filename = data.get('temp_file')
     
@@ -2487,6 +2498,8 @@ def get_monthly_report() -> Dict[str, Any]:
         mm: Month 1-12 (required)
         jj: Year 0-99 (required)
     """
+    # TODO: CLOUD MODE - Replace with obs_db.load_filtered(kk=kk, mm=mm, jj=jj)
+    # Filter must be done in SQL WHERE clause, not Python
     
     
     # Check if observations are loaded
@@ -4287,6 +4300,9 @@ def get_annual_stats() -> Dict[str, Any]:
         - format=text: Pseudographic output with box-drawing characters
         - format=markdown: Markdown tables for all statistics
     """
+    # TODO: CLOUD MODE - Replace with obs_db.load_filtered(jj=jj)
+    # Filter must be done in SQL WHERE clause, not Python
+    # Consider SQL GROUP BY for monthly aggregation instead of Python loops
     
     # Check if observations are loaded
     observations = current_app.config.get('OBSERVATIONS', [])
@@ -5545,6 +5561,16 @@ def analyze_observations() -> Dict[str, Any]:
     try:
         # Get request parameters
         params = request.get_json()
+        
+        # TODO: CLOUD MODE - CRITICAL REFACTORING REQUIRED
+        # This function uses complex filtering with param1/param2 ranges and filter1/filter2
+        # ALL filters must be converted to SQL WHERE clauses to avoid loading 100K+ records
+        # Required changes:
+        # 1. Create obs_db.load_filtered_analysis() with all filter parameters
+        # 2. Convert _apply_filter() logic to SQL WHERE conditions
+        # 3. Convert _apply_param_range_filter() logic to SQL WHERE conditions
+        # 4. Keep _group_by_parameter() in Python (aggregation after filtering)
+        # 5. Test with large datasets (100K+ observations) to verify performance
         
         # Load observations from current session or default file
         observations = current_app.config.get('OBSERVATIONS', [])

@@ -1444,7 +1444,7 @@ class ObservationForm {
         // Year: CSV stores 0-99, dropdown uses 80-179 (80-99=1980-1999, 0-79=2000-2079)
         if (obs.JJ !== undefined && obs.JJ !== null && obs.JJ !== '') {
             const jj = parseInt(obs.JJ);
-            this.fields.jj.value = jj < YEAR_CUTOFF ? jj + 100 : jj;  // 5 -> 105 (2005), 95 -> 95 (1995)
+            this.fields.jj.value = jj < (YEAR_MIN - 1900) ? jj + 100 : jj;  // 5 -> 105 (2005), 95 -> 95 (1995)
         } else {
             this.fields.jj.value = '';
         }
