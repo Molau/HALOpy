@@ -3326,33 +3326,47 @@ async function showObservationFormForDelete(obs, currentNum, totalNum, onYes, on
 
 // Show Display Observations dialog (filter then navigate)
 async function showDisplayObservationsDialog() {
-    // Get config to check cloud mode
-    const configResponse = await fetch('/api/config');
-    const config = await configResponse.json();
+    // Show spinner while loading
+    const loadingMessage = i18nStrings.messages?.loading_observations || 'Lade Beobachtungen...';
+    const spinnerInfo = showInfoModal(i18nStrings.common.loading || 'Laden...', loadingMessage);
     
-    // Only check for loaded data in Local Mode
-    // In Cloud Mode, data is always in database
-    if (!config.cloud_mode) {
-        try {
-            const response = await fetch('/api/observations?limit=1');
-            if (!response.ok) {
+    try {
+        // Get config to check cloud mode
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        
+        // Only check for loaded data in Local Mode
+        // In Cloud Mode, data is always in database
+        if (!config.cloud_mode) {
+            try {
+                const response = await fetch('/api/observations?limit=1');
+                if (!response.ok) {
+                    spinnerInfo.modal.hide();
+                    await showWarningModal(i18nStrings.messages.no_data);
+                    return;
+                }
+                const data = await response.json();
+                if (!data.total || data.total === 0) {
+                    spinnerInfo.modal.hide();
+                    await showWarningModal(i18nStrings.messages.no_data);
+                    return;
+                }
+            } catch (error) {
+                spinnerInfo.modal.hide();
                 await showWarningModal(i18nStrings.messages.no_data);
                 return;
             }
-            const data = await response.json();
-            if (!data.total || data.total === 0) {
-                await showWarningModal(i18nStrings.messages.no_data);
-                return;
-            }
-        } catch (error) {
-            await showWarningModal(i18nStrings.messages.no_data);
-            return;
         }
-    }
-    
-    // Initialize filter dialog
-    const filterDialog = new FilterDialog();
-    await filterDialog.initialize();
+        
+        // Initialize filter dialog
+        const filterDialog = new FilterDialog();
+        await filterDialog.initialize();
+        
+        // Hide spinner
+        spinnerInfo.modal.hide();
+        spinnerInfo.modalEl.addEventListener('hidden.bs.modal', () => {
+            spinnerInfo.modalEl.remove();
+        });
     
     // Show filter dialog with callbacks
     filterDialog.show(
