@@ -46,9 +46,10 @@ from halo.resources.i18n import get_i18n
 from halo.services.auth import AuthService
 from halo.services.settings import Settings
 
-# NEW CODE - Using io.observations + io.observations_file (Layer 2 + Layer 3a)
+# NEW CODE - Using io.observations + io.observations_file + io.observations_db (Layer 2 + Layer 3a + Layer 3b)
 import halo.io.observations as obs_logic
 import halo.io.observations_file as obs_file
+import halo.io.observations_db as obs_db
 
 # NEW CODE - Using io.observers + io.observers_file (Layer 2 + Layer 3a)
 import halo.io.observers as observer_logic
@@ -479,7 +480,10 @@ def get_help(lang: str) -> Dict[str, Any]:
 @api_blueprint.route('/observations', methods=['GET'])
 def get_observations() -> Dict[str, Any]:
     """
-    Get observations from the currently loaded file (in memory) with optional pagination.
+    Get observations with optional pagination.
+    
+    - Cloud Mode: Read directly from database (Layer 3b)
+    - Local Mode: Read from in-memory data loaded via /file/upload or /file/load
 
     Query parameters:
     - limit: Maximum number of results (default from constants.DEFAULT_OBSERVATION_LIMIT, <=0 returns all)
@@ -488,9 +492,15 @@ def get_observations() -> Dict[str, Any]:
     limit = int(request.args.get('limit', DEFAULT_OBSERVATION_LIMIT))
     offset = int(request.args.get('offset', 0))
 
-    # Get in-memory data loaded via /file/upload or /file/load
-    observations = current_app.config.get('OBSERVATIONS') or []
-    loaded_file = current_app.config.get('LOADED_FILE')
+    # Layer 3: Get observations from storage
+    if is_cloud_mode():
+        # Cloud Mode: Read from database (Layer 3b)
+        observations = obs_db.load_all()
+        loaded_file = None
+    else:
+        # Local Mode: Read from in-memory data (Layer 3a via app.config)
+        observations = current_app.config.get('OBSERVATIONS') or []
+        loaded_file = current_app.config.get('LOADED_FILE')
 
     total = len(observations)
     # Support limit <= 0 meaning "fetch all" from the current offset
@@ -602,16 +612,14 @@ def add_observation() -> Dict[str, Any]:
         obs.remarks = data.get('remarks', '') or ''
 
         if is_cloud_mode():
-            # Cloud Mode: Save to database
+            # Cloud Mode: Save to database (Layer 3b)
             success = obs_db.save_one(obs)
             if not success:
                 return jsonify({'error': 'duplicate'}), 409
             
-            # Reload from database to update in-memory cache
-            observations = obs_db.load_all()
-            current_app.config['OBSERVATIONS'] = observations
-            
-            return jsonify({'success': True, 'count': len(observations)})
+            # Get count directly from database (no caching)
+            count = obs_db.count()
+            return jsonify({'success': True, 'count': count})
         else:
             # Local Mode: In-memory operations
             observations = current_app.config.get('OBSERVATIONS') or []
@@ -644,21 +652,19 @@ def delete_observation() -> Dict[str, Any]:
 
     try:
         if is_cloud_mode():
-            # Cloud Mode: Delete from database
+            # Cloud Mode: Delete from database (Layer 3b)
             key = (
                 data.get('KK'), data.get('O'), data.get('JJ'),
                 data.get('MM'), data.get('TT'), data.get('EE'), data.get('GG')
             )
             success = obs_db.delete_one(key)
             
-            # Reload from database to update in-memory cache
-            observations = obs_db.load_all()
-            current_app.config['OBSERVATIONS'] = observations
-            
+            # Get count directly from database (no caching)
+            count = obs_db.count()
             return jsonify({
                 'success': True,
                 'deleted': success,
-                'count': len(observations)
+                'count': count
             })
         else:
             # Local Mode: Delete from in-memory list
@@ -788,12 +794,17 @@ def filter_observations() -> Dict[str, Any]:
         filter_type = params.get('filter_type')
         action = params.get('action', 'keep')
         
-        # Load current observations from session
-        observations = current_app.config.get('OBSERVATIONS', [])
-        if not observations:
-            return jsonify({'error': 'no_observations_loaded'}), 400
+        # Layer 3: Get observations from storage
+        if is_cloud_mode():
+            # Cloud Mode: Read from database (Layer 3b)
+            observations = obs_db.load_all()
+        else:
+            # Local Mode: Read from in-memory cache
+            observations = current_app.config.get('OBSERVATIONS', [])
+            if not observations:
+                return jsonify({'error': 'no_observations_loaded'}), 400
         
-        # Load observers for SH filtering (already loaded in app config)
+        # Load observers for SH filtering
         observers_list = current_app.config.get('OBSERVERS', [])
         
         # Filter observations based on type
