@@ -108,10 +108,6 @@ def login() -> Dict[str, Any]:
         session['observer_kk'] = observer_kk  # None for admin, KK for regular users
         session['is_admin'] = (observer_kk is None)
         
-        # Set FIXED_OBSERVER in app.config for regular users
-        if observer_kk:
-            current_app.config['FIXED_OBSERVER'] = observer_kk
-        
         return jsonify({
             'success': True,
             'observer_kk': observer_kk,
@@ -494,28 +490,22 @@ def get_observations() -> Dict[str, Any]:
 
     # Layer 3: Get observations from storage
     if is_cloud_mode():
-        # Cloud Mode: Use SQL pagination for performance (Layer 3b)
-        fixed_observer = current_app.config.get('FIXED_OBSERVER')
+        # Cloud Mode: Use SQL filtering for performance (Layer 3b)
+        # Read from session (per-user), not app.config (shared across all users)
+        fixed_observer = session.get('observer_kk')  # None for admin, KK for regular users
         
-        # Get total count first (with Fixed Observer filter if set)
+        # Load filtered observations (with Fixed Observer filter if set)
         if fixed_observer:
-            total = obs_db.count(kk=int(fixed_observer))
+            observations = obs_db.load_filtered(kk=int(fixed_observer))
         else:
-            total = obs_db.count()
+            observations = obs_db.load_all()
         
-        # Apply pagination directly in SQL query
+        # Apply pagination in Python (since SQL pagination not yet implemented)
+        total = len(observations)
         if limit <= 0:
-            # Fetch all from offset
-            if fixed_observer:
-                paginated = obs_db.load_filtered(kk=int(fixed_observer), limit=None, offset=offset)
-            else:
-                paginated = obs_db.load_filtered(limit=None, offset=offset)
+            paginated = observations[offset:]
         else:
-            # Fetch limited results from offset
-            if fixed_observer:
-                paginated = obs_db.load_filtered(kk=int(fixed_observer), limit=limit, offset=offset)
-            else:
-                paginated = obs_db.load_filtered(limit=limit, offset=offset)
+            paginated = observations[offset:offset + limit]
         
         loaded_file = None
     else:
@@ -2090,7 +2080,13 @@ def fixed_observer() -> Dict[str, Any]:
             'observer': observer
         })
     else:
-        observer = current_app.config.get('FIXED_OBSERVER', '')
+        # Cloud Mode: Read from session (set on login)
+        # Local Mode: Read from app.config (optional UI setting)
+        if is_cloud_mode():
+            observer = session.get('observer_kk', '')
+        else:
+            observer = current_app.config.get('FIXED_OBSERVER', '')
+        
         return jsonify({
             'observer': observer,
             'cloud_mode': is_cloud_mode(),
