@@ -131,17 +131,17 @@ class Settings:
             ['INPUT_MODE', app_config.get('INPUT_MODE', 'N')],
             ['OUTPUT_MODE', app_config.get('OUTPUT_MODE', 'P')],
             ['ACTIVE_OBSERVERS_ONLY', '1' if app_config.get('ACTIVE_OBSERVERS_ONLY', False) else '0'],
-            ['STARTUP_FILE_ENABLED', '1' if app_config.get('STARTUP_FILE_ENABLED', False) else '0'],
-            ['STARTUP_FILE_PATH', app_config.get('STARTUP_FILE_PATH', '')],
             ['DATE_DEFAULT_MODE', app_config.get('DATE_DEFAULT_MODE', 'none')],
             ['DATE_DEFAULT_MONTH', str(app_config.get('DATE_DEFAULT_MONTH', 1))],
             ['DATE_DEFAULT_YEAR', str(app_config.get('DATE_DEFAULT_YEAR', 2026))],
-            ['UPLOAD_PASSWORD', app_config.get('UPLOAD_PASSWORD', '')],
             ['LANGUAGE', app_config.get('LANGUAGE', 'de')],
         ]
-        # In cloud mode, FIXED_OBSERVER is not saved to config (controlled by login)
+        # Local Mode only: FIXED_OBSERVER, file operations, upload settings
         if not is_cloud_mode():
             rows.insert(3, ['FIXED_OBSERVER', app_config.get('FIXED_OBSERVER', '')])
+            rows.append(['STARTUP_FILE_ENABLED', '1' if app_config.get('STARTUP_FILE_ENABLED', False) else '0'])
+            rows.append(['STARTUP_FILE_PATH', app_config.get('STARTUP_FILE_PATH', '')])
+            rows.append(['UPLOAD_PASSWORD', app_config.get('UPLOAD_PASSWORD', '')])
         
         with open(cfg_file, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
