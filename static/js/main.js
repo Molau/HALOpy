@@ -616,8 +616,8 @@ async function showAddObservationDialog() {
 
 // Numeric entry (Kurzeingabe) dialog
 async function showAddObservationDialogNumeric() {
-    // Check if a file is loaded
-    if (!window.haloData.isLoaded) {
+    // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
+    if (!window.haloConfig.isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -1485,8 +1485,8 @@ async function showAddObservationDialogNumeric() {
 
 // Menu-based entry (Langeingabe) dialog
 async function showAddObservationDialogMenu() {
-    // Check if a file is loaded
-    if (!window.haloData.isLoaded) {
+    // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
+    if (!window.haloConfig.isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -3880,8 +3880,8 @@ async function showStartupFileDialog() {
 
 // Select observations (Selektieren)
 async function showSelectDialog() {
-    // Check if a file is loaded
-    if (!window.haloData.fileName) {
+    // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
+    if (!window.haloConfig.isCloudMode && !window.haloData.fileName) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -6022,8 +6022,8 @@ async function continueLoadFile() {
 
 // Merge files - Datei -> Verbinden
 async function showMergeFileDialog() {
-    // Check if a file is loaded
-    if (!window.haloData.fileName) {
+    // Check if a file is loaded (Local Mode only - Cloud Mode doesn't support file merge)
+    if (!window.haloConfig.isCloudMode && !window.haloData.fileName) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
