@@ -64,7 +64,10 @@ def create_app(config=None):
         app.config.update(config)
     
     # Load persisted settings from halo.cfg (CSV)
-    Settings.load_into(app.config, root_path)
+    # Cloud Mode: Settings loaded per-request (need session context)
+    # Local Mode: Load settings during app initialization
+    if not is_cloud_mode():
+        Settings.load_into(app.config, root_path)
     
     # Observation loading at startup
     # - Cloud mode: Observations loaded on-demand from database (no startup load)
@@ -125,6 +128,12 @@ def create_app(config=None):
             if not session.get('authenticated', False):
                 # Redirect to login page
                 return redirect(url_for('login'))
+            
+            # Load user-specific settings after authentication
+            # This needs session context, so we do it here instead of in create_app()
+            if not hasattr(g, 'settings_loaded'):
+                Settings.load_into(app.config, root_path)
+                g.settings_loaded = True
     
     @app.context_processor
     def inject_i18n():
