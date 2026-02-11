@@ -18,6 +18,37 @@ let CIRCULAR_HALOS = new Set(); // Will be loaded from /api/constants on page lo
 let PILLAR_HEIGHT_VALUES = []; // Light pillar height values (-1, 1-90)
 let ALL_PILLAR_HEIGHT_VALUES = []; // All height values including 0
 
+// Password policy configuration
+const PASSWORD_POLICY = {
+    minLength: 8,
+    requireCategories: 3, // At least 3 of 4 categories required
+    categories: {
+        lowercase: /[a-z]/,
+        uppercase: /[A-Z]/,
+        digits: /[0-9]/,
+        special: /[^a-zA-Z0-9]/
+    }
+};
+
+// Validate password against policy
+function validatePassword(password) {
+    if (password.length < PASSWORD_POLICY.minLength) {
+        return { valid: false, error: 'password_too_short' };
+    }
+    
+    let categoriesMatched = 0;
+    if (PASSWORD_POLICY.categories.lowercase.test(password)) categoriesMatched++;
+    if (PASSWORD_POLICY.categories.uppercase.test(password)) categoriesMatched++;
+    if (PASSWORD_POLICY.categories.digits.test(password)) categoriesMatched++;
+    if (PASSWORD_POLICY.categories.special.test(password)) categoriesMatched++;
+    
+    if (categoriesMatched < PASSWORD_POLICY.requireCategories) {
+        return { valid: false, error: 'password_complexity' };
+    }
+    
+    return { valid: true };
+}
+
 // Wait for i18nStrings to be loaded - reusable helper function
 // Usage: await waitForI18n() in any module's DOMContentLoaded handler
 window.waitForI18n = function() {
@@ -6785,8 +6816,9 @@ async function showChangePasswordDialog() {
                     return;
                 }
                 
-                if (newPassword.length < 4) {
-                    showError(i18n.error_password_too_short);
+                const validation = validatePassword(newPassword);
+                if (!validation.valid) {
+                    showError(i18n['error_' + validation.error]);
                     return;
                 }
                 
@@ -6841,8 +6873,9 @@ async function showChangePasswordDialog() {
                     return;
                 }
                 
-                if (newPassword.length < 4) {
-                    showError(i18n.error_password_too_short);
+                const validation = validatePassword(newPassword);
+                if (!validation.valid) {
+                    showError(i18n['error_' + validation.error]);
                     return;
                 }
                 
@@ -6875,7 +6908,8 @@ async function showChangePasswordDialog() {
                         modal.hide();
                         showNotification(i18n.success_password_changed, 'success');
                     } else {
-                        showError(result.error);
+                        // Translate error key from backend (e.g., "error_current_password_wrong")
+                        showError(i18n[result.error]);
                     }
                 } catch (error) {
                     showError(i18nStrings.messages.error_loading);

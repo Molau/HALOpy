@@ -525,7 +525,8 @@
     "confirm_password_label": "Confirm Password",
     "error_current_password_wrong": "Current password is incorrect",
     "error_passwords_dont_match": "Passwords do not match",
-    "error_password_too_short": "Password must be at least 4 characters long",
+    "error_password_too_short": "Password must be at least 8 characters long",
+    "error_password_complexity": "Password must contain at least 3 of 4 categories: lowercase, uppercase, digits, special characters",
     "error_select_user": "Please select a user",
     "success_password_changed": "Password changed successfully",
     "success_password_set": "Password for {user} set successfully"
