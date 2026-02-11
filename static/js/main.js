@@ -3326,21 +3326,28 @@ async function showObservationFormForDelete(obs, currentNum, totalNum, onYes, on
 
 // Show Display Observations dialog (filter then navigate)
 async function showDisplayObservationsDialog() {
-    // Check if data is loaded on the server
-    try {
-        const response = await fetch('/api/observations?limit=1');
-        if (!response.ok) {
+    // Get config to check cloud mode
+    const configResponse = await fetch('/api/config');
+    const config = await configResponse.json();
+    
+    // Only check for loaded data in Local Mode
+    // In Cloud Mode, data is always in database
+    if (!config.cloud_mode) {
+        try {
+            const response = await fetch('/api/observations?limit=1');
+            if (!response.ok) {
+                await showWarningModal(i18nStrings.messages.no_data);
+                return;
+            }
+            const data = await response.json();
+            if (!data.total || data.total === 0) {
+                await showWarningModal(i18nStrings.messages.no_data);
+                return;
+            }
+        } catch (error) {
             await showWarningModal(i18nStrings.messages.no_data);
             return;
         }
-        const data = await response.json();
-        if (!data.total || data.total === 0) {
-            await showWarningModal(i18nStrings.messages.no_data);
-            return;
-        }
-    } catch (error) {
-        await showWarningModal(i18nStrings.messages.no_data);
-        return;
     }
     
     // Initialize filter dialog
@@ -6243,12 +6250,6 @@ async function showFixedObserverDialog() {
         const configResponse = await fetch('/api/config/fixed_observer');
         const config = await configResponse.json();
         const currentObserver = config.observer || '';
-        
-        // Check if in cloud mode (not editable)
-        if (config.cloud_mode || !config.editable) {
-            showErrorDialog(i18nStrings.messages.fixed_observer_cloud_mode_locked);
-            return;
-        }
         
         // Get list of observers
         const obsResponse = await fetch('/api/observers/list');

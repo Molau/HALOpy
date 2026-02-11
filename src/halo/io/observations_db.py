@@ -67,9 +67,17 @@ def _tuple_to_observation(row: Tuple) -> Observation:
         Observation object
     """
     # Parse pillar field: "8HHHH" → HO, HU
+    # Special values: "//" = not observed (stored as -2 in Python)
     pillar = row[20] or ""
-    HO = int(pillar[1:3]) if len(pillar) >= 3 else 0
-    HU = int(pillar[3:5]) if len(pillar) >= 5 else 0
+    if pillar == "//":
+        HO = -2
+        HU = -2
+    elif len(pillar) >= 3 and pillar[1:3].isdigit():
+        HO = int(pillar[1:3])
+        HU = int(pillar[3:5]) if len(pillar) >= 5 and pillar[3:5].isdigit() else 0
+    else:
+        HO = 0
+        HU = 0
     
     return Observation(
         KK=row[0], O=row[1], JJ=row[2], MM=row[3], TT=row[4], g=row[5],
