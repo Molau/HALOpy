@@ -1485,8 +1485,8 @@ def download_file() -> Dict[str, Any]:
         print("🔍 DEBUG: About to generate CSV content")
         csv_buffer = io.StringIO()
         
-        print(f"🔍 DEBUG: Calling ObservationCSV.write_observations with {len(all_observations)} observations")
-        ObservationCSV.write_observations(all_observations, csv_buffer)
+        print(f"🔍 DEBUG: Calling ObservationCSV.write_to_buffer with {len(all_observations)} observations")
+        ObservationCSV.write_to_buffer(all_observations, csv_buffer)
         
         print("🔍 DEBUG: Getting CSV content from buffer")
         csv_content = csv_buffer.getvalue()
