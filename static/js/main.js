@@ -5270,9 +5270,10 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             // Show upload progress
             const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
             
-            // Call unified /api/file/upload endpoint
+            // Call cloud server DIRECTLY (both Local and Cloud Mode)
             const replaceMode = uploadMode === 'replace';
-            const response = await fetch('/api/file/upload', {
+            const uploadUrl = isCloudMode ? '/api/file/upload' : `${cloudServerUrl}/api/file/upload`;
+            const response = await fetch(uploadUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -5350,7 +5351,7 @@ async function downloadCloudMode(cloudServerUrl) {
         spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
         // Download from cloud server with session authentication
-        const downloadUrl = `${cloudServerUrl}/api/sync/download`;
+        const downloadUrl = `${cloudServerUrl}/api/file/download`;
         const response = await fetch(downloadUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -5413,7 +5414,7 @@ async function downloadLocalMode(cloudServerUrl) {
                 spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
                 
                 // Download from cloud server with password authentication
-                const downloadUrl = `${cloudServerUrl}/api/sync/download`;
+                const downloadUrl = `${cloudServerUrl}/api/file/download`;
                 const response = await fetch(downloadUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
