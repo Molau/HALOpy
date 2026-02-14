@@ -1667,8 +1667,16 @@ def upload_observers() -> Dict[str, Any]:
         
         # Add new observer records to database
         print(f"🔍 DEBUG: Adding {len(observers)} new observer records")
-        for obs_record in observers:
-            observer_db.save_one(obs_record)
+        for i, obs_record in enumerate(observers):
+            print(f"🔍 DEBUG: Saving record {i+1}: {obs_record}")
+            try:
+                observer_db.save_one(obs_record)
+                print(f"🔍 DEBUG: Record {i+1} saved successfully")
+            except Exception as e:
+                print(f"🔍 DEBUG: Error saving record {i+1}: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
         
         # Get total count from database for response
         total_count = observer_db.count()

@@ -3936,7 +3936,7 @@ async function showStartupFileDialog() {
             modalEl.remove();
         });
     } catch (error) {
-        showErrorDialog('Fehler beim Laden der Dateiliste: ' + error.message);
+        showErrorDialog(i18nStrings.messages.error_loading_file_list + ': ' + error.message);
     }
 }
 
