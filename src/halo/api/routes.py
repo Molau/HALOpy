@@ -4879,30 +4879,29 @@ def get_observers_list() -> Dict[str, Any]:
         # Cloud Mode: Direct database access WITHOUT session filtering
         # This is public data needed for login dropdown
         try:
-            conn = db_connection.get_connection()
-            cursor = conn.cursor()
-            
-            # Get latest record per observer (highest 'since' value)
-            # PostgreSQL: DISTINCT ON syntax
-            query = """
-                SELECT DISTINCT ON (kk) 
-                    kk, first_name, last_name, since
-                FROM observers
-                ORDER BY kk, since DESC
-            """
-            cursor.execute(query)
-            db_observers = cursor.fetchall()
-            cursor.close()
-            db_connection.return_connection(conn)
-            
-            # Convert to standardized format (rows are tuples: (kk, first_name, last_name, since))
-            observers = []
-            for obs in db_observers:
-                observers.append({
-                    'KK': obs[0],
-                    'VName': obs[1] or '',
-                    'NName': obs[2] or ''
-                })
+            with db_connection.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get latest record per observer (highest 'since' value)
+                # PostgreSQL: DISTINCT ON syntax
+                query = """
+                    SELECT DISTINCT ON (kk) 
+                        kk, first_name, last_name, since
+                    FROM observers
+                    ORDER BY kk, since DESC
+                """
+                cursor.execute(query)
+                db_observers = cursor.fetchall()
+                cursor.close()
+                
+                # Convert to standardized format (rows are tuples: (kk, first_name, last_name, since))
+                observers = []
+                for obs in db_observers:
+                    observers.append({
+                        'KK': obs[0],
+                        'VName': obs[1] or '',
+                        'NName': obs[2] or ''
+                    })
                 
         except Exception as e:
             # On any error, return empty list but still return valid JSON
