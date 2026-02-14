@@ -4840,7 +4840,10 @@ async function saveFile() {
                 updateFileInfoDisplay(newFilename, status.count);
                 
                 // Clean up autosave file
-                await fetch('/api/file/cleanup_autosave', {method: 'POST'});
+                await fetch('/api/file/cleanup_autosave', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
                 
                 showNotification(`<strong>✓</strong> ${newFilename} gespeichert`, 'success');
             } else {
@@ -5588,6 +5591,12 @@ async function showDownloadDialog() {
     document.getElementById('btn-download-file').addEventListener('click', async () => {
         const downloadAll = getDownloadScope();
         
+        // Get current values from form (Local Mode)
+        if (!isCloudMode) {
+            observerKK = observerSelect.value;
+            password = passwordInput.value;
+        }
+        
         // Validation for Local Mode
         if (!isCloudMode) {
             if (!observerKK) {
@@ -5636,6 +5645,19 @@ async function showDownloadDialog() {
             setTimeout(() => spinner.modalEl.remove(), 300);
             
             if (response.ok && result.success) {
+                // Save credentials for convenience (Local Mode only)
+                if (!isCloudMode) {
+                    try {
+                        await fetch('/api/config/upload_password', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password: password, observer_kk: observerKK })
+                        });
+                    } catch (error) {
+                        // Silent fail - not critical if settings save fails
+                    }
+                }
+                
                 // Trigger file save dialog
                 const csvContent = result.csv_content;
                 const defaultFilename = result.is_admin && downloadAll

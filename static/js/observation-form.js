@@ -439,6 +439,35 @@ class ObservationForm {
                 <input type="text" class="form-control form-control-sm" id="form-sectors" maxlength="15">
             </div>
             <div class="col-12">
+                <label class="form-label">${i18nStrings.observations.attributes_label}</label>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="form-attr-star">
+                            <label class="form-check-label" for="form-attr-star">${i18nStrings.observations.attribute_star}</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="form-attr-ka">
+                            <label class="form-check-label" for="form-attr-ka">${i18nStrings.observations.attribute_ka}</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="form-attr-ke">
+                            <label class="form-check-label" for="form-attr-ke">${i18nStrings.observations.attribute_ke}</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="form-attr-ub">
+                            <label class="form-check-label" for="form-attr-ub">${i18nStrings.observations.attribute_ub}</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="form-attr-uh">
+                            <label class="form-check-label" for="form-attr-uh">${i18nStrings.observations.attribute_uh}</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
                 <label class="form-label">${i18nStrings.fields.remarks}</label>
                 <input type="text" class="form-control form-control-sm" id="form-remarks" maxlength="60">
             </div>
@@ -1091,7 +1120,13 @@ class ObservationForm {
             ho: document.getElementById('form-ho'),
             hu: document.getElementById('form-hu'),
             sectors: document.getElementById('form-sectors'),
-            remarks: document.getElementById('form-remarks')
+            remarks: document.getElementById('form-remarks'),
+            // Attribute checkboxes
+            attrStar: document.getElementById('form-attr-star'),
+            attrKA: document.getElementById('form-attr-ka'),
+            attrKE: document.getElementById('form-attr-ke'),
+            attrUB: document.getElementById('form-attr-ub'),
+            attrUH: document.getElementById('form-attr-uh')
         };
         
         const errEl = document.getElementById('obs-form-error');
@@ -1470,6 +1505,11 @@ class ObservationForm {
         this.fields.sectors.value = obs.sectors || '';
         this.fields.remarks.value = obs.remarks || '';
         
+        // Parse and set attributes from remarks
+        if (obs.remarks) {
+            this.parseAttributesFromRemarks(obs.remarks);
+        }
+        
         // Field values are populated from observation
         // Constraints/dependencies are applied by manageFieldDependencies() after this method returns
     }
@@ -1516,7 +1556,7 @@ class ObservationForm {
             HO: this.fields.ho.value && this.fields.ho.value !== '-1' ? parseInt(this.fields.ho.value) : -1,
             HU: this.fields.hu.value && this.fields.hu.value !== '-1' ? parseInt(this.fields.hu.value) : -1,
             sectors: this.fields.sectors.value || '',
-            remarks: this.fields.remarks.value || ''
+            remarks: this.buildRemarksWithAttributes()
         };
     }
     
@@ -1561,6 +1601,98 @@ class ObservationForm {
             return constraint.includes(String(value));
         }
         return false;
+    }
+    
+    /**
+     * Build remarks text with attributes from checkboxes
+     * @returns {string} Combined remarks text
+     */
+    buildRemarksWithAttributes() {
+        let remarks = this.fields.remarks.value || '';
+        const attributes = [];
+        
+        // Check which attributes are selected
+        if (this.fields.attrStar && this.fields.attrStar.checked) {
+            attributes.push('*');
+        }
+        if (this.fields.attrKA && this.fields.attrKA.checked) {
+            attributes.push('kA');
+        }
+        if (this.fields.attrKE && this.fields.attrKE.checked) {
+            attributes.push('kE');
+        }
+        if (this.fields.attrUB && this.fields.attrUB.checked) {
+            attributes.push('UB');
+        }
+        if (this.fields.attrUH && this.fields.attrUH.checked) {
+            attributes.push('UH');
+        }
+        
+        // If we have attributes, append them to remarks
+        if (attributes.length > 0) {
+            const attributeText = attributes.join('; ');
+            if (remarks) {
+                remarks += '; ' + attributeText;
+            } else {
+                remarks = attributeText;
+            }
+        }
+        
+        return remarks;
+    }
+    
+    /**
+     * Parse attributes from remarks text and set checkboxes
+     * @param {string} remarks - Remarks text to parse
+     */
+    parseAttributesFromRemarks(remarks) {
+        if (!remarks || !this.fields.attrStar) {
+            return;
+        }
+        
+        // Reset all checkboxes first
+        this.fields.attrStar.checked = false;
+        this.fields.attrKA.checked = false;
+        this.fields.attrKE.checked = false;
+        this.fields.attrUB.checked = false;
+        this.fields.attrUH.checked = false;
+        
+        // Check for attribute patterns with word boundaries (space, comma, semicolon, start/end of string)
+        const boundaryPattern = '(^|[\\s,;]){attr}([\\s,;]|$)';
+        
+        // Check for each attribute with word boundaries (case-insensitive)
+        if (remarks.includes('*')) {
+            this.fields.attrStar.checked = true;
+        }
+        if (new RegExp(boundaryPattern.replace('{attr}', 'ka'), 'i').test(remarks)) {
+            this.fields.attrKA.checked = true;
+        }
+        if (new RegExp(boundaryPattern.replace('{attr}', 'ke'), 'i').test(remarks)) {
+            this.fields.attrKE.checked = true;
+        }
+        if (new RegExp(boundaryPattern.replace('{attr}', 'ub'), 'i').test(remarks)) {
+            this.fields.attrUB.checked = true;
+        }
+        if (new RegExp(boundaryPattern.replace('{attr}', 'uh'), 'i').test(remarks)) {
+            this.fields.attrUH.checked = true;
+        }
+        
+        // Clean up the remarks text by removing the attribute patterns with word boundaries
+        let cleanedRemarks = remarks;
+        
+        // Remove attribute patterns (case-insensitive, with word boundaries)
+        cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])\\*([\\s,;]|$)', 'gi'), '$1$2');
+        cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])ka([\\s,;]|$)', 'gi'), '$1$2');
+        cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])ke([\\s,;]|$)', 'gi'), '$1$2');
+        cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])ub([\\s,;]|$)', 'gi'), '$1$2');
+        cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])uh([\\s,;]|$)', 'gi'), '$1$2');
+        
+        // Clean up extra semicolons and spaces
+        cleanedRemarks = cleanedRemarks.replace(/^[;,\s]+|[;,\s]+$/g, ''); // trim
+        cleanedRemarks = cleanedRemarks.replace(/[;,\s]+/g, ' '); // normalize spaces
+        
+        // Set the cleaned remarks back to the field
+        this.fields.remarks.value = cleanedRemarks;
     }
 }
 

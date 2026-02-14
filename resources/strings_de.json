@@ -267,6 +267,12 @@
     "select_no_filter": "Bitte wählen Sie ein Filterkriterium!",
     "add_another_title": "Weitere Beobachtung erfassen?",
     "add_another_message": "Möchten Sie eine weitere Beobachtung erfassen?",
+    "attributes_label": "Besondere Attribute",
+    "attribute_star": "* (Teil eines Halophänomens)",
+    "attribute_ka": "kA (kein Anfang)",
+    "attribute_ke": "kE (kein Ende)",
+    "attribute_ub": "UB (Unterbrechung der Beobachtung)",
+    "attribute_uh": "UH (Unterbrechung des Halos)",
     "detail_labels": {
       "observer": "Beobachter        : ",
       "date": "Datum             : ",
@@ -814,7 +820,8 @@
     "hu": "untere Lichtsäule",
     "sectors": "Sektoren",
     "remarks": "Bemerkungen",
-    "select": "beliebig",
+    "select": "-- Bitte wählen --",
+    "any": "beliebig",
     "max_15_chars": "max 15 Zeichen",
     "max_60_chars": "max 60 Zeichen",
     "not_applicable": "nicht zutreffend"

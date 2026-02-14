@@ -372,20 +372,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!daySelect || !monthSelect || !yearSelect || !i18nStrings) return;
         
         // Day dropdown (1-31)
-        daySelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
+        daySelect.innerHTML = `<option value="">${i18nStrings.fields.any}</option>`;
         for (let i = 1; i <= 31; i++) {
             daySelect.innerHTML += `<option value="${i}">${i.toString().padStart(2, '0')}</option>`;
         }
         
         // Month dropdown - use i18nStrings.months["1"] to ["12"]
-        monthSelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
+        monthSelect.innerHTML = `<option value="">${i18nStrings.fields.any}</option>`;
         for (let i = 1; i <= 12; i++) {
             const monthName = i18nStrings.months[i.toString()];
             monthSelect.innerHTML += `<option value="${i}">${monthName}</option>`;
         }
         
         // Year dropdown (1986-2099)
-        yearSelect.innerHTML = `<option value="">${i18nStrings.fields.select}</option>`;
+        yearSelect.innerHTML = `<option value="">${i18nStrings.fields.any}</option>`;
         for (let i = 1986; i <= 2099; i++) {
             const yy = i % 100;
             yearSelect.innerHTML += `<option value="${yy}">${i}</option>`;

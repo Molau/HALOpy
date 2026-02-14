@@ -279,7 +279,7 @@ class FilterDialog {
         
         const dayPlaceholder = document.createElement('option');
         dayPlaceholder.value = '';
-        dayPlaceholder.textContent = i18nStrings.fields.select;
+        dayPlaceholder.textContent = i18nStrings.fields.any;
         daySelect.appendChild(dayPlaceholder);
         
         for (let day = 1; day <= 31; day++) {
@@ -295,7 +295,7 @@ class FilterDialog {
         
         const monthPlaceholder = document.createElement('option');
         monthPlaceholder.value = '';
-        monthPlaceholder.textContent = i18nStrings.fields.select;
+        monthPlaceholder.textContent = i18nStrings.fields.any;
         monthSelect.appendChild(monthPlaceholder);
         
         for (let month = 1; month <= 12; month++) {
@@ -311,7 +311,7 @@ class FilterDialog {
         
         const yearPlaceholder = document.createElement('option');
         yearPlaceholder.value = '';
-        yearPlaceholder.textContent = i18nStrings.fields.select;
+        yearPlaceholder.textContent = i18nStrings.fields.any;
         yearSelect.appendChild(yearPlaceholder);
         
         for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {

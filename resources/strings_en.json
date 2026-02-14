@@ -32,8 +32,10 @@
     "password_label": "Password",
     "password_placeholder": "Password",
     "login_button": "Login",
-    "error_invalid_credentials": "Invalid credentials",    "error_username_password_required": "Username and password required",
-    "error_server_unreachable": "Server unreachable",    "error_login_failed": "Login error"
+    "error_invalid_credentials": "Invalid credentials",
+    "error_username_password_required": "Username and password required",
+    "error_server_unreachable": "Server unreachable",
+    "error_login_failed": "Login error"
   },
   "common": {
     "yes": "Yes",
@@ -264,8 +266,12 @@
     "select_processing": "Filtering observations...",
     "select_no_filter": "Please select a filter criterion!",
     "add_another_title": "Add another observation?",
-    "add_another_message": "Would you like to add another observation?",
-    "detail_labels": {
+    "add_another_message": "Would you like to add another observation?",    "attributes_label": "Special Attributes",
+    "attribute_star": "* (part of halo phenomenon)",
+    "attribute_ka": "kA (no beginning)",
+    "attribute_ke": "kE (no end)",
+    "attribute_ub": "UB (observation interrupted)",
+    "attribute_uh": "UH (halo interrupted)",    "detail_labels": {
       "observer": "observer          : ",
       "date": "date              : ",
       "start_time": "start of observation :",
@@ -810,7 +816,8 @@
     "hu": "lower light pillar",
     "sectors": "Sectors",
     "remarks": "Remarks",
-    "select": "any",
+    "select": "-- Please select --",
+    "any": "any",
     "max_15_chars": "max 15 chars",
     "max_60_chars": "max 60 chars",
     "not_applicable": "not applicable"
