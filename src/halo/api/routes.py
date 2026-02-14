@@ -2059,8 +2059,6 @@ def upload_password() -> Dict[str, Any]:
         password = data.get('password', '')
         observer_kk = data.get('observer_kk', '')
         
-        print(f"🔍 DEBUG: Saving credentials - observer_kk: {observer_kk}, password length: {len(password)}")
-        
         # Obfuscate password before storing
         obfuscated = Settings.obfuscate(password) if password else ''
         
@@ -2069,12 +2067,8 @@ def upload_password() -> Dict[str, Any]:
         
         # Persist settings
         root_path = Path(__file__).parent.parent.parent.parent
-        print(f"🔍 DEBUG: Saving to config files - root_path: {root_path}")
-        
         Settings.save_key(current_app.config, root_path, 'UPLOAD_PASSWORD', obfuscated)
         Settings.save_key(current_app.config, root_path, 'UPLOAD_OBSERVER_KK', str(observer_kk))
-        
-        print("🔍 DEBUG: Credentials saved successfully")
         
         return jsonify({
             'success': True

@@ -3391,8 +3391,8 @@ async function showObservationFormForDelete(obs, currentNum, totalNum, onYes, on
 // Show Display Observations dialog (filter then navigate)
 async function showDisplayObservationsDialog() {
     // Show spinner while loading
-    const loadingMessage = i18nStrings.messages?.loading_observations || 'Lade Beobachtungen...';
-    const spinnerInfo = showInfoModal(i18nStrings.common.loading || 'Laden...', loadingMessage);
+    const loadingMessage = i18nStrings.messages.loading_observations;
+    const spinnerInfo = showInfoModal(i18nStrings.common.loading, loadingMessage);
     
     try {
         // Get config to check cloud mode
@@ -5386,7 +5386,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 
                 // Build success message with details
                 // Format: "44 Beobachtungen hinzugefügt (25 Duplikate übersprungen)"
-                let message = `✓ ${result.count || 0} ${i18nStrings.observations.observations} `;
+                let message = `✓ ${result.count || 0} ${i18nStrings.common.observations} `;
                 message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;
                 if (result.duplicates && result.duplicates > 0) {
                     message += ` (${result.duplicates} ${i18nStrings.upload_download.duplicates_skipped})`;
@@ -5406,7 +5406,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 // Upload modal already closed - DON'T try to close it again
                 // Translate error code to user-friendly message
                 const errorKey = error.error || 'unknown_error';
-                const errorMsg = i18nStrings.messages?.[errorKey] || i18nStrings.messages?.unknown_error || error.error || 'Unknown error';
+                const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
                 showErrorDialog(errorMsg);
             }
             
@@ -5418,7 +5418,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             }
             
             // Upload modal already closed - DON'T try to close it again
-            const errorMsg = i18nStrings.common?.error || 'Error';
+            const errorMsg = i18nStrings.common.error;
             showErrorDialog(errorMsg + ': ' + error.message);
         }
     });
@@ -5807,6 +5807,63 @@ function fallbackDownload(blob, filename) {
 // ============================================================================
 
 async function showObserverUploadDialog() {
+    // Cloud Mode: User already authenticated, upload directly
+    if (isCloudMode) {
+        const { modal, modalEl } = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
+        
+        try {
+            // Load current observers
+            const observersResponse = await fetch('/api/observers');
+            const observersData = await observersResponse.json();
+            const allObservers = observersData.observers || [];
+            console.log("🔍 DEBUG: Observer upload (Cloud) - observersData:", observersData, "allObservers length:", allObservers.length);
+            
+            if (allObservers.length === 0) {
+                modal.hide();
+                setTimeout(() => modalEl.remove(), 300);
+                showErrorDialog(i18nStrings.messages.no_observer_data_to_upload);
+                return;
+            }
+            
+            // Convert objects to arrays (API expects array format)
+            const observersToUpload = allObservers.map(obs => [
+                obs.KK, obs.VName, obs.NName, obs.seit, obs.aktiv,
+                obs.HbOrt, obs.GH, obs.HLG, obs.HLM, obs.HOW,
+                obs.HBG, obs.HBM, obs.HNS, obs.NbOrt, obs.GN,
+                obs.NLG, obs.NLM, obs.NOW, obs.NBG, obs.NBM, obs.NNS
+            ]);
+            
+            // Upload all observers (session determines KK filter server-side)
+            const response = await fetch('/api/observers/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    observers: observersToUpload,
+                    use_session: true
+                })
+            });
+            
+            modal.hide();
+            setTimeout(() => modalEl.remove(), 300);
+            
+            if (response.ok) {
+                showNotification(i18nStrings.upload_download.upload_success_observer, 'success', 5000);
+            } else {
+                const error = await response.json();
+                const errorKey = error.error || 'unknown_error';
+                const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                showErrorDialog(errorMsg);
+            }
+        } catch (error) {
+            modal.hide();
+            setTimeout(() => modalEl.remove(), 300);
+            console.error('Observer upload error:', error);
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+        }
+        return;
+    }
+    
+    // Local Mode: Ask for credentials to upload to cloud server
     const authModal = showAuthenticationModal(async (observerKK, password) => {
         const { modal, modalEl } = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
         
@@ -5815,17 +5872,20 @@ async function showObserverUploadDialog() {
             const observersResponse = await fetch('/api/observers');
             const observersData = await observersResponse.json();
             const allObservers = observersData.observers || [];
+            console.log("🔍 DEBUG: Observer upload - observersData:", observersData, "allObservers length:", allObservers.length);
             
             // Determine if admin
             const isAdmin = observerKK.toUpperCase() === 'ADMIN';
+            console.log("🔍 DEBUG: Observer upload - observerKK:", observerKK, "isAdmin:", isAdmin);
             
             // Filter observers by KK (unless admin)
             let observersToUpload;
             if (isAdmin) {
                 observersToUpload = allObservers;
             } else {
-                observersToUpload = allObservers.filter(obs => obs[0] === observerKK);
+                observersToUpload = allObservers.filter(obs => obs.KK === observerKK);
             }
+            console.log("🔍 DEBUG: Observer upload - observersToUpload length:", observersToUpload.length, "first observer:", observersToUpload[0]);
             
             if (observersToUpload.length === 0) {
                 // Close spinner on error
@@ -5834,6 +5894,14 @@ async function showObserverUploadDialog() {
                 showErrorDialog(i18nStrings.messages.no_observer_data_to_upload);
                 return;
             }
+            
+            // Convert objects to arrays (API expects array format)
+            const observersArray = observersToUpload.map(obs => [
+                obs.KK, obs.VName, obs.NName, obs.seit, obs.aktiv,
+                obs.HbOrt, obs.GH, obs.HLG, obs.HLM, obs.HOW,
+                obs.HBG, obs.HBM, obs.HNS, obs.NbOrt, obs.GN,
+                obs.NLG, obs.NLM, obs.NOW, obs.NBG, obs.NBM, obs.NNS
+            ]);
             
             // Get cloud server URL
             const configResponse = await fetch('/api/config');
@@ -5848,7 +5916,7 @@ async function showObserverUploadDialog() {
                 body: JSON.stringify({
                     observerKK: observerKK,
                     password: password,
-                    observers: observersToUpload,
+                    observers: observersArray,
                     use_session: isCloudMode
                 })
             });
@@ -5875,13 +5943,13 @@ async function showObserverUploadDialog() {
                     setTimeout(() => {
                         // Translate error code to user-friendly message
                         const errorKey = error.error || 'unknown_error';
-                        const errorMsg = i18nStrings.messages?.[errorKey] || i18nStrings.messages?.unknown_error || error.error || 'Unknown error';
+                        const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
                         showErrorDialog(errorMsg);
                     }, 300);
                 } else {
                     // If no modal found, show error immediately
                     const errorKey = error.error || 'unknown_error';
-                    const errorMsg = i18nStrings.messages?.[errorKey] || i18nStrings.messages?.unknown_error || error.error || 'Unknown error';
+                    const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
                     showErrorDialog(errorMsg);
                 }
             }
@@ -5897,7 +5965,7 @@ async function showObserverUploadDialog() {
                 authModalInstance.hide();
             }
             
-            const errorMsg = i18nStrings.common?.error || 'Error';
+            const errorMsg = i18nStrings.common.error;
             showErrorDialog(errorMsg + ': ' + error.message);
         }
     });
@@ -5924,7 +5992,7 @@ async function uploadObserversLocalMode(cloudServerUrl) {
             if (isAdmin) {
                 observersToUpload = allObservers;
             } else {
-                observersToUpload = allObservers.filter(obs => obs[0] === observerKK);
+                observersToUpload = allObservers.filter(obs => obs.KK === observerKK);
             }
             
             if (observersToUpload.length === 0) {
@@ -5936,6 +6004,14 @@ async function uploadObserversLocalMode(cloudServerUrl) {
                 return;
             }
             
+            // Convert objects to arrays (API expects array format)
+            const observersArray = observersToUpload.map(obs => [
+                obs.KK, obs.VName, obs.NName, obs.seit, obs.aktiv,
+                obs.HbOrt, obs.GH, obs.HLG, obs.HLM, obs.HOW,
+                obs.HBG, obs.HBM, obs.HNS, obs.NbOrt, obs.GN,
+                obs.NLG, obs.NLM, obs.NOW, obs.NBG, obs.NBM, obs.NNS
+            ]);
+            
             // Upload to server
             const response = await fetch(uploadUrl, {
                 method: 'POST',
@@ -5944,7 +6020,7 @@ async function uploadObserversLocalMode(cloudServerUrl) {
                     observerKK: observerKK,
                     password: password,
                     use_session: false,
-                    observers: observersToUpload
+                    observers: observersArray
                 })
             });
             
