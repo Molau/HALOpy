@@ -5306,7 +5306,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 const error = await response.json();
                 // Translate error code to user-friendly message
                 const errorKey = error.error || 'unknown_error';
-                const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error || errorKey;
+                const errorMsg = i18nStrings.messages?.[errorKey] || i18nStrings.messages?.unknown_error || error.error || 'Unknown error';
                 showErrorDialog(errorMsg);
             }
             
@@ -5317,7 +5317,8 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 setTimeout(() => uploadSpinner.modalEl.remove(), 300);
             }
             
-            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+            const errorMsg = i18nStrings.common?.error || 'Error';
+            showErrorDialog(errorMsg + ': ' + error.message);
         }
     });
     
