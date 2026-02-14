@@ -235,8 +235,8 @@ class ObservationCSV:
             for obs in observations:
                 # Helper function to format field values
                 def format_field(value):
-                    """Format field: -1→empty, -2→'/', else→number"""
-                    if value == -1:
+                    """Format field: None/-1→empty, -2→'/', else→number"""
+                    if value is None or value == -1:
                         return ''  # Not observed/unknown
                     elif value == -2:
                         return '/'  # Observed but not present
@@ -252,7 +252,7 @@ class ObservationCSV:
                 
                 # For HO and HU: -1→spaces, 0→'//', else→number with padding
                 ho_str = ''
-                if obs.HO == -1:
+                if obs.HO is None or obs.HO == -1:
                     ho_str = '  '  # Not observed = spaces
                 elif obs.HO == 0:
                     ho_str = '//'  # Not applicable
@@ -260,7 +260,7 @@ class ObservationCSV:
                     ho_str = str(obs.HO).zfill(2)  # Pad to 2 digits
                 
                 hu_str = ''
-                if obs.HU == -1:
+                if obs.HU is None or obs.HU == -1:
                     hu_str = '  '  # Not observed = spaces
                 elif obs.HU == 0:
                     hu_str = '//'  # Not applicable
@@ -276,7 +276,7 @@ class ObservationCSV:
                     str(obs.JJ),
                     str(obs.MM),
                     str(obs.TT),
-                    str(obs.g),
+                    format_field(obs.g),  # Use format_field for g
                     format_field(obs.ZS),
                     format_field(obs.ZM),
                     d_str,
@@ -284,16 +284,16 @@ class ObservationCSV:
                     format_field(obs.N),
                     format_field(obs.C),
                     format_field(obs.c),
-                    str(obs.EE),
+                    format_field(obs.EE),  # Use format_field for EE
                     format_field(obs.H),
                     format_field(obs.F),
                     format_field(obs.V),
                     format_field(obs.f),
                     format_field(obs.zz),
-                    str(obs.GG),
+                    format_field(obs.GG),  # Use format_field for GG
                     ho_hu_field,
                     obs.sectors if obs.sectors else '',  # Empty if no sectors
-                    obs.remarks  # csv.writer handles quoting automatically
+                    obs.remarks if obs.remarks else ''  # Handle None in remarks
                 ]
                 
                 writer.writerow(fields)
@@ -313,8 +313,8 @@ class ObservationCSV:
         for obs in observations:
             # Helper function to format field values
             def format_field(value):
-                """Format field: -1→empty, -2→'/', else→number"""
-                if value == -1:
+                """Format field: None/-1→empty, -2→'/', else→number"""
+                if value is None or value == -1:
                     return ''  # Not observed/unknown
                 elif value == -2:
                     return '/'  # Observed but not present
@@ -326,7 +326,7 @@ class ObservationCSV:
             
             # For HO and HU: -1→spaces, 0→'//', else→number with padding
             ho_str = ''
-            if obs.HO == -1:
+            if obs.HO is None or obs.HO == -1:
                 ho_str = '  '  # Not observed = spaces
             elif obs.HO == 0:
                 ho_str = '//'  # Not applicable
@@ -334,7 +334,7 @@ class ObservationCSV:
                 ho_str = str(obs.HO).zfill(2)  # Pad to 2 digits
             
             hu_str = ''
-            if obs.HU == -1:
+            if obs.HU is None or obs.HU == -1:
                 hu_str = '  '  # Not observed = spaces
             elif obs.HU == 0:
                 hu_str = '//'  # Not applicable
@@ -350,7 +350,7 @@ class ObservationCSV:
                 str(obs.JJ),
                 str(obs.MM),
                 str(obs.TT),
-                str(obs.g),
+                format_field(obs.g),  # Use format_field for g
                 format_field(obs.ZS),
                 format_field(obs.ZM),
                 d_str,
@@ -358,16 +358,16 @@ class ObservationCSV:
                 format_field(obs.N),
                 format_field(obs.C),
                 format_field(obs.c),
-                str(obs.EE),
+                format_field(obs.EE),  # Use format_field for EE
                 format_field(obs.H),
                 format_field(obs.F),
                 format_field(obs.V),
                 format_field(obs.f),
                 format_field(obs.zz),
-                str(obs.GG),
+                format_field(obs.GG),  # Use format_field for GG
                 ho_hu_field,
                 obs.sectors if obs.sectors else '',  # Empty if no sectors
-                obs.remarks  # csv.writer handles quoting automatically
+                obs.remarks if obs.remarks else ''  # Handle None in remarks
             ]
             
             writer.writerow(fields)
