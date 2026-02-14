@@ -1663,9 +1663,12 @@ def upload_observers() -> Dict[str, Any]:
                 existing_records = observer_db.load_filtered(kk=kk)
                 print(f"🔍 DEBUG: Deleting {len(existing_records)} existing records for KK={kk}")
                 for i, record in enumerate(existing_records):
-                    print(f"🔍 DEBUG: Deleting record {i+1}: KK={record[0]}, since={record[2]}")
+                    # Database returns dicts with column names as keys
+                    record_kk = record['kk'] if isinstance(record, dict) else record[0]
+                    record_since = record['since'] if isinstance(record, dict) else record[2]
+                    print(f"🔍 DEBUG: Deleting record {i+1}: KK={record_kk}, since={record_since}")
                     # Delete by kk and since (unique key)
-                    observer_db.delete_one(int(record[0]), record[2])
+                    observer_db.delete_one(int(record_kk), record_since)
                     print(f"🔍 DEBUG: Record {i+1} deleted successfully")
             print("🔍 DEBUG: All existing records deleted successfully")
         except Exception as e:
