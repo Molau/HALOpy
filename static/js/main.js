@@ -5825,10 +5825,35 @@ async function showObserverUploadDialog() {
                 const text = await file.text();
                 const lines = text.split('\n').filter(line => line.trim());
                 
-                // Parse CSV into array format
+                // Parse CSV into array format (handle quoted fields properly)
                 const observers = lines.map(line => {
-                    // Split by comma (handle quoted fields if needed)
-                    const fields = line.split(',').map(f => f.trim());
+                    const fields = [];
+                    let current = '';
+                    let inQuotes = false;
+                    
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        
+                        if (char === '"') {
+                            if (inQuotes && line[i + 1] === '"') {
+                                // Escaped quote
+                                current += '"';
+                                i++; // Skip next quote
+                            } else {
+                                // Toggle quote mode
+                                inQuotes = !inQuotes;
+                            }
+                        } else if (char === ',' && !inQuotes) {
+                            // Field separator (only outside quotes)
+                            fields.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    // Add last field
+                    fields.push(current.trim());
+                    
                     return fields;
                 });
                 
