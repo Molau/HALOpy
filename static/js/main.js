@@ -5532,10 +5532,12 @@ async function showDownloadDialog() {
     // Setup auth fields (Local Mode only)
     let observerKK = null;
     let password = null;
+    let observerSelect = null;
+    let passwordInput = null;
     
     if (!isCloudMode) {
-        const observerSelect = document.getElementById('download-observer');
-        const passwordInput = document.getElementById('download-password');
+        observerSelect = document.getElementById('download-observer');
+        passwordInput = document.getElementById('download-password');
         const togglePasswordBtn = document.getElementById('toggle-download-password');
         const passwordIcon = document.getElementById('download-password-icon');
         
