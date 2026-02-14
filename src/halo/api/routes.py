@@ -4936,8 +4936,8 @@ def get_observers_list() -> Dict[str, Any]:
         # Convert to list
         observers = list(unique_observers.values())
     
-    # Sort by KK
-    observers.sort(key=lambda x: int(x['KK']) if x['KK'].isdigit() else 0)
+    # Sort by KK (handle both int and string types)
+    observers.sort(key=lambda x: int(x['KK']) if isinstance(x['KK'], str) and x['KK'].isdigit() else (x['KK'] if isinstance(x['KK'], int) else 0))
     
     return jsonify({'observers': observers})
 
