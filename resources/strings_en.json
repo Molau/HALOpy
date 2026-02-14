@@ -800,7 +800,7 @@
     "hu": "lower light pillar",
     "sectors": "Sectors",
     "remarks": "Remarks",
-    "select": "--",
+    "select": "any",
     "max_15_chars": "max 15 chars",
     "max_60_chars": "max 60 chars",
     "not_applicable": "not applicable"

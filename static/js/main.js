@@ -5090,11 +5090,15 @@ async function showUploadDialog() {
 }
 
 function continueUpload(isCloudMode, cloudServerUrl, username) {
-    // Both modes: Show authentication dialog first, then file picker
-    showAuthenticationModal(async (observerKK, password) => {
-        // After authentication, show file picker
-        showUploadFileDialog(observerKK, password, isCloudMode, cloudServerUrl);
-    }, cloudServerUrl);
+    if (isCloudMode) {
+        // Cloud mode: Already authenticated via session, show file picker directly
+        showUploadFileDialog(null, null, isCloudMode, cloudServerUrl);
+    } else {
+        // Local mode: Show authentication dialog first, then file picker
+        showAuthenticationModal(async (observerKK, password) => {
+            showUploadFileDialog(observerKK, password, isCloudMode, cloudServerUrl);
+        }, cloudServerUrl);
+    }
 }
 
 // Upload in cloud mode: Select file from local disk
@@ -5155,22 +5159,55 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
         try {
             const text = await file.text();
             
-            // Show uploading message
+            // Parse CSV to extract observations
+            const lines = text.split('\n').filter(line => line.trim());
+            const observations = lines.slice(1).map(line => {
+                const parts = line.split(',');
+                // Parse CSV fields into observation object
+                return {
+                    KK: parseInt(parts[0]) || -1,
+                    O: parseInt(parts[1]) || -1,
+                    JJ: parseInt(parts[2]) || -1,
+                    MM: parseInt(parts[3]) || -1,
+                    TT: parseInt(parts[4]) || -1,
+                    g: parseInt(parts[5]) || -1,
+                    ZS: parseInt(parts[6]) || -1,
+                    ZM: parseInt(parts[7]) || -1,
+                    d: parseInt(parts[8]) || -1,
+                    DD: parseInt(parts[9]) || -1,
+                    N: parseInt(parts[10]) || -1,
+                    C: parseInt(parts[11]) || -1,
+                    c: parseInt(parts[12]) || -1,
+                    EE: parseInt(parts[13]) || -1,
+                    H: parseInt(parts[14]) || -1,
+                    F: parseInt(parts[15]) || -1,
+                    V: parseInt(parts[16]) || -1,
+                    f: parseInt(parts[17]) || -1,
+                    zz: parseInt(parts[18]) || -1,
+                    GG: parseInt(parts[19]) || -1,
+                    sectors: parts[20] || '',
+                    remarks: parts[21] || ''
+                };
+            });
+            
+            // Hide loading spinner
             loadingSpinner.modal.hide();
             setTimeout(() => loadingSpinner.modalEl.remove(), 300);
             
+            // Show upload progress
             const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
             
-            // Upload to cloud server
-            const uploadUrl = `${cloudServerUrl}/api/sync/upload`;
-            const response = await fetch(uploadUrl, {
+            // Call unified /api/file/upload endpoint
+            const replaceMode = uploadMode === 'replace';
+            const response = await fetch('/api/file/upload', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     observerKK: observerKK,
                     password: password,
-                    csv_content: text,
-                    mode: uploadMode
+                    observations: observations,
+                    use_session: isCloudMode,
+                    replace_mode: replaceMode
                 })
             });
             
@@ -5179,39 +5216,28 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
             
             if (response.ok) {
                 const result = await response.json();
-                showNotification(
-                    `✓ ${result.count || 0} ${i18nStrings.upload_download.upload_success}`,
-                    'success',
-                    5000
-                );
                 
-                // Return to main page
-                setTimeout(() => {
-                    window.navigateInternal('/');
-                }, 2000);
+                // Build success message with details
+                let message = `✓ ${result.count || 0} ${i18nStrings.observations.observations}`;
+                if (result.duplicates && result.duplicates > 0) {
+                    message += ` (${result.duplicates} ${i18nStrings.upload_download.duplicates_skipped})`;
+                }
+                message += ` ${result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added}`;
+                
+                showNotification(message, 'success', 5000);
+                
+                // Reload observations
+                await loadObservations();
             } else {
                 const error = await response.json();
-                showErrorDialog(i18nStrings.common.error + ': ' + (error.error || i18nStrings.errors.unknown_error), () => {
-                    window.navigateInternal('/');
-                });
+                showErrorDialog(i18nStrings.common.error + ': ' + (error.error || i18nStrings.errors.unknown_error));
             }
             
         } catch (error) {
             loadingSpinner.modal.hide();
             setTimeout(() => loadingSpinner.modalEl.remove(), 300);
             
-            // Check if it's a network error (server unreachable)
-            if (error.message.includes('fetch') || error.name === 'TypeError') {
-                const serverErrorMsg = i18nStrings.upload_download.server_unreachable_details.replace('{0}', cloudServerUrl);
-                showErrorDialog(
-                    serverErrorMsg,
-                    () => { window.navigateInternal('/'); }
-                );
-            } else {
-                showErrorDialog(i18nStrings.common.error + ': ' + error.message, () => {
-                    window.navigateInternal('/');
-                });
-            }
+            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
         }
     });
     

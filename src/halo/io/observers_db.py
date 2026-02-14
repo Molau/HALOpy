@@ -14,7 +14,7 @@ try:
 except ImportError:
     psycopg2 = None  # type: ignore
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from halo.io.db_connection import get_connection
 
 
