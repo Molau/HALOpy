@@ -4874,20 +4874,13 @@ def get_observers_list() -> Dict[str, Any]:
     This endpoint does NOT require authentication - it's used by login, upload, and download dialogs.
     """
     
-    print("🔍 DEBUG: /api/observers/list called")
-    print(f"🔍 DEBUG: is_cloud_mode() = {is_cloud_mode()}")
-    
     # Get observers based on deployment mode
     if is_cloud_mode():
         # Cloud Mode: Direct database access WITHOUT session filtering
         # This is public data needed for login dropdown
         try:
-            print("🔍 DEBUG: Attempting to get database connection...")
             conn = db_connection.get_connection()
-            print(f"🔍 DEBUG: Got connection: {conn}")
-            
             cursor = conn.cursor()
-            print("🔍 DEBUG: Got cursor")
             
             # Get latest record per observer (highest 'since' value)
             # PostgreSQL: DISTINCT ON syntax
@@ -4897,16 +4890,10 @@ def get_observers_list() -> Dict[str, Any]:
                 FROM observers
                 ORDER BY kk, since DESC
             """
-            print(f"🔍 DEBUG: Executing query: {query}")
             cursor.execute(query)
-            print("🔍 DEBUG: Query executed")
-            
             db_observers = cursor.fetchall()
-            print(f"🔍 DEBUG: Fetched {len(db_observers)} observers")
-            
             cursor.close()
             db_connection.return_connection(conn)
-            print("🔍 DEBUG: Connection returned to pool")
             
             # Convert to standardized format (rows are tuples: (kk, first_name, last_name, since))
             observers = []
@@ -4916,11 +4903,10 @@ def get_observers_list() -> Dict[str, Any]:
                     'VName': obs[1] or '',
                     'NName': obs[2] or ''
                 })
-            print(f"🔍 DEBUG: Converted to {len(observers)} observer objects")
                 
         except Exception as e:
             # On any error, return empty list but still return valid JSON
-            print(f"🔍 DEBUG ERROR: Exception occurred: {e}")
+            print(f"Error loading observers for dropdown: {e}")
             import traceback
             traceback.print_exc()
             observers = []
@@ -4951,12 +4937,9 @@ def get_observers_list() -> Dict[str, Any]:
         # Convert to list
         observers = list(unique_observers.values())
     
-    print(f"🔍 DEBUG: Final observer count: {len(observers)}")
-    
     # Sort by KK
     observers.sort(key=lambda x: int(x['KK']) if x['KK'].isdigit() else 0)
     
-    print(f"🔍 DEBUG: Returning JSON response with {len(observers)} observers")
     return jsonify({'observers': observers})
 
 
