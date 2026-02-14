@@ -5807,59 +5807,71 @@ function fallbackDownload(blob, filename) {
 // ============================================================================
 
 async function showObserverUploadDialog() {
-    // Cloud Mode: User already authenticated, upload directly
+    // Cloud Mode: Show file picker to select local halobeo.csv
     if (isCloudMode) {
-        const { modal, modalEl } = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
+        // Create file input element
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.csv';
         
-        try {
-            // Load current observers (ALL records, not just latest)
-            const observersResponse = await fetch('/api/observers?latest_only=false');
-            const observersData = await observersResponse.json();
-            const allObservers = observersData.observers || [];
-            console.log("🔍 DEBUG: Observer upload (Cloud) - observersData:", observersData, "allObservers length:", allObservers.length);
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
             
-            if (allObservers.length === 0) {
+            const { modal, modalEl } = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
+            
+            try {
+                // Read CSV file
+                const text = await file.text();
+                const lines = text.split('\n').filter(line => line.trim());
+                
+                // Parse CSV into array format
+                const observers = lines.map(line => {
+                    // Split by comma (handle quoted fields if needed)
+                    const fields = line.split(',').map(f => f.trim());
+                    return fields;
+                });
+                
+                console.log("🔍 DEBUG: Observer upload (Cloud) - file:", file.name, "observers count:", observers.length);
+                
+                if (observers.length === 0) {
+                    modal.hide();
+                    setTimeout(() => modalEl.remove(), 300);
+                    showErrorDialog(i18nStrings.messages.no_observer_data_to_upload);
+                    return;
+                }
+                
+                // Upload to server (session auth)
+                const response = await fetch('/api/observers/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        observers: observers,
+                        use_session: true
+                    })
+                });
+                
                 modal.hide();
                 setTimeout(() => modalEl.remove(), 300);
-                showErrorDialog(i18nStrings.messages.no_observer_data_to_upload);
-                return;
+                
+                if (response.ok) {
+                    showNotification(i18nStrings.upload_download.upload_success_observer, 'success', 5000);
+                } else {
+                    const error = await response.json();
+                    const errorKey = error.error || 'unknown_error';
+                    const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                    showErrorDialog(errorMsg);
+                }
+            } catch (error) {
+                modal.hide();
+                setTimeout(() => modalEl.remove(), 300);
+                console.error('Observer upload error:', error);
+                showErrorDialog(i18nStrings.common.error + ': ' + error.message);
             }
-            
-            // Convert objects to arrays (API expects array format)
-            const observersToUpload = allObservers.map(obs => [
-                obs.KK, obs.VName, obs.NName, obs.seit, obs.aktiv,
-                obs.HbOrt, obs.GH, obs.HLG, obs.HLM, obs.HOW,
-                obs.HBG, obs.HBM, obs.HNS, obs.NbOrt, obs.GN,
-                obs.NLG, obs.NLM, obs.NOW, obs.NBG, obs.NBM, obs.NNS
-            ]);
-            
-            // Upload all observers (session determines KK filter server-side)
-            const response = await fetch('/api/observers/upload', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    observers: observersToUpload,
-                    use_session: true
-                })
-            });
-            
-            modal.hide();
-            setTimeout(() => modalEl.remove(), 300);
-            
-            if (response.ok) {
-                showNotification(i18nStrings.upload_download.upload_success_observer, 'success', 5000);
-            } else {
-                const error = await response.json();
-                const errorKey = error.error || 'unknown_error';
-                const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
-                showErrorDialog(errorMsg);
-            }
-        } catch (error) {
-            modal.hide();
-            setTimeout(() => modalEl.remove(), 300);
-            console.error('Observer upload error:', error);
-            showErrorDialog(i18nStrings.common.error + ': ' + error.message);
-        }
+        };
+        
+        // Trigger file picker
+        fileInput.click();
         return;
     }
     
