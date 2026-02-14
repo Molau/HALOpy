@@ -157,6 +157,7 @@ def create_app(config=None):
             request.path.startswith('/static/') or
             request.path.startswith('/api/language/') or
             request.path.startswith('/api/file/') or
+            request.path.startswith('/api/observers/list') or  # Public endpoint for login dropdown
             request.path.startswith('/api/observers/upload') or
             request.path.startswith('/api/observers/download')):
             return
