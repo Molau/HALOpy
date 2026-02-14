@@ -770,7 +770,7 @@ def save_observations() -> Dict[str, Any]:
         return jsonify({'success': False, 'exists': True, 'filename': filename}), 200
     
     try:
-        obs_file.save_file(filename, observations)
+        obs_file.save_file(observations, filepath)
         
         return jsonify({
             'success': True,
@@ -971,54 +971,6 @@ def filter_observations() -> Dict[str, Any]:
             'deleted_count': deleted_count
         })
     
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@api_blueprint.route('/statistics', methods=['GET'])
-def get_statistics() -> Dict[str, Any]:
-    """
-    Get database statistics.
-    
-    Returns:
-        JSON object with:
-        - total_observations
-        - date_range
-        - observers_count
-        - halo_types_distribution
-        - regions_distribution
-    """
-    # TODO: CLOUD MODE - Replace file loading with obs_db.get_statistics()
-    # This should use SQL aggregate functions (COUNT, MIN, MAX, GROUP BY)
-    # instead of loading all observations into memory
-    
-    csv_handler = ObservationCSV()
-    data_path = obs_file.get_data_path('ALLE.CSV')
-    
-    try:
-        observations, needs_conversion = csv_handler.read_observations(str(data_path))
-        # Auto-convert legacy format
-        if needs_conversion:
-            csv_handler.write_observations(data_path, observations)
-        
-        # Calculate statistics
-        years = [obs.JJ for obs in observations]
-        halo_types = Counter(obs.EE for obs in observations)
-        regions = Counter(obs.GG for obs in observations)
-        observers = set(obs.KK for obs in observations)
-        
-        result = {
-            'total_observations': len(observations),
-            'date_range': {
-                'start': min(years) if years else None,
-                'end': max(years) if years else None
-            },
-            'observers_count': len(observers),
-            'top_halo_types': dict(halo_types.most_common(10)),
-        }
-        
-        return jsonify(result)
-        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1334,7 +1286,7 @@ def upload_file() -> Dict[str, Any]:
     
     Request body:
         {
-            "observerKK": "44",          # Required
+            "observerKK": "44",          # Local Mode only
             "password": "password",      # Local Mode only
             "observations": [...],
             "use_session": true/false,   # Cloud Mode: true, Local Mode: false
@@ -1516,39 +1468,6 @@ def download_file() -> Dict[str, Any]:
             'count': len(all_observations),
             'observer_kk': authenticated_kk,
             'is_admin': is_admin
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-        #     observations = result.get('observations', [])
-        #     
-        #     # Store in app config
-        #     current_app.config['OBSERVATIONS'] = observations
-        #     current_app.config['LOADED_FILE'] = filename
-        #     current_app.config['DIRTY'] = True
-        #     
-        #     return jsonify({
-        #         'success': True,
-        #         'filename': filename,
-        #         'count': len(observations),
-        #         'observations': observations,
-        #         'message': f'Downloaded {len(observations)} observations'
-        #     })
-        # else:
-        #     return jsonify({'error': f'Download failed with status {response.status_code}'}), 500
-        
-        # Placeholder response (remove when implementing actual download)
-        # For now, return empty observations list
-        observations = []
-        
-        current_app.config['OBSERVATIONS'] = observations
-        current_app.config['LOADED_FILE'] = filename
-        
-        return jsonify({
-            'success': True,
-            'filename': filename,
-            'count': len(observations),
-            'observations': observations
         })
         
     except Exception as e:
@@ -4909,11 +4828,8 @@ def get_observers_list() -> Dict[str, Any]:
                         'NName': obs[2] or ''
                     })
                 
-        except Exception as e:
+        except Exception:
             # On any error, return empty list but still return valid JSON
-            print(f"Error loading observers for dropdown: {e}")
-            import traceback
-            traceback.print_exc()
             observers = []
     else:
         # Local Mode: Get from app config (CSV)

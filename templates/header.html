@@ -2,7 +2,7 @@
 <nav class="navbar navbar-dark bg-primary">
     <div class="container-fluid">
         <span class="navbar-brand mb-0 h1">
-            <i class="bi bi-cloud-sun"></i> HALO 3.0
+            <i class="bi bi-cloud-sun"></i> HALO 3.0 {% if is_cloud %}<span class="badge bg-info">cloud</span>{% else %}<span class="badge bg-secondary">local</span>{% endif %}
         </span>
         <div class="btn-group btn-group-sm" role="group">
             <button type="button" class="btn {% if lang() == 'de' %}btn-light{% else %}btn-outline-light{% endif %}" id="lang-de">DE</button>
