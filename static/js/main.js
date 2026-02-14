@@ -5139,7 +5139,6 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
     }
     
     const observerDisabled = fixedObserver ? 'disabled' : '';
-    let savedObserverKK = '';
     
     // Auth fields section (only visible in Local Mode)
     const authFieldsHtml = !isCloudMode ? `
