@@ -1482,10 +1482,17 @@ def download_file() -> Dict[str, Any]:
             return jsonify({'error': 'no_observations'}), 404
         
         # Generate CSV content
+        print("🔍 DEBUG: About to generate CSV content")
         csv_buffer = io.StringIO()
-        ObservationCSV.write_observations(all_observations, csv_buffer)
-        csv_content = csv_buffer.getvalue()
         
+        print(f"🔍 DEBUG: Calling ObservationCSV.write_observations with {len(all_observations)} observations")
+        ObservationCSV.write_observations(all_observations, csv_buffer)
+        
+        print("🔍 DEBUG: Getting CSV content from buffer")
+        csv_content = csv_buffer.getvalue()
+        print(f"🔍 DEBUG: CSV content length: {len(csv_content)} characters")
+        
+        print("🔍 DEBUG: Returning JSON response")
         return jsonify({
             'success': True,
             'csv_content': csv_content,
@@ -1495,6 +1502,10 @@ def download_file() -> Dict[str, Any]:
         })
         
     except Exception as e:
+        print(f"🔍 DEBUG: EXCEPTION in download_file: {str(e)}")
+        print(f"🔍 DEBUG: Exception type: {type(e)}")
+        import traceback
+        print(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 
