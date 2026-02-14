@@ -1349,12 +1349,6 @@ def upload_file() -> Dict[str, Any]:
     use_session = data.get('use_session', False)  # True in Cloud Mode
     replace_mode = data.get('replace_mode', True)  # Default: Replace mode
     
-    if not observer_kk:
-        return jsonify({'error': 'observer_kk_required'}), 400
-    
-    if not new_observations_data:
-        return jsonify({'error': 'no_observations_to_upload'}), 400
-    
     # Authentication (both Cloud Mode with session and Local Mode with password)
     # Authenticate user
     is_admin = False
@@ -1367,8 +1361,17 @@ def upload_file() -> Dict[str, Any]:
         
         is_admin = session.get('is_admin', False)
         authenticated_kk = session.get('observer_kk')  # None for admin
+        
+        # In Cloud Mode with session, use authenticated_kk as observer_kk
+        # (ignore observerKK from request body)
+        if not is_admin:
+            observer_kk = authenticated_kk  # Regular user: use KK from session
+        # Admin can upload for any KK, so use observerKK from request if provided
     else:
         # Cloud Mode with password (proxied from Local Mode)
+        if not observer_kk:
+            return jsonify({'error': 'observer_kk_required'}), 400
+        
         if not password:
             return jsonify({'error': 'password_required'}), 400
         
@@ -1380,6 +1383,9 @@ def upload_file() -> Dict[str, Any]:
         
         is_admin = (user_kk is None)  # None = admin
         authenticated_kk = user_kk
+    
+    if not new_observations_data:
+        return jsonify({'error': 'no_observations_to_upload'}), 400
     
     try:
         # Convert observation dicts to Observation objects

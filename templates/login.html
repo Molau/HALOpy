@@ -113,7 +113,7 @@
                 <div class="mb-3">
                     <label for="password" class="form-label">{{ g.i18n.get('login.password_label') }}</label>
                     <div class="position-relative">
-                        <input type="password" class="form-control pe-5" id="password" name="password" placeholder="{{ g.i18n.get('login.password_placeholder') }}" required>
+                        <input type="password" class="form-control pe-5" id="password" name="password" placeholder="{{ g.i18n.get('login.password_placeholder') }}" autocomplete="current-password" required>
                         <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-password" style="z-index: 10;">
                             <i class="bi bi-eye text-secondary" id="password-icon"></i>
                         </button>
