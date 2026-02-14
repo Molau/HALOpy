@@ -5606,14 +5606,13 @@ async function showDownloadDialog() {
         // Show spinner
         const spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
-        // CRITICAL: For Cloud Mode, get file handle IMMEDIATELY to preserve user activation
+        // CRITICAL: Get file handle IMMEDIATELY to preserve user activation (both modes!)
         let fileHandle = null;
-        console.log("🔍 DEBUG: About to check Cloud Mode file picker - isCloudMode:", isCloudMode, "API available:", 'showSaveFilePicker' in window);
-        console.log("🔍 DEBUG: Condition result:", isCloudMode && 'showSaveFilePicker' in window);
-        if (isCloudMode && 'showSaveFilePicker' in window) {
+        const useFilePicker = 'showSaveFilePicker' in window;
+        
+        if (useFilePicker) {
             try {
                 const defaultFilename = downloadAll ? 'halobeo.csv' : 'observations.csv';
-                console.log("🔍 DEBUG: Opening immediate file picker for Cloud Mode");
                 fileHandle = await window.showSaveFilePicker({
                     suggestedName: defaultFilename,
                     types: [{
@@ -5621,12 +5620,9 @@ async function showDownloadDialog() {
                         accept: {'text/csv': ['.csv']},
                     }],
                 });
-                console.log("🔍 DEBUG: File handle acquired successfully");
             } catch (err) {
-                console.log("🔍 DEBUG: File picker error:", err.name, err.message);
                 if (err.name === 'AbortError') {
                     // User cancelled - hide spinner and exit completely
-                    console.log("🔍 DEBUG: User cancelled first file picker - exiting");
                     spinner.modal.hide();
                     setTimeout(() => spinner.modalEl.remove(), 300);
                     return;
@@ -5634,8 +5630,6 @@ async function showDownloadDialog() {
                 // API error - will fall back to download method
                 fileHandle = null;
             }
-        } else {
-            console.log("🔍 DEBUG: Skipping Cloud Mode file picker - isCloudMode:", isCloudMode, "API available:", 'showSaveFilePicker' in window);
         }
         
         try {
@@ -5663,11 +5657,6 @@ async function showDownloadDialog() {
             const result = await response.json();
             
             if (response.ok && result.success) {
-                console.log("🔍 DEBUG: Download success block reached");
-                console.log("🔍 DEBUG: isCloudMode:", isCloudMode);
-                console.log("🔍 DEBUG: observerKK:", observerKK, "password:", password ? "SET" : "NULL", "fileHandle:", fileHandle ? "EXISTS" : "NULL");
-                console.log("🔍 DEBUG: fileHandle exists:", fileHandle ? "YES" : "NO");
-                
                 // Save credentials for convenience (Local Mode only)
                 if (!isCloudMode) {
                     try {
@@ -5687,12 +5676,8 @@ async function showDownloadDialog() {
                     ? 'halobeo.csv'
                     : 'observations.csv';
                 
-                console.log("🔍 DEBUG: fileHandle check - isCloudMode:", isCloudMode, "fileHandle:", fileHandle ? "VALID" : "NULL");
-                
-                console.log("🔍 DEBUG: fileHandle exists:", fileHandle ? "YES" : "NO");
-                
-                if (isCloudMode && fileHandle) {
-                    // Cloud Mode with pre-acquired file handle - write directly
+                if (fileHandle) {
+                    // File handle acquired - write directly (both Cloud and Local Mode)
                     try {
                         const writable = await fileHandle.createWritable();
                         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

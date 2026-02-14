@@ -72,6 +72,19 @@
             top: 10px;
             right: 10px;
         }
+        
+        /* Enhanced native password toggle visibility */
+        #password {
+            /* Ensure native browser password toggle is visible */
+            padding-right: 3rem !important;
+        }
+        
+        /* Force display of native browser password toggle */
+        #password::-ms-reveal,
+        #password::-webkit-credentials-auto-fill-button {
+            display: block !important;
+            opacity: 1 !important;
+        }
     </style>
 </head>
 <body>
@@ -112,12 +125,7 @@
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">{{ g.i18n.get('login.password_label') }}</label>
-                    <div class="position-relative">
-                        <input type="password" class="form-control pe-5" id="password" name="password" placeholder="{{ g.i18n.get('login.password_placeholder') }}" autocomplete="current-password" required>
-                        <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-password" style="z-index: 10;">
-                            <i class="bi bi-eye text-secondary" id="password-icon"></i>
-                        </button>
-                    </div>
+                    <input type="password" class="form-control" id="password" name="password" placeholder="{{ g.i18n.get('login.password_placeholder') }}" autocomplete="current-password" required>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">{{ g.i18n.get('login.login_button') }}</button>
             </form>
@@ -193,17 +201,6 @@
         
         // Load observers on page load
         loadObservers();
-        
-        // Toggle password visibility
-        const togglePasswordBtn = document.getElementById('toggle-password');
-        const passwordInput = document.getElementById('password');
-        const passwordIcon = document.getElementById('password-icon');
-        
-        togglePasswordBtn.addEventListener('click', () => {
-            const type = passwordInput.type === 'password' ? 'text' : 'password';
-            passwordInput.type = type;
-            passwordIcon.className = type === 'password' ? 'bi bi-eye text-secondary' : 'bi bi-eye-slash text-secondary';
-        });
         
         // Login form submission
         document.getElementById('login-form').addEventListener('submit', async (e) => {
