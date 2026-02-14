@@ -4880,9 +4880,10 @@ def get_observers_list() -> Dict[str, Any]:
         # This is public data needed for login dropdown
         try:
             conn = db_connection.get_connection()
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor()
             
             # Get latest record per observer (highest 'since' value)
+            # PostgreSQL: DISTINCT ON syntax
             query = """
                 SELECT DISTINCT ON (kk) 
                     kk, first_name, last_name, since
@@ -4892,19 +4893,22 @@ def get_observers_list() -> Dict[str, Any]:
             cursor.execute(query)
             db_observers = cursor.fetchall()
             cursor.close()
+            db_connection.return_connection(conn)
             
-            # Convert to standardized format
+            # Convert to standardized format (rows are tuples: (kk, first_name, last_name, since))
             observers = []
             for obs in db_observers:
                 observers.append({
-                    'KK': obs['kk'],
-                    'VName': obs['first_name'] or '',
-                    'NName': obs['last_name'] or ''
+                    'KK': obs[0],
+                    'VName': obs[1] or '',
+                    'NName': obs[2] or ''
                 })
                 
         except Exception as e:
-            # On any error, return empty list
+            # On any error, return empty list but still return valid JSON
             print(f"Error loading observers for dropdown: {e}")
+            import traceback
+            traceback.print_exc()
             observers = []
     else:
         # Local Mode: Get from app config (CSV)
