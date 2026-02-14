@@ -11,8 +11,10 @@ Date: 2026-02-09
 # Optional import - only needed for cloud mode
 try:
     import psycopg2  # type: ignore[import-untyped]
+    from psycopg2.extras import RealDictCursor  # type: ignore[import-untyped]
 except ImportError:
     psycopg2 = None  # type: ignore
+    RealDictCursor = None  # type: ignore
 
 from typing import Any, Dict, List, Optional
 from halo.io.db_connection import get_connection

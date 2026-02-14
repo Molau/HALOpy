@@ -1304,37 +1304,7 @@ def upload_file() -> Dict[str, Any]:
     if not new_observations_data:
         return jsonify({'error': 'no_observations_to_upload'}), 400
     
-    # Mode detection
-    if not use_session:
-        # Local Mode: Proxy to cloud server
-        if not password:
-            return jsonify({'error': 'password_required'}), 400
-        
-        try:
-            import requests
-            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
-            upload_url = f"{cloud_server_url.rstrip('/')}/api/file/upload"
-            
-            # Forward request to cloud server with credentials
-            response = requests.post(
-                upload_url,
-                json={
-                    'observerKK': observer_kk,
-                    'password': password,
-                    'observations': new_observations_data,
-                    'use_session': False,  # Tell cloud server to use password auth
-                    'replace_mode': replace_mode
-                },
-                timeout=60
-            )
-            
-            # Return cloud server response
-            return jsonify(response.json()), response.status_code
-            
-        except Exception as e:
-            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
-    
-    # Cloud Mode: Direct database operations with authentication
+    # Authentication (both Cloud Mode with session and Local Mode with password)
     # Authenticate user
     is_admin = False
     authenticated_kk = None
@@ -1442,35 +1412,7 @@ def download_file() -> Dict[str, Any]:
     if not observer_kk:
         return jsonify({'error': 'observer_kk_missing'}), 400
     
-    # Local Mode: Proxy to cloud server
-    if not use_session:
-        if not password:
-            return jsonify({'error': 'password_required'}), 400
-        
-        try:
-            import requests
-            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
-            download_url = f"{cloud_server_url.rstrip('/')}/api/file/download"
-            
-            # Forward request to cloud server with credentials
-            response = requests.post(
-                download_url,
-                json={
-                    'observerKK': observer_kk,
-                    'password': password,
-                    'use_session': False,
-                    'download_all': download_all
-                },
-                timeout=60
-            )
-            
-            # Return cloud server response
-            return jsonify(response.json()), response.status_code
-            
-        except Exception as e:
-            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
-    
-    # Cloud Mode: Direct database operations with authentication
+    # Authentication (both Cloud Mode with session and Local Mode with password)
     try:
         # Authenticate user
         is_admin = False
@@ -1638,35 +1580,7 @@ def upload_observers() -> Dict[str, Any]:
     if not observers:
         return jsonify({'error': 'no_observer_data_to_upload'}), 400
     
-    # Local Mode: Proxy to cloud server
-    if not use_session:
-        if not observer_kk or not password:
-            return jsonify({'error': 'observer_kk_password_required'}), 400
-        
-        try:
-            import requests
-            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
-            upload_url = f"{cloud_server_url.rstrip('/')}/api/observers/upload"
-            
-            # Forward request to cloud server with credentials
-            response = requests.post(
-                upload_url,
-                json={
-                    'observerKK': observer_kk,
-                    'password': password,
-                    'observers': observers,
-                    'use_session': False
-                },
-                timeout=60
-            )
-            
-            # Return cloud server response
-            return jsonify(response.json()), response.status_code
-            
-        except Exception as e:
-            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
-    
-    # Cloud Mode: Direct database operations with authentication
+    # Authentication (both Cloud Mode with session and Local Mode with password)
     try:
         # Authenticate user
         is_admin = False
@@ -1766,34 +1680,7 @@ def download_observers() -> Dict[str, Any]:
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
     
-    # Local Mode: Proxy to cloud server
-    if not use_session:
-        if not observer_kk or not password:
-            return jsonify({'error': 'observer_kk_password_required'}), 400
-        
-        try:
-            import requests
-            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
-            download_url = f"{cloud_server_url.rstrip('/')}/api/observers/download"
-            
-            # Forward request to cloud server with credentials
-            response = requests.post(
-                download_url,
-                json={
-                    'observerKK': observer_kk,
-                    'password': password,
-                    'use_session': False
-                },
-                timeout=60
-            )
-            
-            # Return cloud server response
-            return jsonify(response.json()), response.status_code
-            
-        except Exception as e:
-            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
-    
-    # Cloud Mode: Direct database operations with authentication
+    # Authentication (both Cloud Mode with session and Local Mode with password)
     try:
         # Authenticate user
         if use_session:
@@ -5636,7 +5523,7 @@ def update_observer_site(kk):
                     updated_observers.append(obs)
             
             if not entry_found:
-                return jsonify({'error': 'site_entry_not_found', 'kk': kk, 'seit': original_seit}), 404
+                return jsonify({'error': 'site_entry_not_found', 'kk': kk, 'seit': seit}), 404
             
             def sort_key(obs):
                 kk_val = obs[0]
