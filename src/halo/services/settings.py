@@ -104,6 +104,8 @@ class Settings:
                             app_config['DATE_DEFAULT_YEAR'] = 2026
                     elif key == 'UPLOAD_PASSWORD':
                         app_config['UPLOAD_PASSWORD'] = value
+                    elif key == 'UPLOAD_OBSERVER_KK':
+                        app_config['UPLOAD_OBSERVER_KK'] = value
                     elif key == 'LANGUAGE':
                         # Saved language preference (de or en)
                         app_config['LANGUAGE'] = value if value in ('de', 'en') else 'de'
@@ -141,6 +143,7 @@ class Settings:
             rows.insert(3, ['FIXED_OBSERVER', app_config.get('FIXED_OBSERVER', '')])
             rows.append(['STARTUP_FILE_PATH', app_config.get('STARTUP_FILE_PATH', '')])
             rows.append(['UPLOAD_PASSWORD', app_config.get('UPLOAD_PASSWORD', '')])
+            rows.append(['UPLOAD_OBSERVER_KK', app_config.get('UPLOAD_OBSERVER_KK', '')])
         
         with open(cfg_file, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)

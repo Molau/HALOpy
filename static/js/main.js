@@ -5647,15 +5647,22 @@ async function showDownloadDialog() {
             setTimeout(() => spinner.modalEl.remove(), 300);
             
             if (response.ok && result.success) {
+                console.log("🔍 DEBUG: Download success block reached");
+                console.log("🔍 DEBUG: isCloudMode:", isCloudMode);
+                console.log("🔍 DEBUG: observerKK:", observerKK, "password:", password ? "SET" : "NULL");
+                
                 // Save credentials for convenience (Local Mode only)
                 if (!isCloudMode) {
+                    console.log("🔍 DEBUG: Saving credentials after download success - observerKK:", observerKK, "password length:", password ? password.length : 0);
                     try {
-                        await fetch('/api/config/upload_password', {
+                        const response = await fetch('/api/config/upload_password', {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ password: password, observer_kk: observerKK })
                         });
+                        console.log("🔍 DEBUG: Credentials save response:", response.status, response.ok);
                     } catch (error) {
+                        console.error("🔍 DEBUG: Error saving credentials:", error);
                         // Silent fail - not critical if settings save fails
                     }
                 }
@@ -5698,14 +5705,43 @@ async function showDownloadDialog() {
 }
 
 function triggerFileSaveDialog(csvContent, defaultFilename) {
+    console.log("🔍 DEBUG: triggerFileSaveDialog called with filename:", defaultFilename);
+    
     // Create a Blob from CSV content
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Try to use the modern File System Access API if available
+    if ('showSaveFilePicker' in window) {
+        console.log("🔍 DEBUG: Using modern File System Access API");
+        window.showSaveFilePicker({
+            suggestedName: defaultFilename,
+            types: [{
+                description: 'CSV files',
+                accept: {'text/csv': ['.csv']},
+            }],
+        }).then(fileHandle => {
+            return fileHandle.createWritable();
+        }).then(writable => {
+            writable.write(blob);
+            return writable.close();
+        }).catch(err => {
+            console.log("🔍 DEBUG: File System Access API cancelled or failed, falling back to download link");
+            // Fallback to download link
+            fallbackDownload(blob, defaultFilename);
+        });
+    } else {
+        console.log("🔍 DEBUG: Using fallback download link method");
+        fallbackDownload(blob, defaultFilename);
+    }
+}
+
+function fallbackDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     
-    // Create temporary <a> element to trigger download with save dialog
+    // Create temporary <a> element to trigger download
     const link = document.createElement('a');
     link.href = url;
-    link.download = defaultFilename;  // Suggested filename
+    link.download = filename;  // Suggested filename
     link.style.display = 'none';
     
     // Trigger download
