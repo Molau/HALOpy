@@ -109,15 +109,15 @@ def get_cloud_server_url():
     Get the cloud server base URL for upload/download operations.
     
     Returns:
-        str: Cloud server URL (e.g., 'https://halo.online')
+        str: Cloud server URL (e.g., 'https://halopy.online')
     
     Environment Variable:
         HALOPY_CLOUD_SERVER_URL: Override default cloud server URL
     
     Default:
-        https://halo.online
+        https://halopy.online
     """
-    return os.environ.get('HALOPY_CLOUD_SERVER_URL', 'https://halo.online')
+    return os.environ.get('HALOPY_CLOUD_SERVER_URL', 'https://halopy.online')
 
 
 def get_database_url():

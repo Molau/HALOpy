@@ -10,6 +10,7 @@ from pathlib import Path
 
 # Third-party imports
 from flask import Flask, render_template, session, request, g, redirect, url_for
+from flask_cors import CORS
 
 # Project imports
 from halo.api import api_blueprint
@@ -68,6 +69,29 @@ def create_app(config=None):
     
     if config:
         app.config.update(config)
+    
+    # Enable CORS for Upload/Download APIs
+    # Allows Local Mode (localhost) to access Cloud Server APIs
+    CORS(app, resources={
+        r"/api/file/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type"],
+            "supports_credentials": False
+        },
+        r"/api/observers/upload": {
+            "origins": "*",
+            "methods": ["POST", "OPTIONS"],
+            "allow_headers": ["Content-Type"],
+            "supports_credentials": False
+        },
+        r"/api/observers/download": {
+            "origins": "*",
+            "methods": ["POST", "OPTIONS"],
+            "allow_headers": ["Content-Type"],
+            "supports_credentials": False
+        }
+    })
     
     # Load persisted settings from halo.cfg (CSV)
     # Cloud Mode: Settings loaded per-request (need session context)
