@@ -1587,6 +1587,10 @@ def upload_observers() -> Dict[str, Any]:
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
     
+    print(f"🔍 DEBUG: Observer upload - use_session={use_session}, observer_kk={observer_kk}, observers count={len(observers)}")
+    if observers:
+        print(f"🔍 DEBUG: First observer: {observers[0]}")
+    
     # Validate parameters
     if not observers:
         return jsonify({'error': 'no_observer_data_to_upload'}), 400
@@ -1651,14 +1655,18 @@ def upload_observers() -> Dict[str, Any]:
             if len(obs_record) >= 1:
                 uploaded_kks.add(int(obs_record[0]))
         
+        print(f"🔍 DEBUG: Uploaded KKs: {uploaded_kks}")
+        
         # Delete existing records for uploaded KKs
         for kk in uploaded_kks:
             existing_records = observer_db.load_filtered(kk=kk)
+            print(f"🔍 DEBUG: Deleting {len(existing_records)} existing records for KK={kk}")
             for record in existing_records:
                 # Delete by kk and since (unique key)
                 observer_db.delete_one(int(record[0]), record[2])
         
         # Add new observer records to database
+        print(f"🔍 DEBUG: Adding {len(observers)} new observer records")
         for obs_record in observers:
             observer_db.save_one(obs_record)
         
