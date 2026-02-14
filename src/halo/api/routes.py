@@ -2052,19 +2052,23 @@ def fixed_observer() -> Dict[str, Any]:
 
 @api_blueprint.route('/config/upload_password', methods=['GET', 'PUT'])
 def upload_password() -> Dict[str, Any]:
-    """Get or set upload password (obfuscated)."""
+    """Get or set upload password (obfuscated) and associated observer_kk."""
     
     if request.method == 'PUT':
         data = request.get_json()
         password = data.get('password', '')
+        observer_kk = data.get('observer_kk', '')
         
         # Obfuscate password before storing
         obfuscated = Settings.obfuscate(password) if password else ''
         
         current_app.config['UPLOAD_PASSWORD'] = obfuscated
-        # Persist setting
+        current_app.config['UPLOAD_OBSERVER_KK'] = str(observer_kk)
+        
+        # Persist settings
         root_path = Path(__file__).parent.parent.parent.parent
         Settings.save_key(current_app.config, root_path, 'UPLOAD_PASSWORD', obfuscated)
+        Settings.save_key(current_app.config, root_path, 'UPLOAD_OBSERVER_KK', str(observer_kk))
         
         return jsonify({
             'success': True
@@ -2073,8 +2077,11 @@ def upload_password() -> Dict[str, Any]:
         # Get obfuscated password and deobfuscate it
         obfuscated = current_app.config.get('UPLOAD_PASSWORD', '')
         password = Settings.deobfuscate(obfuscated) if obfuscated else ''
+        observer_kk = current_app.config.get('UPLOAD_OBSERVER_KK', '')
+        
         return jsonify({
-            'password': password
+            'password': password,
+            'observer_kk': observer_kk
         })
 
 

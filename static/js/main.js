@@ -4865,6 +4865,7 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
     let observers = [];
     let fixedObserver = '';
     let savedPassword = '';
+    let savedObserverKK = '';
     
     try {
         const [obsResponse, configResponse, passwordResponse] = await Promise.all([
@@ -4886,6 +4887,7 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         if (passwordResponse.ok) {
             const passwordData = await passwordResponse.json();
             savedPassword = passwordData.password || '';
+            savedObserverKK = passwordData.observer_kk || '';
         }
     } catch (error) {}
     
@@ -4941,11 +4943,17 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
     observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
         const option = document.createElement('option');
         option.value = obs.KK;
-        const selected = obs.KK === fixedObserver ? 'selected' : '';
+        // Preselect: savedObserverKK > fixedObserver > none
+        const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
         option.selected = selected === 'selected';
         option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
         observerSelect.appendChild(option);
     });
+    
+    // Preselect admin if that was saved
+    if (savedObserverKK === 'admin') {
+        adminOption.selected = true;
+    }
     
     // Toggle password visibility
     togglePasswordBtn.addEventListener('click', () => {
@@ -4990,12 +4998,12 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         // Local Mode: No separate login call - credentials will be sent with upload/download request
         // Just collect credentials and pass to callback
         
-        // Save password to halo.cfg (obfuscated) for convenience
+        // Save password AND observer_kk to halo.cfg (obfuscated) for convenience
         try {
             await fetch('/api/config/upload_password', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
+                body: JSON.stringify({ password: password, observer_kk: observerKK })
             });
         } catch (error) {}
         
@@ -5093,6 +5101,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
     let observers = [];
     let fixedObserver = '';
     let savedPassword = '';
+    let savedObserverKK = '';
     let startupFilePath = '';
     
     if (!isCloudMode) {
@@ -5117,6 +5126,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             if (passwordResponse.ok) {
                 const passwordData = await passwordResponse.json();
                 savedPassword = passwordData.password || '';
+                savedObserverKK = passwordData.observer_kk || '';
             }
             
             if (startupResponse.ok) {
@@ -5129,6 +5139,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
     }
     
     const observerDisabled = fixedObserver ? 'disabled' : '';
+    let savedObserverKK = '';
     
     // Auth fields section (only visible in Local Mode)
     const authFieldsHtml = !isCloudMode ? `
@@ -5209,11 +5220,17 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
         observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
             const option = document.createElement('option');
             option.value = obs.KK;
-            const selected = obs.KK === fixedObserver ? 'selected' : '';
+            // Preselect: savedObserverKK > fixedObserver > none
+            const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
             option.selected = selected === 'selected';
             option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
             observerSelect.appendChild(option);
         });
+        
+        // Preselect admin if that was saved
+        if (savedObserverKK === 'admin') {
+            adminOption.selected = true;
+        }
         
         // Toggle password visibility
         togglePasswordBtn.addEventListener('click', () => {
@@ -5258,12 +5275,12 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 return;
             }
             
-            // Save password to config for convenience
+            // Save password AND observer_kk to config for convenience
             try {
                 await fetch('/api/config/upload_password', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: password })
+                    body: JSON.stringify({ password: password, observer_kk: observerKK })
                 });
             } catch (error) {}
         }
@@ -5416,6 +5433,7 @@ async function showDownloadDialog() {
     let observers = [];
     let fixedObserver = '';
     let savedPassword = '';
+    let savedObserverKK = '';
     
     if (!isCloudMode) {
         try {
@@ -5438,6 +5456,7 @@ async function showDownloadDialog() {
             if (passwordResp.ok) {
                 const passwordData = await passwordResp.json();
                 savedPassword = passwordData.password || '';
+                savedObserverKK = passwordData.observer_kk || '';
             }
         } catch (error) {}
     }
@@ -5528,11 +5547,17 @@ async function showDownloadDialog() {
         observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
             const option = document.createElement('option');
             option.value = obs.KK;
-            const selected = obs.KK === fixedObserver ? 'selected' : '';
+            // Preselect: savedObserverKK > fixedObserver > none
+            const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
             option.selected = selected === 'selected';
             option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
             observerSelect.appendChild(option);
         });
+        
+        // Preselect admin if that was saved
+        if (savedObserverKK === 'admin') {
+            adminOption.selected = true;
+        }
         
         // Password toggle
         togglePasswordBtn.addEventListener('click', () => {
