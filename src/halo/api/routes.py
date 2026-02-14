@@ -1658,12 +1658,21 @@ def upload_observers() -> Dict[str, Any]:
         print(f"🔍 DEBUG: Uploaded KKs: {uploaded_kks}")
         
         # Delete existing records for uploaded KKs
-        for kk in uploaded_kks:
-            existing_records = observer_db.load_filtered(kk=kk)
-            print(f"🔍 DEBUG: Deleting {len(existing_records)} existing records for KK={kk}")
-            for record in existing_records:
-                # Delete by kk and since (unique key)
-                observer_db.delete_one(int(record[0]), record[2])
+        try:
+            for kk in uploaded_kks:
+                existing_records = observer_db.load_filtered(kk=kk)
+                print(f"🔍 DEBUG: Deleting {len(existing_records)} existing records for KK={kk}")
+                for i, record in enumerate(existing_records):
+                    print(f"🔍 DEBUG: Deleting record {i+1}: KK={record[0]}, since={record[2]}")
+                    # Delete by kk and since (unique key)
+                    observer_db.delete_one(int(record[0]), record[2])
+                    print(f"🔍 DEBUG: Record {i+1} deleted successfully")
+            print("🔍 DEBUG: All existing records deleted successfully")
+        except Exception as e:
+            print(f"🔍 DEBUG: Error during deletion: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
         
         # Add new observer records to database
         print(f"🔍 DEBUG: Adding {len(observers)} new observer records")
