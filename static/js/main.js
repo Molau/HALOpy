@@ -18,6 +18,9 @@ let CIRCULAR_HALOS = new Set(); // Will be loaded from /api/constants on page lo
 let PILLAR_HEIGHT_VALUES = []; // Light pillar height values (-1, 1-90)
 let ALL_PILLAR_HEIGHT_VALUES = []; // All height values including 0
 
+// Global cloud mode flag - loaded once at startup
+let isCloudMode = false;
+
 // Password policy configuration
 const PASSWORD_POLICY = {
     minLength: 8,
@@ -129,6 +132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const configResponse = await fetch('/api/config');
         if (configResponse.ok) {
             const config = await configResponse.json();
+            isCloudMode = config.cloud_mode; // Initialize global variable
             window.haloConfig.cloud_mode = config.cloud_mode;
         }
     } catch (e) {
@@ -298,7 +302,7 @@ async function loadObserverCodes() {
     // Load simplified observer list (just KK codes for initial validation)
     // Observer activity is checked via API endpoint when needed (g-field)
     const resp = await fetch('/api/observers/list');
-    if (!resp.ok) throw new Error(i18nStrings.messages?.observer_list_load_failed || 'Could not load observer list');
+    if (!resp.ok) throw new Error(i18nStrings.messages.observer_list_load_failed);
     const data = await resp.json();
     const observers = data.observers || [];
     
@@ -5035,7 +5039,6 @@ async function showUploadDialog() {
         // Check if we're in cloud mode
         const configResponse = await fetch('/api/config');
         const config = await configResponse.json();
-        const isCloudMode = config.cloud_mode;
         const cloudServerUrl = config.cloud_server_url;
         
         // Check if there are unsaved changes
@@ -5428,7 +5431,6 @@ async function showDownloadDialog() {
     // Detect cloud vs local mode
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
-    const isCloudMode = config.cloud_mode;
     const cloudServerUrl = config.cloud_server_url;
     
     // Load data for Local Mode auth fields
@@ -5473,12 +5475,7 @@ async function showDownloadDialog() {
         </div>
         <div class="mb-3">
             <label for="download-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
-            <div class="position-relative">
-                <input type="password" class="form-control pe-5" id="download-password" autocomplete="current-password" value="${savedPassword}">
-                <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-download-password" style="z-index: 10;">
-                    <i class="bi bi-eye text-secondary" id="download-password-icon"></i>
-                </button>
-            </div>
+            <input type="password" class="form-control" id="download-password" autocomplete="new-password" value="${savedPassword}">
         </div>
     ` : '';
     
@@ -5538,8 +5535,6 @@ async function showDownloadDialog() {
     if (!isCloudMode) {
         observerSelect = document.getElementById('download-observer');
         passwordInput = document.getElementById('download-password');
-        const togglePasswordBtn = document.getElementById('toggle-download-password');
-        const passwordIcon = document.getElementById('download-password-icon');
         
         // Load observers list
         // Populate observer dropdown - same logic as upload dialog
@@ -5562,13 +5557,6 @@ async function showDownloadDialog() {
         if (savedObserverKK === 'admin') {
             adminOption.selected = true;
         }
-        
-        // Password toggle
-        togglePasswordBtn.addEventListener('click', () => {
-            const type = passwordInput.type === 'password' ? 'text' : 'password';
-            passwordInput.type = type;
-            passwordIcon.className = type === 'password' ? 'bi bi-eye text-secondary' : 'bi bi-eye-slash text-secondary';
-        });
         
         // Store values when changed
         observerSelect.addEventListener('change', () => {
@@ -5618,6 +5606,38 @@ async function showDownloadDialog() {
         // Show spinner
         const spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
+        // CRITICAL: For Cloud Mode, get file handle IMMEDIATELY to preserve user activation
+        let fileHandle = null;
+        console.log("🔍 DEBUG: About to check Cloud Mode file picker - isCloudMode:", isCloudMode, "API available:", 'showSaveFilePicker' in window);
+        console.log("🔍 DEBUG: Condition result:", isCloudMode && 'showSaveFilePicker' in window);
+        if (isCloudMode && 'showSaveFilePicker' in window) {
+            try {
+                const defaultFilename = downloadAll ? 'halobeo.csv' : 'observations.csv';
+                console.log("🔍 DEBUG: Opening immediate file picker for Cloud Mode");
+                fileHandle = await window.showSaveFilePicker({
+                    suggestedName: defaultFilename,
+                    types: [{
+                        description: 'CSV files',
+                        accept: {'text/csv': ['.csv']},
+                    }],
+                });
+                console.log("🔍 DEBUG: File handle acquired successfully");
+            } catch (err) {
+                console.log("🔍 DEBUG: File picker error:", err.name, err.message);
+                if (err.name === 'AbortError') {
+                    // User cancelled - hide spinner and exit completely
+                    console.log("🔍 DEBUG: User cancelled first file picker - exiting");
+                    spinner.modal.hide();
+                    setTimeout(() => spinner.modalEl.remove(), 300);
+                    return;
+                }
+                // API error - will fall back to download method
+                fileHandle = null;
+            }
+        } else {
+            console.log("🔍 DEBUG: Skipping Cloud Mode file picker - isCloudMode:", isCloudMode, "API available:", 'showSaveFilePicker' in window);
+        }
+        
         try {
             // Build request
             const downloadUrl = `${cloudServerUrl}/api/file/download`;
@@ -5642,42 +5662,71 @@ async function showDownloadDialog() {
             
             const result = await response.json();
             
-            // Hide spinner
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-            
             if (response.ok && result.success) {
                 console.log("🔍 DEBUG: Download success block reached");
                 console.log("🔍 DEBUG: isCloudMode:", isCloudMode);
-                console.log("🔍 DEBUG: observerKK:", observerKK, "password:", password ? "SET" : "NULL");
+                console.log("🔍 DEBUG: observerKK:", observerKK, "password:", password ? "SET" : "NULL", "fileHandle:", fileHandle ? "EXISTS" : "NULL");
+                console.log("🔍 DEBUG: fileHandle exists:", fileHandle ? "YES" : "NO");
                 
                 // Save credentials for convenience (Local Mode only)
                 if (!isCloudMode) {
-                    console.log("🔍 DEBUG: Saving credentials after download success - observerKK:", observerKK, "password length:", password ? password.length : 0);
                     try {
                         const response = await fetch('/api/config/upload_password', {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ password: password, observer_kk: observerKK })
                         });
-                        console.log("🔍 DEBUG: Credentials save response:", response.status, response.ok);
                     } catch (error) {
-                        console.error("🔍 DEBUG: Error saving credentials:", error);
                         // Silent fail - not critical if settings save fails
                     }
                 }
                 
-                // Trigger file save dialog
+                // Handle file saving
                 const csvContent = result.csv_content;
                 const defaultFilename = result.is_admin && downloadAll
                     ? 'halobeo.csv'
                     : 'observations.csv';
-                triggerFileSaveDialog(csvContent, defaultFilename);
                 
-                // Success notification
-                const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
-                showNotification(successMessage, 'success');
+                console.log("🔍 DEBUG: fileHandle check - isCloudMode:", isCloudMode, "fileHandle:", fileHandle ? "VALID" : "NULL");
+                
+                console.log("🔍 DEBUG: fileHandle exists:", fileHandle ? "YES" : "NO");
+                
+                if (isCloudMode && fileHandle) {
+                    // Cloud Mode with pre-acquired file handle - write directly
+                    try {
+                        const writable = await fileHandle.createWritable();
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        await writable.write(blob);
+                        await writable.close();
+                        
+                        // Hide spinner
+                        spinner.modal.hide();
+                        setTimeout(() => spinner.modalEl.remove(), 300);
+                        
+                        // Success notification
+                        const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
+                        showNotification(successMessage, 'success');
+                    } catch (err) {
+                        // Fall back to download method
+                        triggerFileSaveDialog(csvContent, defaultFilename, spinner);
+                        
+                        // Success notification
+                        const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
+                        showNotification(successMessage, 'success');
+                    }
+                } else {
+                    // Local Mode or Cloud Mode fallback - use standard method
+                    triggerFileSaveDialog(csvContent, defaultFilename, spinner);
+                    
+                    // Success notification
+                    const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
+                    showNotification(successMessage, 'success');
+                }
             } else {
+                // Hide spinner on error
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+                
                 showErrorDialog(i18nStrings.common.error + ': ' + result.error);
             }
         } catch (error) {
@@ -5704,15 +5753,20 @@ async function showDownloadDialog() {
     });
 }
 
-function triggerFileSaveDialog(csvContent, defaultFilename) {
-    console.log("🔍 DEBUG: triggerFileSaveDialog called with filename:", defaultFilename);
-    
+function triggerFileSaveDialog(csvContent, defaultFilename, spinner = null) {
     // Create a Blob from CSV content
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     
+    // Function to hide spinner after file operation
+    const hideSpinnerAfterSave = () => {
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+    };
+    
     // Try to use the modern File System Access API if available
     if ('showSaveFilePicker' in window) {
-        console.log("🔍 DEBUG: Using modern File System Access API");
         window.showSaveFilePicker({
             suggestedName: defaultFilename,
             types: [{
@@ -5724,14 +5778,22 @@ function triggerFileSaveDialog(csvContent, defaultFilename) {
         }).then(writable => {
             writable.write(blob);
             return writable.close();
+        }).then(() => {
+            hideSpinnerAfterSave();
         }).catch(err => {
-            console.log("🔍 DEBUG: File System Access API cancelled or failed, falling back to download link");
-            // Fallback to download link
-            fallbackDownload(blob, defaultFilename);
+            if (err.name === 'AbortError') {
+                // User cancelled - just hide spinner
+                hideSpinnerAfterSave();
+            } else {
+                // API not supported or other error - fallback to download
+                fallbackDownload(blob, defaultFilename);
+                hideSpinnerAfterSave();
+            }
         });
     } else {
-        console.log("🔍 DEBUG: Using fallback download link method");
         fallbackDownload(blob, defaultFilename);
+        // Hide spinner immediately for fallback method since there's no user interaction
+        hideSpinnerAfterSave();
     }
 }
 
@@ -5791,7 +5853,6 @@ async function showObserverUploadDialog() {
             // Get cloud server URL
             const configResponse = await fetch('/api/config');
             const config = await configResponse.json();
-            const isCloudMode = config.cloud_mode;
             const cloudServerUrl = config.cloud_server_url;
             
             // Call cloud server DIRECTLY (both Local and Cloud Mode)
