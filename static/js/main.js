@@ -5591,8 +5591,8 @@ async function showDownloadDialog() {
     document.getElementById('btn-download-file').addEventListener('click', async () => {
         const downloadAll = getDownloadScope();
         
-        // Get current values from form (Local Mode)
-        if (!isCloudMode) {
+        // Get current values from form (Local Mode only)
+        if (!isCloudMode && observerSelect && passwordInput) {
             observerKK = observerSelect.value;
             password = passwordInput.value;
         }
