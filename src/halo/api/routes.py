@@ -1682,7 +1682,35 @@ def upload_observers() -> Dict[str, Any]:
         for i, obs_record in enumerate(observers):
             print(f"🔍 DEBUG: Saving record {i+1}: {obs_record}")
             try:
-                observer_db.save_one(obs_record)
+                # Convert array to dict if needed (database expects dict format)
+                if isinstance(obs_record, list):
+                    observer_dict = {
+                        'kk': obs_record[0],
+                        'first_name': obs_record[1],
+                        'last_name': obs_record[2],
+                        'since': obs_record[3],
+                        'active': obs_record[4],
+                        'primary_site': obs_record[5],
+                        'primary_region': obs_record[6],
+                        'primary_lon_deg': obs_record[7],
+                        'primary_lon_min': obs_record[8],
+                        'primary_lon_dir': obs_record[9],
+                        'primary_lat_deg': obs_record[10],
+                        'primary_lat_min': obs_record[11],
+                        'primary_lat_dir': obs_record[12],
+                        'secondary_site': obs_record[13],
+                        'secondary_region': obs_record[14],
+                        'secondary_lon_deg': obs_record[15],
+                        'secondary_lon_min': obs_record[16],
+                        'secondary_lon_dir': obs_record[17],
+                        'secondary_lat_deg': obs_record[18],
+                        'secondary_lat_min': obs_record[19],
+                        'secondary_lat_dir': obs_record[20]
+                    }
+                else:
+                    observer_dict = obs_record
+                
+                observer_db.save_one(observer_dict)
                 print(f"🔍 DEBUG: Record {i+1} saved successfully")
             except Exception as e:
                 print(f"🔍 DEBUG: Error saving record {i+1}: {e}")
