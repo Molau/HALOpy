@@ -166,7 +166,7 @@
         // Load observers and populate dropdown
         async function loadObservers() {
             try {
-                const response = await fetch('/api/observers');
+                const response = await fetch('/api/observers/list');
                 if (response.ok) {
                     const data = await response.json();
                     const observers = data.observers || [];
@@ -182,7 +182,7 @@
                     observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
                         const option = document.createElement('option');
                         option.value = obs.KK;
-                        option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
+                        option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName} ${obs.NName}`.trim();
                         usernameSelect.appendChild(option);
                     });
                 }

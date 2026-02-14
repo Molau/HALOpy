@@ -4869,36 +4869,74 @@ def get_observers() -> Dict[str, Any]:
 
 @api_blueprint.route('/observers/list', methods=['GET'])
 def get_observers_list() -> Dict[str, Any]:
-    """Get list of unique observers (KK + Name) for dropdown."""
+    """Get list of unique observers (KK + Name) for dropdown.
+    
+    This endpoint does NOT require authentication - it's used by login, upload, and download dialogs.
+    """
     
     # Get observers based on deployment mode
     if is_cloud_mode():
-        observers = observer_db.load_filtered(latest_only=True)  # Only latest records per KK
-    else:
-        observers = current_app.config.get('OBSERVERS', [])
-    
-    # Get unique observers by KK
-    unique_observers = {}
-    for obs in observers:
-        kk = obs[0]
-        vname = obs[1] if obs[1] else ''  # VName
-        nname = obs[2] if obs[2] else ''  # NName
-        
-        # Skip if KK is empty or both names are empty
-        if not kk or (not vname and not nname):
-            continue
+        # Cloud Mode: Direct database access WITHOUT session filtering
+        # This is public data needed for login dropdown
+        try:
+            conn = db_connection.get_connection()
+            cursor = conn.cursor(dictionary=True)
             
-        if kk not in unique_observers:
-            unique_observers[kk] = {
-                'KK': kk,
-                'VName': vname,
-                'NName': nname
-            }
+            # Get latest record per observer (highest 'since' value)
+            query = """
+                SELECT DISTINCT ON (kk) 
+                    kk, first_name, last_name, since
+                FROM observers
+                ORDER BY kk, since DESC
+            """
+            cursor.execute(query)
+            db_observers = cursor.fetchall()
+            cursor.close()
+            
+            # Convert to standardized format
+            observers = []
+            for obs in db_observers:
+                observers.append({
+                    'KK': obs['kk'],
+                    'VName': obs['first_name'] or '',
+                    'NName': obs['last_name'] or ''
+                })
+                
+        except Exception as e:
+            # On any error, return empty list
+            print(f"Error loading observers for dropdown: {e}")
+            observers = []
+    else:
+        # Local Mode: Get from app config (CSV)
+        csv_observers = current_app.config.get('OBSERVERS', [])
+        
+        # Get unique observers by KK (only latest record)
+        unique_observers = {}
+        for obs in csv_observers:
+            if len(obs) < 3:
+                continue
+            kk = obs[0]
+            vname = obs[1] if obs[1] else ''
+            nname = obs[2] if obs[2] else ''
+            
+            # Skip if KK is empty or both names are empty
+            if not kk or (not vname and not nname):
+                continue
+                
+            if kk not in unique_observers:
+                unique_observers[kk] = {
+                    'KK': kk,
+                    'VName': vname,
+                    'NName': nname
+                }
+        
+        # Convert to list
+        observers = list(unique_observers.values())
     
-    # Convert to list and sort by KK
-    observer_list = sorted(unique_observers.values(), key=lambda x: x['KK'])
+    # Sort by KK
+    observers.sort(key=lambda x: int(x['KK']) if x['KK'].isdigit() else 0)
     
-    return jsonify({'observers': observer_list})
+    return jsonify({'observers': observers})
 
 
 def _parse_seit(seit_str: str) -> int:
