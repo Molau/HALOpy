@@ -164,7 +164,35 @@ else:
   - ✓ Read file first, understand syntax, then replace with proper context
 - **Impact**: Prevents syntax errors and broken code from blind string replacements
 
-### 0a. Import Organization Standard - Decision #030
+### 0a. Source Code Verification Principle - Decision #032
+- **Date**: 2026-02-14
+- **Status**: ✓ Approved
+- **Core Rule**: NEVER guess variable names, types, API signatures, or database schemas - ALWAYS verify in source code
+- **Critical Principle**: All technical details MUST be determined by reading actual source code, not assumed
+- **REQUIRED Workflow**:
+  1. ✓ **Read database schema**: Check `scripts/setup_database.sql` for exact column names and types
+  2. ✓ **Read API definitions**: Check actual function signatures, not assumptions
+  3. ✓ **Read existing code**: Check variable names, field indices, data structures in existing files
+  4. ✓ **Verify compatibility**: Ensure new code matches existing patterns and interfaces
+- **FORBIDDEN Practices**:
+  - ✗ Guessing column names (e.g., `primary_longitude` when actual is `primary_lon_deg, primary_lon_min, primary_lon_dir`)
+  - ✗ Assuming API parameter names without checking function definitions
+  - ✗ Creating inconsistent field mappings between database and application layers
+  - ✗ Implementing interfaces without checking actual interface definitions
+- **Rationale**:
+  - Guessing causes runtime errors that are hard to debug
+  - Schema mismatches break production systems
+  - Wastes time fixing preventable errors
+  - Erodes trust in code quality
+  - Creates technical debt that compounds over time
+- **Examples**:
+  - ✗ **WRONG**: Assume database has `primary_longitude` and `primary_latitude` fields
+  - ✓ **CORRECT**: Read `setup_database.sql` to find actual fields are `primary_lon_deg, primary_lon_min, primary_lon_dir, primary_lat_deg, primary_lat_min, primary_lat_dir`
+  - ✗ **WRONG**: Guess that CSV has 19 fields
+  - ✓ **CORRECT**: Read actual CSV file or schema documentation to find it has 21 fields
+- **Impact**: CRITICAL - prevents production errors and ensures code correctness from the start
+
+### 0b. Import Organization Standard - Decision #030
 - **Date**: 2026-02-07
 - **Status**: ✓ Approved
 - **Core Rule**: ALL imports MUST be consolidated at the top of each Python file - NO inline imports within functions

@@ -22,40 +22,38 @@ from halo.io.db_connection import get_connection
 # READ Operations
 # ========================================
 
-def load_all() -> List[List[str]]:
+def load_all() -> List[Dict[str, Any]]:
     """
     Load all observer records from database, sorted by kk, since.
     
     Returns:
-        List of observer records (each record is list of 21 strings)
+        List of observer records (each record is a dict with column names as keys)
         
     Example:
         >>> records = load_all()
         >>> print(f"Loaded {len(records)} observer records")
     """
     with get_connection() as conn:
-        with conn.cursor() as cursor:
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute("""
-                SELECT kk, active, since, first_name, last_name,
-                       primary_site, primary_region, primary_longitude, primary_latitude, primary_altitude,
-                       secondary_site, secondary_region, secondary_longitude, secondary_latitude, secondary_altitude,
-                       geographic_region, publication_rights, institution, address, email, phone
+                SELECT kk, first_name, last_name, since, active,
+                       primary_site, primary_region,
+                       primary_lon_deg, primary_lon_min, primary_lon_dir,
+                       primary_lat_deg, primary_lat_min, primary_lat_dir,
+                       secondary_site, secondary_region,
+                       secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
+                       secondary_lat_deg, secondary_lat_min, secondary_lat_dir
                 FROM observers
                 ORDER BY kk, since
             """)
             
             rows = cursor.fetchall()
             
-            # Convert tuples to lists of strings (match file format)
-            records = []
-            for row in rows:
-                record = [str(value) if value is not None else "" for value in row]
-                records.append(record)
-            
-            return records
+            # Convert RealDictRow to regular dict
+            return [dict(row) for row in rows]
 
 
-def load_filtered(**filters) -> List[List[str]]:
+def load_filtered(**filters) -> List[Dict[str, Any]]:
     """
     Load observer records with filters.
     
@@ -66,7 +64,6 @@ def load_filtered(**filters) -> List[List[str]]:
     - first_name, last_name: Name (str, LIKE partial match)
     - primary_site, primary_region: Primary site (str, LIKE partial match)
     - secondary_site, secondary_region: Secondary site (str, LIKE partial match)
-    - geographic_region: Geographic region (str, exact match)
     - standort: Site search (str, searches both primary_site and secondary_site)
     - region: Region search (int, searches both primary_region and secondary_region)
     - latest_only: If True, returns only latest record per KK (bool)
@@ -76,7 +73,7 @@ def load_filtered(**filters) -> List[List[str]]:
         **filters: Field name → value
         
     Returns:
-        List of observer records matching filters, sorted by kk, since
+        List of observer records (dicts) matching filters, sorted by kk, since
         
     Examples:
         >>> # Observer 44
@@ -108,7 +105,7 @@ def load_filtered(**filters) -> List[List[str]]:
     mm = filters.pop('mm', None)
     
     with get_connection() as conn:
-        with conn.cursor() as cursor:
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             # Build WHERE clause dynamically
             where_clauses = []
             params = []
@@ -162,20 +159,26 @@ def load_filtered(**filters) -> List[List[str]]:
             if where_clauses:
                 where_sql = " AND ".join(where_clauses)
                 query = f"""
-                    SELECT kk, active, since, first_name, last_name,
-                           primary_site, primary_region, primary_longitude, primary_latitude, primary_altitude,
-                           secondary_site, secondary_region, secondary_longitude, secondary_latitude, secondary_altitude,
-                           geographic_region, publication_rights, institution, address, email, phone
+                    SELECT kk, first_name, last_name, since, active,
+                           primary_site, primary_region,
+                           primary_lon_deg, primary_lon_min, primary_lon_dir,
+                           primary_lat_deg, primary_lat_min, primary_lat_dir,
+                           secondary_site, secondary_region,
+                           secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
+                           secondary_lat_deg, secondary_lat_min, secondary_lat_dir
                     FROM observers
                     WHERE {where_sql}
                     ORDER BY kk, since
                 """
             else:
                 query = """
-                    SELECT kk, active, since, first_name, last_name,
-                           primary_site, primary_region, primary_longitude, primary_latitude, primary_altitude,
-                           secondary_site, secondary_region, secondary_longitude, secondary_latitude, secondary_altitude,
-                           geographic_region, publication_rights, institution, address, email, phone
+                    SELECT kk, first_name, last_name, since, active,
+                           primary_site, primary_region,
+                           primary_lon_deg, primary_lon_min, primary_lon_dir,
+                           primary_lat_deg, primary_lat_min, primary_lat_dir,
+                           secondary_site, secondary_region,
+                           secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
+                           secondary_lat_deg, secondary_lat_min, secondary_lat_dir
                     FROM observers
                     ORDER BY kk, since
                 """
@@ -183,18 +186,15 @@ def load_filtered(**filters) -> List[List[str]]:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             
-            # Convert tuples to lists of strings (match file format)
-            records = []
-            for row in rows:
-                record = [str(value) if value is not None else "" for value in row]
-                records.append(record)
+            # Convert RealDictRow to regular dict
+            records = [dict(row) for row in rows]
             
             # Handle latest_only filter (done in Python for simplicity)
             if latest_only:
                 latest_records = {}
                 for record in records:
-                    kk = record[0]
-                    since = record[2]
+                    kk = record['kk']
+                    since = record['since']
                     
                     # Parse seit (MM/YY) to compare dates
                     try:
@@ -212,7 +212,7 @@ def load_filtered(**filters) -> List[List[str]]:
                 
                 records = [rec_tuple[0] for rec_tuple in latest_records.values()]
                 # Re-sort by kk
-                records.sort(key=lambda x: x[0])
+                records.sort(key=lambda x: x['kk'])
             
             return records
 
@@ -239,41 +239,44 @@ def count() -> int:
 # WRITE Operations
 # ========================================
 
-def save_one(record: List[str]) -> bool:
+def save_one(record: Dict[str, Any]) -> bool:
     """
-    Insert new observer record (21 fields).
+    Insert new observer record.
     
     Args:
-        record: List of 21 strings matching observer record format
+        record: Dict with column names as keys
         
     Returns:
         True if inserted successfully
         False if duplicate key (kk, since)
         
     Example:
-        >>> record = ['44', '1', '04/26', 'Max', 'Mustermann', ...]
+        >>> record = {'kk': '44', 'first_name': 'Max', 'last_name': 'Mustermann', ...}
         >>> if save_one(record):
         ...     print("Observer record saved")
         ... else:
         ...     print("Duplicate record (kk, since)")
     """
-    if len(record) != 21:
-        raise ValueError(f"Observer record must have 21 fields, got {len(record)}")
-    
     with get_connection() as conn:
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO observers (
-                        kk, active, since, first_name, last_name,
-                        primary_site, primary_region, primary_longitude, primary_latitude, primary_altitude,
-                        secondary_site, secondary_region, secondary_longitude, secondary_latitude, secondary_altitude,
-                        geographic_region, publication_rights, institution, address, email, phone
+                        kk, first_name, last_name, since, active,
+                        primary_site, primary_region,
+                        primary_lon_deg, primary_lon_min, primary_lon_dir,
+                        primary_lat_deg, primary_lat_min, primary_lat_dir,
+                        secondary_site, secondary_region,
+                        secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
+                        secondary_lat_deg, secondary_lat_min, secondary_lat_dir
                     ) VALUES (
-                        %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s
+                        %(kk)s, %(first_name)s, %(last_name)s, %(since)s, %(active)s,
+                        %(primary_site)s, %(primary_region)s,
+                        %(primary_lon_deg)s, %(primary_lon_min)s, %(primary_lon_dir)s,
+                        %(primary_lat_deg)s, %(primary_lat_min)s, %(primary_lat_dir)s,
+                        %(secondary_site)s, %(secondary_region)s,
+                        %(secondary_lon_deg)s, %(secondary_lon_min)s, %(secondary_lon_dir)s,
+                        %(secondary_lat_deg)s, %(secondary_lat_min)s, %(secondary_lat_dir)s
                     )
                 """, record)
                 
@@ -286,39 +289,45 @@ def save_one(record: List[str]) -> bool:
             return False
 
 
-def update_one(kk: int, seit: str, record: List[str]) -> bool:
+def update_one(kk: int, seit: str, record: Dict[str, Any]) -> bool:
     """
     Update existing observer record.
     
     Args:
         kk: Observer code
         seit: Validity date (format: MM/YY)
-        record: Updated record (21 fields)
+        record: Updated record (dict with column names as keys)
         
     Returns:
         True if updated (1 row affected)
         False if not found (0 rows affected)
         
     Example:
-        >>> record = ['44', '1', '04/26', 'Max', 'Mustermann', ...]
+        >>> record = {'kk': '44', 'first_name': 'Max', ...}
         >>> if update_one(44, '04/26', record):
         ...     print("Observer record updated")
         ... else:
         ...     print("Record not found")
     """
-    if len(record) != 21:
-        raise ValueError(f"Observer record must have 21 fields, got {len(record)}")
-    
     with get_connection() as conn:
         with conn.cursor() as cursor:
+            # Prepare parameters with WHERE clause values
+            params = dict(record)
+            params['_where_kk'] = kk
+            params['_where_seit'] = seit
+            
             cursor.execute("""
                 UPDATE observers SET
-                    kk=%s, active=%s, since=%s, first_name=%s, last_name=%s,
-                    primary_site=%s, primary_region=%s, primary_longitude=%s, primary_latitude=%s, primary_altitude=%s,
-                    secondary_site=%s, secondary_region=%s, secondary_longitude=%s, secondary_latitude=%s, secondary_altitude=%s,
-                    geographic_region=%s, publication_rights=%s, institution=%s, address=%s, email=%s, phone=%s
-                WHERE kk=%s AND since=%s
-            """, record + [kk, seit])
+                    kk=%(kk)s, first_name=%(first_name)s, last_name=%(last_name)s,
+                    since=%(since)s, active=%(active)s,
+                    primary_site=%(primary_site)s, primary_region=%(primary_region)s,
+                    primary_lon_deg=%(primary_lon_deg)s, primary_lon_min=%(primary_lon_min)s, primary_lon_dir=%(primary_lon_dir)s,
+                    primary_lat_deg=%(primary_lat_deg)s, primary_lat_min=%(primary_lat_min)s, primary_lat_dir=%(primary_lat_dir)s,
+                    secondary_site=%(secondary_site)s, secondary_region=%(secondary_region)s,
+                    secondary_lon_deg=%(secondary_lon_deg)s, secondary_lon_min=%(secondary_lon_min)s, secondary_lon_dir=%(secondary_lon_dir)s,
+                    secondary_lat_deg=%(secondary_lat_deg)s, secondary_lat_min=%(secondary_lat_min)s, secondary_lat_dir=%(secondary_lat_dir)s
+                WHERE kk=%(_where_kk)s AND since=%(_where_seit)s
+            """, params)
             
             affected_rows = cursor.rowcount
             conn.commit()

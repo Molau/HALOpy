@@ -4736,26 +4736,26 @@ def get_observers() -> Dict[str, Any]:
             
             if kk_records:
                 if is_cloud_mode():
-                    # Database already filtered to valid records, take the latest one
-                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs[2])) if kk_records else None
-                else:
-                    # Find the latest record where seit <= observation date
-                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs[3])) if kk_records else None
-                
-                if latest_record:
-                    # Return single observer with GH and GN (adjust indices for DB vs CSV)
-                    if is_cloud_mode():
+                    # Database returns dicts - use column names
+                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs['since'])) if kk_records else None
+                    
+                    if latest_record:
                         result = {
-                            'KK': latest_record[0],
-                            'VName': latest_record[3],
-                            'NName': latest_record[4],
-                            'seit': latest_record[2],
-                            'aktiv': latest_record[1],
-                            'HbOrt': latest_record[5],
-                            'GH': latest_record[6],
-                            'GN': latest_record[15]
+                            'KK': latest_record['kk'],
+                            'VName': latest_record['first_name'],
+                            'NName': latest_record['last_name'],
+                            'seit': latest_record['since'],
+                            'aktiv': latest_record['active'],
+                            'HbOrt': latest_record['primary_site'],
+                            'GH': latest_record['primary_region'],
+                            'GN': latest_record['secondary_region']
                         }
-                    else:
+                        return jsonify({'observer': result})
+                else:
+                    # Local mode: CSV arrays - use index positions
+                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs[3])) if kk_records else None
+                    
+                    if latest_record:
                         result = {
                             'KK': latest_record[0],
                             'VName': latest_record[1],
@@ -4766,7 +4766,7 @@ def get_observers() -> Dict[str, Any]:
                             'GH': latest_record[6],
                             'GN': latest_record[14]
                         }
-                    return jsonify({'observer': result})
+                        return jsonify({'observer': result})
             
             # If no matching record found, return empty
             return jsonify({'observer': None})
@@ -4786,32 +4786,38 @@ def get_observers() -> Dict[str, Any]:
             observers = observer_db.load_filtered(latest_only=latest_only)
         
         # Convert to dict format for JSON (DB format)
+        # DB returns dicts with column names as keys
         result = []
         for obs in observers:
-            if len(obs) >= 21:
-                result.append({
-                    'KK': obs[0],
-                    'aktiv': obs[1],
-                    'seit': obs[2],
-                    'VName': obs[3],
-                    'NName': obs[4],
-                    'HbOrt': obs[5],
-                    'HbReg': obs[6],
-                    'HbLon': obs[7],
-                    'HbLat': obs[8],
-                    'HbHoehe': obs[9],
-                    'NbOrt': obs[10],
-                    'NbReg': obs[11],
-                    'NbLon': obs[12],
-                    'NbLat': obs[13],
-                    'NbHoehe': obs[14],
-                    'GH': obs[15],
-                    'Publ': obs[16],
-                    'Institut': obs[17],
-                    'Anschrift': obs[18],
-                    'Email': obs[19],
-                    'Telefon': obs[20]
-                })
+            # Format coordinates as strings: "deg° min' dir"
+            primary_lon = f"{obs['primary_lon_deg']}° {obs['primary_lon_min']}' {obs['primary_lon_dir']}" if obs.get('primary_lon_deg') and obs.get('primary_lon_min') else ""
+            primary_lat = f"{obs['primary_lat_deg']}° {obs['primary_lat_min']}' {obs['primary_lat_dir']}" if obs.get('primary_lat_deg') and obs.get('primary_lat_min') else ""
+            secondary_lon = f"{obs['secondary_lon_deg']}° {obs['secondary_lon_min']}' {obs['secondary_lon_dir']}" if obs.get('secondary_lon_deg') and obs.get('secondary_lon_min') else ""
+            secondary_lat = f"{obs['secondary_lat_deg']}° {obs['secondary_lat_min']}' {obs['secondary_lat_dir']}" if obs.get('secondary_lat_deg') and obs.get('secondary_lat_min') else ""
+            
+            result.append({
+                'KK': obs['kk'],
+                'VName': obs['first_name'],
+                'NName': obs['last_name'],
+                'seit': obs['since'],
+                'aktiv': obs['active'],
+                'HbOrt': obs['primary_site'],
+                'HbReg': obs['primary_region'],
+                'HbLon': primary_lon,
+                'HbLat': primary_lat,
+                'HbHoehe': '',             # Not in DB schema
+                'NbOrt': obs['secondary_site'],
+                'NbReg': obs['secondary_region'],
+                'NbLon': secondary_lon,
+                'NbLat': secondary_lat,
+                'NbHoehe': '',             # Not in DB schema
+                'GH': obs['primary_region'],  # same as HbReg
+                'Publ': '',                # Not in DB schema
+                'Institut': '',            # Not in DB schema
+                'Anschrift': '',           # Not in DB schema
+                'Email': '',               # Not in DB schema
+                'Telefon': ''              # Not in DB schema
+            })
         
         return jsonify({'observers': result})
     else:
