@@ -4,6 +4,9 @@ import csv
 from pathlib import Path
 from typing import Dict, Any
 
+# Third-party imports
+from flask import session
+
 # Project imports
 from halo.config import is_cloud_mode
 
@@ -54,7 +57,6 @@ class Settings:
         # Local Mode: get observer KK from app_config (optional UI filter, single-user)
         observer_kk = None
         if is_cloud_mode():
-            from flask import session
             observer_kk = session.get('observer_kk', '')
             if not observer_kk:
                 # No observer set yet (before login) - skip loading config
@@ -86,8 +88,6 @@ class Settings:
                         # In cloud mode, FIXED_OBSERVER is controlled by login, not loaded from config
                         if not is_cloud_mode():
                             app_config['FIXED_OBSERVER'] = value
-                    elif key == 'STARTUP_FILE_ENABLED':
-                        app_config['STARTUP_FILE_ENABLED'] = value in ('1', 'true', 'True')
                     elif key == 'STARTUP_FILE_PATH':
                         app_config['STARTUP_FILE_PATH'] = value
                     elif key == 'DATE_DEFAULT_MODE':
@@ -117,7 +117,6 @@ class Settings:
         # Local Mode: get observer KK from app_config (optional UI filter)
         observer_kk = None
         if is_cloud_mode():
-            from flask import session
             observer_kk = session.get('observer_kk', '')
             if not observer_kk:
                 # No observer set yet (before login) - skip saving config
@@ -127,6 +126,7 @@ class Settings:
             observer_kk = app_config.get('FIXED_OBSERVER', '')
         
         cfg_file = Settings._cfg_path(root_path, observer_kk)
+        
         rows = [
             ['INPUT_MODE', app_config.get('INPUT_MODE', 'N')],
             ['OUTPUT_MODE', app_config.get('OUTPUT_MODE', 'P')],
@@ -139,7 +139,6 @@ class Settings:
         # Local Mode only: FIXED_OBSERVER, file operations, upload settings
         if not is_cloud_mode():
             rows.insert(3, ['FIXED_OBSERVER', app_config.get('FIXED_OBSERVER', '')])
-            rows.append(['STARTUP_FILE_ENABLED', '1' if app_config.get('STARTUP_FILE_ENABLED', False) else '0'])
             rows.append(['STARTUP_FILE_PATH', app_config.get('STARTUP_FILE_PATH', '')])
             rows.append(['UPLOAD_PASSWORD', app_config.get('UPLOAD_PASSWORD', '')])
         

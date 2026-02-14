@@ -3853,10 +3853,22 @@ async function showActiveObserversDialog() {
 // Startup file setting dialog
 async function showStartupFileDialog() {
     try {
+        // Load file list from data/ folder
+        const fileListResponse = await fetch('/api/file/list');
+        if (!fileListResponse.ok) throw new Error('Could not load file list');
+        const fileListResult = await fileListResponse.json();
+        const files = fileListResult.files || [];
+        
+        // Load current startup file configuration
         const response = await fetch('/api/config/startup_file');
         const config = await response.json();
-        const enabled = !!config.enabled;
         const currentFile = config.file_path || '';
+
+        // Build file dropdown options with "Keine Datei laden" as first option
+        const fileOptions = [
+            `<option value="">${i18nStrings.settings.startup_file_no_file}</option>`,
+            ...files.map(f => `<option value="${f}" ${f === currentFile ? 'selected' : ''}>${f}</option>`)
+        ].join('');
 
         const modalHtml = `
             <div class="modal fade" id="startup-file-modal" tabindex="-1">
@@ -3868,14 +3880,11 @@ async function showStartupFileDialog() {
                         </div>
                         <div class="modal-body">
                             <p class="mb-3">${i18nStrings.settings.startup_file_question}</p>
-                            <div class="form-check form-check-inline mb-3">
-                                <input class="form-check-input" type="radio" name="startup_file" id="startup-yes" value="1" ${enabled ? 'checked' : ''}>
-                                <label class="form-check-label" for="startup-yes">${i18nStrings.common.yes}</label>
-                            </div>
-                            <div class="form-check form-check-inline mb-3">
-                                <input class="form-check-input" type="radio" name="startup_file" id="startup-no" value="0" ${!enabled ? 'checked' : ''}>
-                                <label class="form-check-label" for="startup-no">${i18nStrings.common.no}</label>
-                            </div>
+                            <label class="form-label">${i18nStrings.settings.startup_file_select_label}</label>
+                            <select class="form-select mb-2" id="startup-file-select">
+                                ${fileOptions}
+                            </select>
+                            <p class="text-muted small mb-0">${i18nStrings.settings.startup_file_info}</p>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
@@ -3900,36 +3909,20 @@ async function showStartupFileDialog() {
         });
 
         document.getElementById('btn-startup-ok').addEventListener('click', async () => {
-            const selected = document.querySelector('input[name="startup_file"]:checked');
-            const newEnabled = selected ? selected.value === '1' : enabled;
+            const selectedFile = document.getElementById('startup-file-select').value;
             modal.hide();
 
-            if (newEnabled) {
-                // Show file selector
-                const fileInput = document.createElement('input');
-                fileInput.type = 'file';
-                fileInput.accept = '.HAL,.hal,.CSV,.csv';
-                fileInput.onchange = async (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        await fetch('/api/config/startup_file', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({enabled: true, file_path: file.name})
-                        });
-                        // Show success message
-                        showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_changed}`);
-                    }
-                };
-                fileInput.click();
+            // Save selection (empty string = no file)
+            await fetch('/api/config/startup_file', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({file_path: selectedFile})
+            });
+            
+            // Show success message
+            if (selectedFile) {
+                showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_changed}`);
             } else {
-                // Disable startup file loading
-                await fetch('/api/config/startup_file', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({enabled: false, file_path: ''})
-                });
-                // Show success message
                 showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_disabled}`);
             }
         });
@@ -3938,7 +3931,9 @@ async function showStartupFileDialog() {
             clearMenuHighlights();
             modalEl.remove();
         });
-    } catch (error) {}
+    } catch (error) {
+        showErrorDialog('Fehler beim Laden der Dateiliste: ' + error.message);
+    }
 }
 
 // Select observations (Selektieren)
@@ -5065,17 +5060,48 @@ function continueUpload(isCloudMode, cloudServerUrl, username) {
 
 // Upload: Combined dialog with auth fields (Local Mode only) + file selection + mode
 async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
+    // Check if there are unsaved changes
+    try {
+        const statusResponse = await fetch('/api/file/status');
+        if (statusResponse.ok) {
+            const status = await statusResponse.json();
+            if (status.dirty) {
+                // Ask user if they want to save first
+                const save = await new Promise(resolve => {
+                    showConfirmDialog(
+                        'Ungespeicherte Änderungen',
+                        'Die Datei enthält ungespeicherte Änderungen. Möchten Sie diese zuerst speichern?',
+                        (confirmed) => resolve(confirmed)
+                    );
+                });
+                
+                if (save === undefined) {
+                    // User cancelled
+                    return;
+                } else if (save) {
+                    // Save file first
+                    await saveFile();
+                }
+                // If user said "No", continue without saving
+            }
+        }
+    } catch (error) {
+        console.error('Error checking file status:', error);
+    }
+    
     // Load data for Local Mode auth fields
     let observers = [];
     let fixedObserver = '';
     let savedPassword = '';
+    let startupFilePath = '';
     
     if (!isCloudMode) {
         try {
-            const [obsResponse, configResponse, passwordResponse] = await Promise.all([
+            const [obsResponse, configResponse, passwordResponse, startupResponse] = await Promise.all([
                 fetch('/api/observers'),
                 fetch('/api/config/fixed_observer'),
-                fetch('/api/config/upload_password')
+                fetch('/api/config/upload_password'),
+                fetch('/api/config/startup_file')
             ]);
             
             if (obsResponse.ok) {
@@ -5091,6 +5117,13 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             if (passwordResponse.ok) {
                 const passwordData = await passwordResponse.json();
                 savedPassword = passwordData.password || '';
+            }
+            
+            if (startupResponse.ok) {
+                const startupConfig = await startupResponse.json();
+                if (startupConfig.enabled && startupConfig.file_path) {
+                    startupFilePath = startupConfig.file_path;
+                }
             }
         } catch (error) {}
     }
@@ -5127,7 +5160,12 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                         ${authFieldsHtml}
                         <div class="mb-3">
                             <label class="form-label">${i18nStrings.file.load}:</label>
-                            <input type="file" class="form-control" id="upload-file-input" accept=".csv">
+                            ${startupFilePath ? `
+                                <input type="text" class="form-control" value="${startupFilePath}" readonly style="background-color: #f8f9fa;">
+                                <small class="text-muted">Startup-Datei wird verwendet</small>
+                            ` : `
+                                <input type="file" class="form-control" id="upload-file-input" accept=".csv">
+                            `}
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="upload_mode" id="upload-add" value="add" checked>
@@ -5191,6 +5229,22 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 document.getElementById('btn-upload-file').click();
             }
         });
+        
+        // Load startup file settings (Local Mode only)        
+        // Setup startup file UI (Local Mode only)
+        if (startupFilePath) {
+            // Startup file is already shown in the read-only form field above
+            // No need for additional UI elements
+            useStartupFile = true;
+        } else {
+            // File input is shown, setup its event handlers if it exists
+            const fileInput = document.getElementById('upload-file-input');
+            if (fileInput) {
+                fileInput.addEventListener('change', () => {
+                    useStartupFile = false;
+                });
+            }
+        }
     }
     
     document.getElementById('btn-upload-file').addEventListener('click', async () => {
@@ -5214,23 +5268,43 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             } catch (error) {}
         }
         
-        const file = fileInput.files[0];
-        if (!file) {
-            showErrorDialog(i18nStrings.messages.no_file_selected);
-            return;
+        // Get the file (either from input or startup file)
+        let uploadFile;
+        if (startupFilePath) {
+            // Use startup file - create a dummy File object with the path
+            uploadFile = { name: startupFilePath.split(/[\\/]/).pop() };
+        } else {
+            // Get selected file from input
+            const fileInput = document.getElementById('upload-file-input');
+            if (!fileInput || !fileInput.files.length) {
+                showErrorDialog(i18nStrings.messages.no_file_selected);
+                return;
+            }
+            uploadFile = fileInput.files[0];
         }
-        
+
         const uploadMode = document.querySelector('input[name="upload_mode"]:checked').value;
         
-        // Hide modal
+        // CLOSE upload modal FIRST
         modal.hide();
         setTimeout(() => modalEl.remove(), 300);
         
-        // Read CSV file
-        const loadingSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.messages.loading_file);
+        // Show single spinner for entire operation (reading + uploading)
+        const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
         
         try {
-            const text = await file.text();
+            let text;
+            if (startupFilePath) {
+                // Read startup file content via dedicated API
+                const response = await fetch('/api/file/read-startup');
+                if (!response.ok) {
+                    throw new Error(`Could not read startup file: ${response.statusText}`);
+                }
+                text = await response.text();
+            } else {
+                // Read selected file
+                text = await uploadFile.text();
+            }
             
             // Parse CSV to extract observations
             const lines = text.split('\n').filter(line => line.trim());
@@ -5263,16 +5337,10 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 };
             });
             
-            // Hide loading spinner
-            loadingSpinner.modal.hide();
-            setTimeout(() => loadingSpinner.modalEl.remove(), 300);
-            
-            // Show upload progress
-            const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
-            
             // Call cloud server DIRECTLY (both Local and Cloud Mode)
             const replaceMode = uploadMode === 'replace';
             const uploadUrl = isCloudMode ? '/api/file/upload' : `${cloudServerUrl}/api/file/upload`;
+            
             const response = await fetch(uploadUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -5285,26 +5353,35 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 })
             });
             
-            // Always close spinner after response
-            uploadSpinner.modal.hide();
-            setTimeout(() => uploadSpinner.modalEl.remove(), 300);
-            
             if (response.ok) {
+                // Close spinner on success
+                uploadSpinner.modal.hide();
+                setTimeout(() => uploadSpinner.modalEl.remove(), 300);
+                
+                // Upload modal already closed - DON'T try to close it again
+                
                 const result = await response.json();
                 
                 // Build success message with details
-                let message = `✓ ${result.count || 0} ${i18nStrings.observations.observations}`;
+                // Format: "44 Beobachtungen hinzugefügt (25 Duplikate übersprungen)"
+                let message = `✓ ${result.count || 0} ${i18nStrings.observations.observations} `;
+                message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;
                 if (result.duplicates && result.duplicates > 0) {
                     message += ` (${result.duplicates} ${i18nStrings.upload_download.duplicates_skipped})`;
                 }
-                message += ` ${result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added}`;
                 
                 showNotification(message, 'success', 5000);
                 
-                // Reload observations
-                await loadObservations();
+                // In Cloud Mode: No reload needed, data is already in database
+                // In Local Mode: Not applicable (upload goes to cloud server, not local storage)
             } else {
+                // Close spinner on error
+                uploadSpinner.modal.hide();
+                setTimeout(() => uploadSpinner.modalEl.remove(), 300);
+                
                 const error = await response.json();
+                
+                // Upload modal already closed - DON'T try to close it again
                 // Translate error code to user-friendly message
                 const errorKey = error.error || 'unknown_error';
                 const errorMsg = i18nStrings.messages?.[errorKey] || i18nStrings.messages?.unknown_error || error.error || 'Unknown error';
@@ -5318,6 +5395,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 setTimeout(() => uploadSpinner.modalEl.remove(), 300);
             }
             
+            // Upload modal already closed - DON'T try to close it again
             const errorMsg = i18nStrings.common?.error || 'Error';
             showErrorDialog(errorMsg + ': ' + error.message);
         }
@@ -5500,81 +5578,101 @@ function triggerFileSaveDialog(csvContent, defaultFilename) {
 // ============================================================================
 
 async function showObserverUploadDialog() {
-    // Detect cloud vs local mode
-    const configResponse = await fetch('/api/config');
-    const config = await configResponse.json();
-    
-    if (config.cloud_mode) {
-        await downloadObserversCloudMode(config.cloud_server_url);
-    } else {
-        await downloadObserversLocalMode(config.cloud_server_url);
-    }
-    let spinner = null;
-    try {
-        spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
+    const authModal = showAuthenticationModal(async (observerKK, password) => {
+        const { modal, modalEl } = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
         
-        // Load current observers from app
-        const observersResponse = await fetch('/api/observers');
-        const observersData = await observersResponse.json();
-        const allObservers = observersData.observers || [];
-        
-        if (allObservers.length === 0) {
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
+        try {
+            // Load current observers
+            const observersResponse = await fetch('/api/observers');
+            const observersData = await observersResponse.json();
+            const allObservers = observersData.observers || [];
+            
+            // Determine if admin
+            const isAdmin = observerKK.toUpperCase() === 'ADMIN';
+            
+            // Filter observers by KK (unless admin)
+            let observersToUpload;
+            if (isAdmin) {
+                observersToUpload = allObservers;
+            } else {
+                observersToUpload = allObservers.filter(obs => obs[0] === observerKK);
             }
-            showErrorDialog(i18nStrings.common.error + ': ' + i18nStrings.messages.no_observer_data_to_upload);
-            return;
-        }
-        
-        // Upload to server with session authentication
-        const response = await fetch(uploadUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                use_session: true,
-                observers: allObservers
-            })
-        });
-        
-        let result = null;
-        if (response.ok) {
-            result = await response.json();
-        } else {
-            try {
-                result = await response.json();
-            } catch (e) {
-                result = null;
+            
+            if (observersToUpload.length === 0) {
+                // Close spinner on error
+                modal.hide();
+                setTimeout(() => modalEl.remove(), 300);
+                showErrorDialog(i18nStrings.messages.no_observer_data_to_upload);
+                return;
             }
+            
+            // Get cloud server URL
+            const configResponse = await fetch('/api/config');
+            const config = await configResponse.json();
+            const isCloudMode = config.cloud_mode;
+            const cloudServerUrl = config.cloud_server_url;
+            
+            // Call cloud server DIRECTLY (both Local and Cloud Mode)
+            const uploadUrl = isCloudMode ? '/api/observers/upload' : `${cloudServerUrl}/api/observers/upload`;
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    observerKK: observerKK,
+                    password: password,
+                    observers: observersToUpload,
+                    use_session: isCloudMode
+                })
+            });
+            
+            if (response.ok) {
+                // Close spinner on success
+                modal.hide();
+                setTimeout(() => modalEl.remove(), 300);
+                
+                const result = await response.json();
+                showNotification(i18nStrings.upload_download.upload_success_observer, 'success', 5000);
+            } else {
+                // Close spinner on error
+                modal.hide();
+                setTimeout(() => modalEl.remove(), 300);
+                
+                const error = await response.json();
+                
+                // Close auth modal AND wait for it to be fully closed
+                const authModalInstance = bootstrap.Modal.getInstance(authModal);
+                if (authModalInstance) {
+                    authModalInstance.hide();
+                    // Wait for modal to close before showing error
+                    setTimeout(() => {
+                        // Translate error code to user-friendly message
+                        const errorKey = error.error || 'unknown_error';
+                        const errorMsg = i18nStrings.messages?.[errorKey] || i18nStrings.messages?.unknown_error || error.error || 'Unknown error';
+                        showErrorDialog(errorMsg);
+                    }, 300);
+                } else {
+                    // If no modal found, show error immediately
+                    const errorKey = error.error || 'unknown_error';
+                    const errorMsg = i18nStrings.messages?.[errorKey] || i18nStrings.messages?.unknown_error || error.error || 'Unknown error';
+                    showErrorDialog(errorMsg);
+                }
+            }
+            
+        } catch (error) {
+            // Close spinner if request failed completely
+            modal.hide();
+            setTimeout(() => modalEl.remove(), 300);
+            
+            // Close auth modal first
+            const authModalInstance = bootstrap.Modal.getInstance(authModal);
+            if (authModalInstance) {
+                authModalInstance.hide();
+            }
+            
+            const errorMsg = i18nStrings.common?.error || 'Error';
+            showErrorDialog(errorMsg + ': ' + error.message);
         }
-        
-        // Hide spinner
-        if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-        }
-        
-        if (response.ok && result && result.success) {
-            showNotification(i18nStrings.upload_download.upload_success_observer, 'success');
-        } else if (!response.ok) {
-            showErrorDialog(
-                i18nStrings.upload_download.server_unreachable_details.replace('{0}', uploadUrl),
-                () => { window.navigateInternal('/'); }
-            );
-        } else {
-            const errorMessage = result && result.error ? result.error : i18nStrings.upload_download.server_unreachable;
-            showErrorDialog(i18nStrings.common.error + ': ' + errorMessage);
-        }
-    } catch (error) {
-        if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-        }
-        showErrorDialog(
-            i18nStrings.upload_download.server_unreachable_details.replace('{0}', uploadUrl),
-            () => { window.navigateInternal('/'); }
-        );
-    }
+    });
 }
 
 async function uploadObserversLocalMode(cloudServerUrl) {
@@ -5693,13 +5791,13 @@ async function downloadObserversCloudMode(cloudServerUrl) {
         
         const result = await response.json();
         
-        // Hide spinner
-        if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-        }
-        
         if (response.ok && result.success) {
+            // Close spinner on success
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            
             // Trigger file save dialog
             const csvContent = result.csv_content;
             const defaultFilename = 'halobeo.csv';
@@ -5708,11 +5806,23 @@ async function downloadObserversCloudMode(cloudServerUrl) {
             // Success notification
             showNotification(i18nStrings.upload_download.download_success_observer, 'success');
         } else if (!response.ok) {
+            // Close spinner on error
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            
             showErrorDialog(
                 i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
                 () => { window.navigateInternal('/'); }
             );
         } else {
+            // Close spinner on error
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            
             showErrorDialog(i18nStrings.common.error + ': ' + result.error);
         }
     } catch (error) {
@@ -5798,13 +5908,13 @@ async function downloadObserversLocalMode(cloudServerUrl) {
             
             const result = await response.json();
             
-            // Hide spinner
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-            }
-            
             if (response.ok && result.success) {
+                // Close spinner on success
+                if (spinner) {
+                    spinner.modal.hide();
+                    setTimeout(() => spinner.modalEl.remove(), 300);
+                }
+                
                 // Trigger file save dialog
                 const csvContent = result.csv_content;
                 const defaultFilename = 'halobeo.csv';
@@ -5813,11 +5923,23 @@ async function downloadObserversLocalMode(cloudServerUrl) {
                 // Success notification
                 showNotification(i18nStrings.upload_download.download_success_observer, 'success');
             } else if (!response.ok) {
+                // Close spinner on error
+                if (spinner) {
+                    spinner.modal.hide();
+                    setTimeout(() => spinner.modalEl.remove(), 300);
+                }
+                
                 showErrorDialog(
                     i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
                     () => { window.navigateInternal('/'); }
                 );
             } else {
+                // Close spinner on error  
+                if (spinner) {
+                    spinner.modal.hide();
+                    setTimeout(() => spinner.modalEl.remove(), 300);
+                }
+                
                 showErrorDialog(i18nStrings.common.error + ': ' + result.error);
             }
         } catch (error) {
@@ -5977,8 +6099,11 @@ async function checkAutosaveRecovery() {
 
 // Show error dialog
 function showErrorDialog(message, onClose = null) {
+    // Generate unique modal ID to avoid conflicts
+    const modalId = 'error-modal-' + Date.now();
+    
     const modalHtml = `
-        <div class="modal fade" id="error-modal" tabindex="-1">
+        <div class="modal fade" id="${modalId}" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -5996,11 +6121,29 @@ function showErrorDialog(message, onClose = null) {
         </div>`;
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('error-modal');
+    const modalEl = document.getElementById(modalId);
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
+    
     modalEl.addEventListener('hidden.bs.modal', () => {
+        // Clean up modal element
         modalEl.remove();
+        
+        // Force cleanup of any remaining Bootstrap modal backdrops
+        setTimeout(() => {
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(backdrop => {
+                backdrop.remove();
+            });
+            
+            // Reset body styles if needed
+            if (document.querySelectorAll('.modal.show').length === 0) {
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+        }, 100);
+        
         if (onClose) {
             onClose();
         }

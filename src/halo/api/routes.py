@@ -1081,6 +1081,57 @@ def new_file() -> Dict[str, Any]:
         return jsonify({'error': str(e)}), 500
 
 
+@api_blueprint.route('/file/list', methods=['GET'])
+def list_data_files():
+    """List all CSV files in the data/ folder for startup file selection."""
+    # Only in Local Mode
+    if is_cloud_mode():
+        return jsonify({'error': 'file_list_cloud_mode_not_supported'}), 403
+    
+    try:
+        root_path = Path(__file__).parent.parent.parent.parent
+        data_path = root_path / 'data'
+        
+        if not data_path.exists():
+            return jsonify({'files': []})
+        
+        # Get all CSV files
+        files = [f.name for f in data_path.glob('*.csv')]
+        files.sort()
+        
+        return jsonify({'files': files})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/file/read-startup', methods=['GET'])
+def read_startup_file():
+    """Read the configured startup file and return its CSV content."""
+    # Only in Local Mode
+    if is_cloud_mode():
+        return jsonify({'error': 'startup_file_cloud_mode_not_supported'}), 403
+    
+    startup_file_path = current_app.config.get('STARTUP_FILE_PATH', '')
+    if not startup_file_path:
+        return jsonify({'error': 'no_startup_file_configured'}), 404
+    
+    try:
+        # Always look in data/ folder
+        root_path = Path(__file__).parent.parent.parent.parent
+        file_path = root_path / 'data' / startup_file_path
+        
+        if not file_path.exists():
+            return jsonify({'error': 'startup_file_not_found', 'path': str(file_path)}), 404
+        
+        # Read CSV file as text
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @api_blueprint.route('/file/load', methods=['POST'])
 def load_file_from_browser() -> Dict[str, Any]:
     """Load a file from user's filesystem directly into memory."""
@@ -2107,27 +2158,23 @@ def startup_file_setting() -> Dict[str, Any]:
     
     if request.method == 'PUT':
         data = request.get_json() or {}
-        enabled = bool(data.get('enabled', False))
         file_path = data.get('file_path', '')
         
-        current_app.config['STARTUP_FILE_ENABLED'] = enabled
-        current_app.config['STARTUP_FILE_PATH'] = file_path if enabled else ''
+        current_app.config['STARTUP_FILE_PATH'] = file_path
         
         # Persist settings
         root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'STARTUP_FILE_ENABLED', '1' if enabled else '0')
-        Settings.save_key(current_app.config, root_path, 'STARTUP_FILE_PATH', file_path if enabled else '')
+        Settings.save_key(current_app.config, root_path, 'STARTUP_FILE_PATH', file_path)
         
         return jsonify({
             'success': True,
-            'enabled': enabled,
+            'enabled': bool(file_path),
             'file_path': file_path
         })
     else:
-        enabled = bool(current_app.config.get('STARTUP_FILE_ENABLED', False))
         file_path = current_app.config.get('STARTUP_FILE_PATH', '')
         return jsonify({
-            'enabled': enabled,
+            'enabled': bool(file_path),
             'file_path': file_path
         })
 

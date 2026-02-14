@@ -105,10 +105,9 @@ def create_app(config=None):
     
     if not is_cloud_mode():
         # Local mode: Load startup file if configured
-        startup_enabled = app.config.get('STARTUP_FILE_ENABLED', False)
         startup_file = app.config.get('STARTUP_FILE_PATH', '')
         
-        if startup_enabled and startup_file:
+        if startup_file:
             try:
                 observations, filepath = obs_file.open_file(startup_file)
                 app.config['OBSERVATIONS'] = observations
