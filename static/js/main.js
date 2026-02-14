@@ -5083,8 +5083,8 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 // Ask user if they want to save first
                 const save = await new Promise(resolve => {
                     showConfirmDialog(
-                        'Ungespeicherte Änderungen',
-                        'Die Datei enthält ungespeicherte Änderungen. Möchten Sie diese zuerst speichern?',
+                        i18nStrings.messages.unsaved_changes_title,
+                        i18nStrings.messages.upload_warning_unsaved_changes,
                         (confirmed) => resolve(confirmed)
                     );
                 });
@@ -5857,8 +5857,6 @@ async function showObserverUploadDialog() {
                     return fields;
                 });
                 
-                console.log("🔍 DEBUG: Observer upload (Cloud) - file:", file.name, "observers count:", observers.length);
-                
                 if (observers.length === 0) {
                     modal.hide();
                     setTimeout(() => modalEl.remove(), 300);
@@ -5909,11 +5907,9 @@ async function showObserverUploadDialog() {
             const observersResponse = await fetch('/api/observers?latest_only=false');
             const observersData = await observersResponse.json();
             const allObservers = observersData.observers || [];
-            console.log("🔍 DEBUG: Observer upload - observersData:", observersData, "allObservers length:", allObservers.length);
             
             // Determine if admin
             const isAdmin = observerKK.toUpperCase() === 'ADMIN';
-            console.log("🔍 DEBUG: Observer upload - observerKK:", observerKK, "isAdmin:", isAdmin);
             
             // Filter observers by KK (unless admin)
             let observersToUpload;
@@ -5922,7 +5918,6 @@ async function showObserverUploadDialog() {
             } else {
                 observersToUpload = allObservers.filter(obs => obs.KK === observerKK);
             }
-            console.log("🔍 DEBUG: Observer upload - observersToUpload length:", observersToUpload.length, "first observer:", observersToUpload[0]);
             
             if (observersToUpload.length === 0) {
                 // Close spinner on error
@@ -6106,31 +6101,201 @@ async function showObserverDownloadDialog() {
     // Detect cloud vs local mode
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
+    const cloudServerUrl = config.cloud_server_url;
     
-    if (config.cloud_mode) {
-        await downloadObserversCloudMode(config.cloud_server_url);
-    } else {
-        await downloadObserversLocalMode(config.cloud_server_url);
+    // Load data for Local Mode auth fields
+    let observers = [];
+    let fixedObserver = '';
+    let savedPassword = '';
+    let savedObserverKK = '';
+    
+    if (!isCloudMode) {
+        try {
+            const [obsResponse, configResp, passwordResp] = await Promise.all([
+                fetch('/api/observers'),
+                fetch('/api/config/fixed_observer'),
+                fetch('/api/config/upload_password')
+            ]);
+            
+            if (obsResponse.ok) {
+                const data = await obsResponse.json();
+                observers = data.observers || [];
+            }
+            
+            if (configResp.ok) {
+                const configData = await configResp.json();
+                fixedObserver = configData.observer || '';
+            }
+            
+            if (passwordResp.ok) {
+                const passwordData = await passwordResp.json();
+                savedPassword = passwordData.password || '';
+                savedObserverKK = passwordData.observer_kk || '';
+            }
+        } catch (error) {}
     }
+    
+    const observerDisabled = fixedObserver ? 'disabled' : '';
+    
+    // Auth fields section (only visible in Local Mode)
+    const authFieldsHtml = !isCloudMode ? `
+        <div class="mb-3">
+            <label for="download-observer-observer" class="form-label">${i18nStrings.upload_download.upload_auth_username}</label>
+            <select class="form-select" id="download-observer-observer" ${observerDisabled}></select>
+        </div>
+        <div class="mb-3">
+            <label for="download-observer-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
+            <input type="password" class="form-control" id="download-observer-password" autocomplete="new-password" value="${savedPassword}">
+        </div>
+    ` : '';
+    
+    // Scope selection section (always visible)
+    const scopeFieldsHtml = `
+        <div class="mb-3">
+            <label class="form-label fw-bold">${i18nStrings.upload_download.download_scope_label}</label>
+            <div class="d-flex gap-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="downloadObserverScope" id="scope-observer-own" value="own" checked>
+                    <label class="form-check-label" for="scope-observer-own">
+                        ${i18nStrings.upload_download.download_scope_own_observer}
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="downloadObserverScope" id="scope-observer-all" value="all">
+                    <label class="form-check-label" for="scope-observer-all">
+                        ${i18nStrings.upload_download.download_scope_all_observer}
+                    </label>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Create combined dialog
+    const modalHtml = `
+        <div class="modal fade" id="download-observer-modal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${i18nStrings.upload_download.download_title_observer || i18nStrings.upload_download.download_title}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${authFieldsHtml}
+                        ${scopeFieldsHtml}
+                    </div>
+                    <div class="modal-footer d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-download-observer">${i18nStrings.common.ok}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById('download-observer-modal');
+    const modal = new bootstrap.Modal(modalEl);
+    
+    // Setup auth fields (Local Mode only)
+    let observerKK = null;
+    let password = null;
+    let observerSelect = null;
+    let passwordInput = null;
+    
+    if (!isCloudMode) {
+        observerSelect = document.getElementById('download-observer-observer');
+        passwordInput = document.getElementById('download-observer-password');
+        
+        // Populate observer dropdown
+        const adminOption = document.createElement('option');
+        adminOption.value = 'admin';
+        adminOption.textContent = 'Admin';
+        observerSelect.appendChild(adminOption);
+        
+        observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
+            const option = document.createElement('option');
+            option.value = obs.KK;
+            const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
+            option.textContent = `${obs.KK} - ${obs.VName} ${obs.NName}`;
+            if (selected) option.selected = true;
+            observerSelect.appendChild(option);
+        });
+        
+        // Prefill from fixed observer if set
+        if (fixedObserver) {
+            observerKK = fixedObserver;
+        }
+    }
+    
+    // Setup OK button handler
+    const btnDownload = document.getElementById('btn-download-observer');
+    btnDownload.addEventListener('click', async () => {
+        // Get scope selection
+        const scopeOwn = document.getElementById('scope-observer-own').checked;
+        const downloadAll = !scopeOwn;
+        
+        // Get auth data (Local Mode)
+        if (!isCloudMode) {
+            observerKK = observerSelect.value;
+            password = passwordInput.value;
+            
+            if (!observerKK || !password) {
+                showErrorDialog(i18nStrings.upload_download.upload_auth_missing);
+                return;
+            }
+            
+            // Save password AND observer_kk to halo.cfg for convenience
+            console.log("🔍 DEBUG: Observer download - saving password for KK:", observerKK, "password length:", password.length);
+            try {
+                await fetch('/api/config/upload_password', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password, observer_kk: observerKK })
+                });
+                console.log("🔍 DEBUG: Observer download - password save request completed");
+            } catch (error) {
+                console.log("🔍 DEBUG: Observer download - password save failed:", error);
+            }
+        }
+        
+        // Close dialog
+        modal.hide();
+        setTimeout(() => modalEl.remove(), 300);
+        
+        // Trigger download
+        if (config.cloud_mode) {
+            await downloadObserversCloudMode(cloudServerUrl, downloadAll);
+        } else {
+            await downloadObserversLocalMode(cloudServerUrl, observerKK, password, downloadAll);
+        }
+    });
+    
+    // Show dialog
+    modal.show();
 }
 
-async function downloadObserversCloudMode(cloudServerUrl) {
+async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
     const downloadUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/observers/download`;
-    // Cloud mode: download complete halobeo.csv (no KK filter)
     let spinner = null;
     try {
         spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        
+        console.log("🔍 DEBUG: Cloud Mode observer download - starting, downloadAll:", downloadAll);
         
         // Download from server with session authentication
         const response = await fetch(downloadUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                use_session: true
+                use_session: true,
+                download_all: downloadAll
             })
         });
         
+        console.log("🔍 DEBUG: Cloud Mode observer download - response status:", response.status, "ok:", response.ok);
+        
         const result = await response.json();
+        console.log("🔍 DEBUG: Cloud Mode observer download - result:", result);
         
         if (response.ok && result.success) {
             // Close spinner on success
@@ -6142,21 +6307,11 @@ async function downloadObserversCloudMode(cloudServerUrl) {
             // Trigger file save dialog
             const csvContent = result.csv_content;
             const defaultFilename = 'halobeo.csv';
+            console.log("🔍 DEBUG: Cloud Mode observer download - triggering file save dialog, content length:", csvContent.length);
             triggerFileSaveDialog(csvContent, defaultFilename);
             
             // Success notification
             showNotification(i18nStrings.upload_download.download_success_observer, 'success');
-        } else if (!response.ok) {
-            // Close spinner on error
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-            }
-            
-            showErrorDialog(
-                i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
-                () => { window.navigateInternal('/'); }
-            );
         } else {
             // Close spinner on error
             if (spinner) {
@@ -6164,13 +6319,19 @@ async function downloadObserversCloudMode(cloudServerUrl) {
                 setTimeout(() => spinner.modalEl.remove(), 300);
             }
             
-            showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+            console.log("🔍 DEBUG: Cloud Mode observer download - error:", result.error);
+            
+            // Show specific error message from server
+            const errorKey = result.error || 'unknown_error';
+            const errorMessage = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+            showErrorDialog(errorMessage);
         }
     } catch (error) {
         if (spinner) {
             spinner.modal.hide();
             setTimeout(() => spinner.modalEl.remove(), 300);
         }
+        console.error("🔍 DEBUG: Cloud Mode observer download - exception:", error);
         showErrorDialog(
             i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
             () => { window.navigateInternal('/'); }
@@ -6178,72 +6339,84 @@ async function downloadObserversCloudMode(cloudServerUrl) {
     }
 }
 
-async function downloadObserversLocalMode(cloudServerUrl) {
+async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, downloadAll = false) {
     const downloadUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/observers/download`;
-    // Local mode: authenticate against cloud server, then download complete halobeo.csv
-    showAuthenticationModal(async (observerKK, password) => {
-        let spinner = null;
-        try {
-            spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+    let spinner = null;
+    try {
+        spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        
+        // Download from cloud server with password authentication
+        const response = await fetch(downloadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                observerKK: observerKK,
+                password: password,
+                use_session: false,
+                download_all: downloadAll
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Local Mode: Save directly to resources/halobeo.csv and reload into memory
+            const csvContent = result.csv_content;
             
-            // Download from cloud server with password authentication
-            const response = await fetch(downloadUrl, {
+            // Save to server's resources/halobeo.csv
+            const saveResponse = await fetch('/api/observers/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    observerKK: observerKK,
-                    password: password,
-                    use_session: false
+                    csv_content: csvContent
                 })
             });
             
-            const result = await response.json();
+            const saveResult = await saveResponse.json();
             
-            if (response.ok && result.success) {
-                // Close spinner on success
-                if (spinner) {
-                    spinner.modal.hide();
-                    setTimeout(() => spinner.modalEl.remove(), 300);
-                }
-                
-                // Trigger file save dialog
-                const csvContent = result.csv_content;
-                const defaultFilename = 'halobeo.csv';
-                triggerFileSaveDialog(csvContent, defaultFilename);
-                
-                // Success notification
-                showNotification(i18nStrings.upload_download.download_success_observer, 'success');
-            } else if (!response.ok) {
-                // Close spinner on error
-                if (spinner) {
-                    spinner.modal.hide();
-                    setTimeout(() => spinner.modalEl.remove(), 300);
-                }
-                
-                showErrorDialog(
-                    i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
-                    () => { window.navigateInternal('/'); }
-                );
-            } else {
-                // Close spinner on error  
-                if (spinner) {
-                    spinner.modal.hide();
-                    setTimeout(() => spinner.modalEl.remove(), 300);
-                }
-                
-                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
-            }
-        } catch (error) {
+            // Close spinner
             if (spinner) {
                 spinner.modal.hide();
                 setTimeout(() => spinner.modalEl.remove(), 300);
             }
-            showErrorDialog(
-                i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
-                () => { window.navigateInternal('/'); }
-            );
+            
+            if (saveResponse.ok && saveResult.success) {
+                // Reload observers into memory
+                await fetch('/api/observers/reload', { method: 'POST' });
+                
+                // Success notification
+                showNotification(i18nStrings.upload_download.download_success_observer, 'success');
+                
+                // Refresh page if on observers page
+                if (window.location.pathname === '/observers') {
+                    window.location.reload();
+                }
+            } else {
+                showErrorDialog(i18nStrings.common.error + ': ' + (saveResult.error || 'save_failed'));
+            }
+        } else {
+            // Close spinner on error
+            if (spinner) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
+            
+            // Show specific error message from server
+            const errorKey = result.error || 'unknown_error';
+            const errorMessage = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+            showErrorDialog(errorMessage);
         }
-    }, cloudServerUrl);
+    } catch (error) {
+        if (spinner) {
+            spinner.modal.hide();
+            setTimeout(() => spinner.modalEl.remove(), 300);
+        }
+        console.error('Observer download error:', error);
+        showErrorDialog(
+            i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
+            () => { window.navigateInternal('/'); }
+        );
+    }
 }
 
 // Helper function - shows a toast message in top-right corner

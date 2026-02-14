@@ -226,6 +226,8 @@
       "download_scope_label": "Umfang:",
       "download_scope_own": "Nur eigene Beobachtungen",
       "download_scope_all": "Alle Beobachtungen",
+      "download_scope_own_observer": "Nur eigene Beobachter",
+      "download_scope_all_observer": "Alle Beobachter",
       "legacy_format_converted_title": "Dateiformat konvertiert",
       "legacy_format_converted_message": "Die Datei wurde aus dem alten HALO-Format in das aktuelle CSV-Format konvertiert und gespeichert.",
       "server_unreachable": "HALO Online-Service ist nicht erreichbar",

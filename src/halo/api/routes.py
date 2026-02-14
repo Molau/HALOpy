@@ -1587,10 +1587,6 @@ def upload_observers() -> Dict[str, Any]:
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
     
-    print(f"🔍 DEBUG: Observer upload - use_session={use_session}, observer_kk={observer_kk}, observers count={len(observers)}")
-    if observers:
-        print(f"🔍 DEBUG: First observer: {observers[0]}")
-    
     # Validate parameters
     if not observers:
         return jsonify({'error': 'no_observer_data_to_upload'}), 400
@@ -1655,32 +1651,23 @@ def upload_observers() -> Dict[str, Any]:
             if len(obs_record) >= 1:
                 uploaded_kks.add(int(obs_record[0]))
         
-        print(f"🔍 DEBUG: Uploaded KKs: {uploaded_kks}")
-        
         # Delete existing records for uploaded KKs
         try:
             for kk in uploaded_kks:
                 existing_records = observer_db.load_filtered(kk=kk)
-                print(f"🔍 DEBUG: Deleting {len(existing_records)} existing records for KK={kk}")
                 for i, record in enumerate(existing_records):
                     # Database returns dicts with column names as keys
                     record_kk = record['kk'] if isinstance(record, dict) else record[0]
                     record_since = record['since'] if isinstance(record, dict) else record[2]
-                    print(f"🔍 DEBUG: Deleting record {i+1}: KK={record_kk}, since={record_since}")
                     # Delete by kk and since (unique key)
                     observer_db.delete_one(int(record_kk), record_since)
-                    print(f"🔍 DEBUG: Record {i+1} deleted successfully")
-            print("🔍 DEBUG: All existing records deleted successfully")
         except Exception as e:
-            print(f"🔍 DEBUG: Error during deletion: {e}")
             import traceback
             traceback.print_exc()
             raise
         
         # Add new observer records to database
-        print(f"🔍 DEBUG: Adding {len(observers)} new observer records")
         for i, obs_record in enumerate(observers):
-            print(f"🔍 DEBUG: Saving record {i+1}: {obs_record}")
             try:
                 # Convert array to dict if needed (database expects dict format)
                 if isinstance(obs_record, list):
@@ -1711,9 +1698,7 @@ def upload_observers() -> Dict[str, Any]:
                     observer_dict = obs_record
                 
                 observer_db.save_one(observer_dict)
-                print(f"🔍 DEBUG: Record {i+1} saved successfully")
             except Exception as e:
-                print(f"🔍 DEBUG: Error saving record {i+1}: {e}")
                 import traceback
                 traceback.print_exc()
                 raise
@@ -1733,12 +1718,12 @@ def upload_observers() -> Dict[str, Any]:
 
 @api_blueprint.route('/observers/download', methods=['POST'])
 def download_observers() -> Dict[str, Any]:
-    """Download complete observer data as CSV file (no KK filter)
+    """Download observer data as CSV file
     
     Cloud Mode: Query database and return CSV
     Local Mode: Proxy to cloud server (send credentials)
     
-    Returns the complete halobeo.csv so it can be used locally.
+    Filters by user's KK unless user is admin or download_all=true.
     Authentication is REQUIRED in both modes for security.
     """
     
@@ -1746,14 +1731,21 @@ def download_observers() -> Dict[str, Any]:
     use_session = data.get('use_session', False)
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
+    download_all = data.get('download_all', False)
     
     # Authentication (both Cloud Mode with session and Local Mode with password)
     try:
         # Authenticate user
+        is_admin = False
+        authenticated_kk = None
+        
         if use_session:
             # Cloud Mode with session
             if not session.get('authenticated', False):
                 return jsonify({'error': 'not_authenticated'}), 401
+            
+            is_admin = session.get('is_admin', False)
+            authenticated_kk = session.get('observer_kk')
         else:
             # Cloud Mode with password (proxied from Local Mode)
             if not observer_kk or not password:
@@ -1764,9 +1756,15 @@ def download_observers() -> Dict[str, Any]:
             
             if not is_valid:
                 return jsonify({'error': 'invalid_credentials'}), 401
+            
+            is_admin = (user_kk is None)
+            authenticated_kk = user_kk
         
-        # Load all observers from database (no KK filter)
-        all_observers = observer_db.load_all()
+        # Load observers from database - filter by KK unless admin or download_all
+        if is_admin or download_all:
+            all_observers = observer_db.load_all()
+        else:
+            all_observers = observer_db.load_filtered(kk=int(authenticated_kk))
         
         if not all_observers:
             return jsonify({'error': 'no_observers'}), 404
@@ -1784,6 +1782,89 @@ def download_observers() -> Dict[str, Any]:
         })
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observers/save', methods=['POST'])
+def save_observers() -> Dict[str, Any]:
+    """Save observer CSV content to resources/halobeo.csv (Local Mode only)
+    
+    Merges downloaded observers with existing ones:
+    - Keeps all observers NOT in the downloaded data
+    - Replaces observers that ARE in the downloaded data
+    """
+    
+    if is_cloud_mode():
+        return jsonify({'error': 'not_available_in_cloud_mode'}), 400
+    
+    data = request.get_json()
+    csv_content = data.get('csv_content', '')
+    
+    if not csv_content:
+        return jsonify({'error': 'no_csv_content'}), 400
+    
+    try:
+        # Parse downloaded CSV content to get list of observers
+        downloaded_observers = []
+        csv_reader = csv.reader(io.StringIO(csv_content))
+        for row in csv_reader:
+            if row and row[0].isdigit():  # Skip header and empty lines
+                downloaded_observers.append(row)
+        
+        # Get list of KKs in downloaded data
+        downloaded_kks = set()
+        for obs in downloaded_observers:
+            if obs:
+                downloaded_kks.add(int(obs[0]))  # KK is first field
+        
+        # Load existing observers from file
+        existing_observers, file_path = observer_file.open_file()
+        
+        # Keep only observers NOT in the downloaded data
+        kept_observers = [obs for obs in existing_observers if int(obs[0]) not in downloaded_kks]
+        
+        # Combine: kept observers + downloaded observers
+        merged_observers = kept_observers + downloaded_observers
+        
+        # Sort by KK, then by seit (same as original HALO sort order)
+        merged_observers.sort(key=lambda obs: (int(obs[0]), obs[2]))
+        
+        # Save merged list to file
+        observer_file.save_file(merged_observers, file_path)
+        
+        return jsonify({
+            'success': True,
+            'file': 'halobeo.csv',
+            'downloaded_kks': list(downloaded_kks),
+            'kept_count': len(kept_observers),
+            'downloaded_count': len(downloaded_observers),
+            'total_count': len(merged_observers)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observers/reload', methods=['POST'])
+def reload_observers() -> Dict[str, Any]:
+    """Reload observers from resources/halobeo.csv into memory (Local Mode only)"""
+    
+    if is_cloud_mode():
+        return jsonify({'error': 'not_available_in_cloud_mode'}), 400
+    
+    try:
+        # Reload observers from file
+        observers, _ = observer_file.open_file()
+        current_app.config['OBSERVERS'] = observers
+        
+        return jsonify({
+            'success': True,
+            'count': len(observers)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
@@ -2115,6 +2196,8 @@ def upload_password() -> Dict[str, Any]:
         password = data.get('password', '')
         observer_kk = data.get('observer_kk', '')
         
+        print(f"🔍 DEBUG: Saving upload password - KK: {observer_kk}, password length: {len(password)}")
+        
         # Obfuscate password before storing
         obfuscated = Settings.obfuscate(password) if password else ''
         
@@ -2126,6 +2209,8 @@ def upload_password() -> Dict[str, Any]:
         Settings.save_key(current_app.config, root_path, 'UPLOAD_PASSWORD', obfuscated)
         Settings.save_key(current_app.config, root_path, 'UPLOAD_OBSERVER_KK', str(observer_kk))
         
+        print(f"🔍 DEBUG: Upload password saved - obfuscated: {obfuscated}, KK: {observer_kk}")
+        
         return jsonify({
             'success': True
         })
@@ -2134,6 +2219,8 @@ def upload_password() -> Dict[str, Any]:
         obfuscated = current_app.config.get('UPLOAD_PASSWORD', '')
         password = Settings.deobfuscate(obfuscated) if obfuscated else ''
         observer_kk = current_app.config.get('UPLOAD_OBSERVER_KK', '')
+        
+        print(f"🔍 DEBUG: Loading upload password - obfuscated: {obfuscated}, KK: {observer_kk}, password length: {len(password)}")
         
         return jsonify({
             'password': password,
