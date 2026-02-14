@@ -1278,16 +1278,12 @@ def upload_file() -> Dict[str, Any]:
     """
     Upload observations - works in both Cloud and Local mode.
     
-    BOTH MODES:
-    - Only authenticated observer's data OR admin can upload all
-    - Supports two modes: Replace (delete + insert) or Append (only insert)
-    
-    Cloud Mode: Database operations (DELETE if replace, then INSERT)
-    Local Mode: In-memory operations (filter if replace, then extend)
+    Cloud Mode: Direct database operations (authenticated via session)
+    Local Mode: Proxy to cloud server (send credentials + data)
     
     Request body:
         {
-            "observerKK": "44",          # Local Mode only
+            "observerKK": "44",          # Required
             "password": "password",      # Local Mode only
             "observations": [...],
             "use_session": true/false,   # Cloud Mode: true, Local Mode: false
@@ -1308,33 +1304,61 @@ def upload_file() -> Dict[str, Any]:
     if not new_observations_data:
         return jsonify({'error': 'no_observations_to_upload'}), 400
     
-    # Authenticate user (BOTH MODES)
+    # Mode detection
+    if not use_session:
+        # Local Mode: Proxy to cloud server
+        if not password:
+            return jsonify({'error': 'password_required'}), 400
+        
+        try:
+            import requests
+            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
+            upload_url = f"{cloud_server_url.rstrip('/')}/api/file/upload"
+            
+            # Forward request to cloud server with credentials
+            response = requests.post(
+                upload_url,
+                json={
+                    'observerKK': observer_kk,
+                    'password': password,
+                    'observations': new_observations_data,
+                    'use_session': False,  # Tell cloud server to use password auth
+                    'replace_mode': replace_mode
+                },
+                timeout=60
+            )
+            
+            # Return cloud server response
+            return jsonify(response.json()), response.status_code
+            
+        except Exception as e:
+            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
+    
+    # Cloud Mode: Direct database operations with authentication
+    # Authenticate user
     is_admin = False
     authenticated_kk = None
     
     if use_session:
-        # Cloud Mode: session authentication
+        # Cloud Mode with session (user already logged in)
         if not session.get('authenticated', False):
             return jsonify({'error': 'not_authenticated'}), 401
         
         is_admin = session.get('is_admin', False)
         authenticated_kk = session.get('observer_kk')  # None for admin
-        
-        # Cloud Mode: authenticated_kk from session is the ONLY truth
-        # Request parameter observerKK is ignored for security reasons
     else:
-        # Local Mode: password authentication
+        # Cloud Mode with password (proxied from Local Mode)
         if not password:
             return jsonify({'error': 'password_required'}), 400
         
         auth_service = AuthService()
-        is_valid, user_info = auth_service.verify_password(observer_kk, password)
+        is_valid, user_kk = auth_service.verify_password(observer_kk, password)
         
         if not is_valid:
             return jsonify({'error': 'invalid_credentials'}), 401
         
-        is_admin = user_info.get('is_admin', False)
-        authenticated_kk = observer_kk if not is_admin else None
+        is_admin = (user_kk is None)  # None = admin
+        authenticated_kk = user_kk
     
     try:
         # Convert observation dicts to Observation objects
@@ -1363,100 +1387,36 @@ def upload_file() -> Dict[str, Any]:
                 'filtered_out': filtered_out_count
             }), 400
         
-        # Mode selection: Replace or Append
-        if is_cloud_mode():
-            # Cloud Mode: Database operations
-            if replace_mode:
-                # REPLACE MODE: Delete all existing observations of this observer first
-                if is_admin:
-                    # Admin uploads: Delete ALL KKs present in upload, then insert
-                    kks_in_upload = set(str(obs.KK) for obs in new_observations)
-                    for kk in kks_in_upload:
-                        obs_db.delete_all_for_observer(kk)
-                else:
-                    # Regular user: Delete only their KK
-                    obs_db.delete_all_for_observer(str(observer_kk))
-            # else: APPEND MODE - skip delete, just insert
-            
-            # Insert new observations into database
-            added_count = 0
-            duplicate_count = 0
-            for obs in new_observations:
-                success = obs_db.save_one(obs)
-                if success:
-                    added_count += 1
-                else:
-                    duplicate_count += 1  # Duplicate detected by DB unique constraint
-            
-            return jsonify({
-                'success': True,
-                'count': added_count,
-                'duplicates': duplicate_count,
-                'filtered_out': filtered_out_count,
-                'mode': 'replace' if replace_mode else 'append'
-            })
-        else:
-            # Local Mode: In-memory operations
-            current_observations = current_app.config.get('OBSERVATIONS', [])
-            
-            if replace_mode:
-                # REPLACE MODE: Delete from memory first
-                if is_admin:
-                    # Admin uploads: Delete ALL KKs present in upload
-                    kks_in_upload = set(str(obs.KK) for obs in new_observations)
-                    current_observations = [
-                        obs for obs in current_observations
-                        if str(obs.KK) not in kks_in_upload
-                    ]
-                else:
-                    # Regular user: Delete only their KK
-                    current_observations = [
-                        obs for obs in current_observations
-                        if str(obs.KK) != str(observer_kk)
-                    ]
-            # else: APPEND MODE - keep existing observations
-            # else: APPEND MODE - keep existing observations
-            
-            # Add new observations (duplicate detection in Local Mode)
-            if replace_mode:
-                # Replace mode: duplicates already removed by delete
-                current_observations.extend(new_observations)
-                duplicate_count = 0
+        # Database operations (Cloud Mode only - Local Mode exits early above)
+        if replace_mode:
+            # REPLACE MODE: Delete all existing observations of this observer first
+            if is_admin:
+                # Admin uploads: Delete ALL KKs present in upload, then insert
+                kks_in_upload = set(str(obs.KK) for obs in new_observations)
+                for kk in kks_in_upload:
+                    obs_db.delete_all_for_observer(kk)
             else:
-                # Append mode: check for duplicates using observation key
-                existing_keys = set()
-                for obs in current_observations:
-                    key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
-                    existing_keys.add(key)
-                
-                duplicate_count = 0
-                for obs in new_observations:
-                    key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
-                    if key not in existing_keys:
-                        current_observations.append(obs)
-                        existing_keys.add(key)
-                    else:
-                        duplicate_count += 1
-            
-            # Sort using HALO sort order (Local Mode uses Python _spaeter)
-            current_observations = sorted(current_observations, key=cmp_to_key(_spaeter))
-            
-            # Save to file and update config
-            filename = current_app.config.get('LOADED_FILE')
-            if filename:
-                obs_file.save_file(current_observations, filename)
-            
-            current_app.config['OBSERVATIONS'] = current_observations
-            current_app.config['DIRTY'] = False
-            
-            return jsonify({
-                'success': True,
-                'count': len(new_observations) - duplicate_count,
-                'total_count': len(current_observations),
-                'duplicates': duplicate_count,
-                'filtered_out': filtered_out_count,
-                'mode': 'replace' if replace_mode else 'append'
-            })
+                # Regular user: Delete only their KK
+                obs_db.delete_all_for_observer(str(observer_kk))
+        # else: APPEND MODE - skip delete, just insert
+        
+        # Insert new observations into database
+        added_count = 0
+        duplicate_count = 0
+        for obs in new_observations:
+            success = obs_db.save_one(obs)
+            if success:
+                added_count += 1
+            else:
+                duplicate_count += 1  # Duplicate detected by DB unique constraint
+        
+        return jsonify({
+            'success': True,
+            'count': added_count,
+            'duplicates': duplicate_count,
+            'filtered_out': filtered_out_count,
+            'mode': 'replace' if replace_mode else 'append'
+        })
         
     except Exception as e:
         return jsonify({'error': 'upload_failed', 'details': str(e)}), 500
@@ -1466,87 +1426,95 @@ def upload_file() -> Dict[str, Any]:
 def download_file() -> Dict[str, Any]:
     """Download filtered observations as CSV file - implements 'Datei -> Download'
     
-    Supports two authentication modes:
-    1. Session-based (cloud mode): user authenticated via session
-    2. Password-based (local mode): user provides credentials
+    Cloud Mode: Query database and return CSV
+    Local Mode: Proxy to cloud server (send credentials + filters)
     
     Filters observations by user's KK unless user is admin.
     Returns CSV content for client-side file save dialog.
     """
     
     data = request.get_json()
-    observer_kk = data.get('observerKK')  # KK number or "Admin"
-    password = data.get('password', '')  # Only for local mode
-    use_session = data.get('use_session', False)  # True for cloud mode
-    download_all = data.get('download_all', False)  # True to bypass KK filter
+    observer_kk = data.get('observerKK')
+    password = data.get('password', '')
+    use_session = data.get('use_session', False)
+    download_all = data.get('download_all', False)
     
-    # Validate parameters
     if not observer_kk:
         return jsonify({'error': 'observer_kk_missing'}), 400
     
+    # Local Mode: Proxy to cloud server
+    if not use_session:
+        if not password:
+            return jsonify({'error': 'password_required'}), 400
+        
+        try:
+            import requests
+            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
+            download_url = f"{cloud_server_url.rstrip('/')}/api/file/download"
+            
+            # Forward request to cloud server with credentials
+            response = requests.post(
+                download_url,
+                json={
+                    'observerKK': observer_kk,
+                    'password': password,
+                    'use_session': False,
+                    'download_all': download_all
+                },
+                timeout=60
+            )
+            
+            # Return cloud server response
+            return jsonify(response.json()), response.status_code
+            
+        except Exception as e:
+            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
+    
+    # Cloud Mode: Direct database operations with authentication
     try:
-        # Determine if user is admin and get authenticated KK
+        # Authenticate user
         is_admin = False
         authenticated_kk = None
         
         if use_session:
-            # Cloud mode: authenticate via session
-            authenticated_kk = session.get('observer_kk')
-            is_admin = session.get('is_admin', False)
-            
-            if not authenticated_kk:
+            # Cloud Mode with session
+            if not session.get('authenticated', False):
                 return jsonify({'error': 'not_authenticated'}), 401
+            
+            is_admin = session.get('is_admin', False)
+            authenticated_kk = session.get('observer_kk')
         else:
-            # Local mode: authenticate via password
-            if observer_kk.upper() == 'ADMIN':
-                # Admin authentication
-                is_valid, user_info = AuthService.verify_password('admin', password)
-                if not is_valid:
-                    return jsonify({'error': 'invalid_admin_credentials'}), 401
-                is_admin = True
-                authenticated_kk = None  # Admin has no specific KK
-            else:
-                # Regular user authentication
-                is_valid, user_info = AuthService.verify_password(observer_kk, password)
-                if not is_valid:
-                    return jsonify({'error': 'invalid_credentials'}), 401
-                authenticated_kk = int(observer_kk)
-                is_admin = False
+            # Cloud Mode with password (proxied from Local Mode)
+            if not password:
+                return jsonify({'error': 'password_required'}), 400
+            
+            auth_service = AuthService()
+            is_valid, user_kk = auth_service.verify_password(observer_kk, password)
+            
+            if not is_valid:
+                return jsonify({'error': 'invalid_credentials'}), 401
+            
+            is_admin = (user_kk is None)
+            authenticated_kk = user_kk
         
-        # Load all.csv observations (Cloud mode only)
-        root_path = Path(current_app.root_path).parent.parent
-        all_csv_path = root_path / 'data' / 'all.csv'
-        
-        if not all_csv_path.exists():
-            return jsonify({'error': 'all_csv_not_found'}), 404
-        
-        # Using io.observations_file
-        all_observations, _ = obs_file.open_file(str(all_csv_path))
-        
-        # Filter observations by KK (unless admin or download_all requested)
+        # Load observations from database
         if is_admin or download_all:
-            # Admin or user requested all observations
-            filtered_observations = all_observations
+            all_observations = obs_db.load_all()
         else:
-            # Regular user gets only their own observations
-            filtered_observations = [
-                obs for obs in all_observations
-                if str(obs.KK) == str(authenticated_kk)
-            ]
+            all_observations = obs_db.load_filtered(kk=int(authenticated_kk))
         
-        if not filtered_observations:
+        if not all_observations:
             return jsonify({'error': 'no_observations'}), 404
         
         # Generate CSV content
         csv_buffer = io.StringIO()
-        obs_file.export_observations_to_csv(filtered_observations, csv_buffer)
+        ObservationCSV.write_observations(all_observations, csv_buffer)
         csv_content = csv_buffer.getvalue()
         
-        # Return CSV content for client-side download
         return jsonify({
             'success': True,
             'csv_content': csv_content,
-            'count': len(filtered_observations),
+            'count': len(all_observations),
             'observer_kk': authenticated_kk,
             'is_admin': is_admin
         })
@@ -1660,60 +1628,74 @@ def upload_observers() -> Dict[str, Any]:
     Admin can upload all observers, regular users only their own.
     """
 
-    if not is_cloud_mode():
-        return jsonify({'error': 'server_unreachable'}), 503
-    
     data = request.get_json()
     observers = data.get('observers', [])
     use_session = data.get('use_session', False)  # True in Cloud Mode
-    
-    # Cloud Mode only parameters (ignored in Cloud Mode, required in Local Mode)
-    observer_kk = data.get('observerKK')  # Local Mode only
-    password = data.get('password', '')    # Local Mode only
+    observer_kk = data.get('observerKK')
+    password = data.get('password', '')
     
     # Validate parameters
     if not observers:
         return jsonify({'error': 'no_observer_data_to_upload'}), 400
     
+    # Local Mode: Proxy to cloud server
+    if not use_session:
+        if not observer_kk or not password:
+            return jsonify({'error': 'observer_kk_password_required'}), 400
+        
+        try:
+            import requests
+            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
+            upload_url = f"{cloud_server_url.rstrip('/')}/api/observers/upload"
+            
+            # Forward request to cloud server with credentials
+            response = requests.post(
+                upload_url,
+                json={
+                    'observerKK': observer_kk,
+                    'password': password,
+                    'observers': observers,
+                    'use_session': False
+                },
+                timeout=60
+            )
+            
+            # Return cloud server response
+            return jsonify(response.json()), response.status_code
+            
+        except Exception as e:
+            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
+    
+    # Cloud Mode: Direct database operations with authentication
     try:
-        # Authenticate user (BOTH MODES)
+        # Authenticate user
         is_admin = False
         authenticated_kk = None
         
         if use_session:
-            # Cloud Mode: session authentication
+            # Cloud Mode with session (user already logged in)
             if not session.get('authenticated', False):
                 return jsonify({'error': 'not_authenticated'}), 401
             
             is_admin = session.get('is_admin', False)
             authenticated_kk = session.get('observer_kk')  # None for admin
-            
-            # Cloud Mode: authenticated_kk from session is the ONLY truth
-            # Request parameters observerKK and password are ignored for security reasons
         else:
-            # Local Mode: password authentication
-            if not observer_kk:
-                return jsonify({'error': 'observer_kk_missing'}), 400
-            
-            if not password:
-                return jsonify({'error': 'password_required'}), 400
+            # Cloud Mode with password (proxied from Local Mode)
+            if not observer_kk or not password:
+                return jsonify({'error': 'observer_kk_password_required'}), 400
             
             auth_service = AuthService()
-            is_valid, user_info = auth_service.verify_password(observer_kk, password)
+            is_valid, user_kk = auth_service.verify_password(observer_kk, password)
             
             if not is_valid:
                 return jsonify({'error': 'invalid_credentials'}), 401
             
-            is_admin = user_info.get('is_admin', False)
-            authenticated_kk = observer_kk if not is_admin else None
+            is_admin = (user_kk is None)  # None = admin
+            authenticated_kk = user_kk
         
         # SECURITY: Filter observers to only include authenticated user's data (unless admin)
-        # After authentication, there are only two cases:
-        # - Admin: is_admin=True, authenticated_kk=None → can upload all data (no filtering)
-        # - Regular User: is_admin=False, authenticated_kk=KK → can only upload their own data
         if not is_admin:
             # Regular user: filter to only their own KK
-            # (authenticated_kk is guaranteed to be set for regular users after authentication)
             filtered_observers = []
             rejected_count = 0
             
@@ -1726,7 +1708,6 @@ def upload_observers() -> Dict[str, Any]:
                         rejected_count += 1
             
             if rejected_count > 0:
-                # Inform user that some records were rejected
                 observers = filtered_observers
                 if not observers:
                     return jsonify({
@@ -1738,63 +1719,32 @@ def upload_observers() -> Dict[str, Any]:
                     }), 403
         # Admin: no filtering needed, can upload all observers
         
-        if is_cloud_mode():
-            # Cloud Mode: Save to database
-            # Replace mode: Remove all existing records for uploaded observers
-            uploaded_kks = set()
-            for obs_record in observers:
-                if len(obs_record) >= 1:
-                    uploaded_kks.add(int(obs_record[0]))
-            
-            # Delete existing records for uploaded KKs
-            for kk in uploaded_kks:
-                existing_records = observer_db.load_filtered(kk=kk)
-                for record in existing_records:
-                    # Delete by kk and since (unique key)
-                    observer_db.delete_one(int(record[0]), record[2])
-            
-            # Add new observer records to database
-            for obs_record in observers:
-                observer_db.save_one(obs_record)
-            
-            # Cloud Mode: No caching - database is always queried directly (Decision #031)
-            # Get total count from database for response (efficient SQL COUNT)
-            total_count = observer_db.count()
-            
-            return jsonify({
-                'success': True,
-                'count': len(observers),
-                'total_count': total_count
-            })
-        else:
-            # Local Mode: File-based operations
-            # Load existing observers (Layer 3a)
-            existing_observers, _ = observer_file.open_file()
-            
-            # Replace mode: Remove all existing records for uploaded observers
-            uploaded_kks = set()
-            for obs_record in observers:
-                if len(obs_record) >= 1:
-                    uploaded_kks.add(obs_record[0])
-            
-            # Keep only observers NOT in the upload
-            filtered_observers = [obs for obs in existing_observers if obs[0] not in uploaded_kks]
-            
-            # Add new observers
-            filtered_observers.extend(observers)
-            
-            # Sort (Layer 2)
-            filtered_observers = observer_logic.sort_observers(filtered_observers)
-            
-            # Save to file (Layer 3a)
-            observer_file.save_file(filtered_observers)
-            current_app.config['OBSERVERS'] = filtered_observers
-            
-            return jsonify({
-                'success': True,
-                'count': len(observers),
-                'total_count': len(filtered_observers)
-            })
+        # Database operations (Cloud Mode only - Local Mode exits early above)
+        # Replace mode: Remove all existing records for uploaded observers
+        uploaded_kks = set()
+        for obs_record in observers:
+            if len(obs_record) >= 1:
+                uploaded_kks.add(int(obs_record[0]))
+        
+        # Delete existing records for uploaded KKs
+        for kk in uploaded_kks:
+            existing_records = observer_db.load_filtered(kk=kk)
+            for record in existing_records:
+                # Delete by kk and since (unique key)
+                observer_db.delete_one(int(record[0]), record[2])
+        
+        # Add new observer records to database
+        for obs_record in observers:
+            observer_db.save_one(obs_record)
+        
+        # Get total count from database for response
+        total_count = observer_db.count()
+        
+        return jsonify({
+            'success': True,
+            'count': len(observers),
+            'total_count': total_count
+        })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1804,60 +1754,68 @@ def upload_observers() -> Dict[str, Any]:
 def download_observers() -> Dict[str, Any]:
     """Download complete observer data as CSV file (no KK filter)
     
+    Cloud Mode: Query database and return CSV
+    Local Mode: Proxy to cloud server (send credentials)
+    
     Returns the complete halobeo.csv so it can be used locally.
-    
-    Supports two authentication modes:
-    1. Session-based (cloud mode): user authenticated via session
-    2. Password-based (local mode): user provides credentials
-    
     Authentication is REQUIRED in both modes for security.
     """
     
     data = request.get_json()
     use_session = data.get('use_session', False)
+    observer_kk = data.get('observerKK')
+    password = data.get('password', '')
     
-    # Parameters for authentication (both modes)
-    observer_kk = data.get('observerKK')  # Local Mode only
-    password = data.get('password', '')    # Local Mode only
-    
-    try:
-        # Authenticate user (BOTH MODES)
-        is_admin = False
+    # Local Mode: Proxy to cloud server
+    if not use_session:
+        if not observer_kk or not password:
+            return jsonify({'error': 'observer_kk_password_required'}), 400
         
+        try:
+            import requests
+            cloud_server_url = current_app.config.get('CLOUD_SERVER_URL', 'https://halo.online')
+            download_url = f"{cloud_server_url.rstrip('/')}/api/observers/download"
+            
+            # Forward request to cloud server with credentials
+            response = requests.post(
+                download_url,
+                json={
+                    'observerKK': observer_kk,
+                    'password': password,
+                    'use_session': False
+                },
+                timeout=60
+            )
+            
+            # Return cloud server response
+            return jsonify(response.json()), response.status_code
+            
+        except Exception as e:
+            return jsonify({'error': 'cloud_server_unreachable', 'details': str(e)}), 503
+    
+    # Cloud Mode: Direct database operations with authentication
+    try:
+        # Authenticate user
         if use_session:
-            # Cloud Mode: session authentication
+            # Cloud Mode with session
             if not session.get('authenticated', False):
                 return jsonify({'error': 'not_authenticated'}), 401
-            
-            is_admin = session.get('is_admin', False)
         else:
-            # Local Mode: password authentication
-            if not observer_kk:
-                return jsonify({'error': 'observer_kk_missing'}), 400
-            
-            if not password:
-                return jsonify({'error': 'password_required'}), 400
+            # Cloud Mode with password (proxied from Local Mode)
+            if not observer_kk or not password:
+                return jsonify({'error': 'observer_kk_password_required'}), 400
             
             auth_service = AuthService()
-            is_valid, user_info = auth_service.verify_password(observer_kk, password)
+            is_valid, user_kk = auth_service.verify_password(observer_kk, password)
             
             if not is_valid:
                 return jsonify({'error': 'invalid_credentials'}), 401
-            
-            is_admin = user_info.get('is_admin', False)
         
-        if is_cloud_mode():
-            # Cloud Mode: Load from database
-            all_observers = observer_db.load_all()
-        else:
-            # Local Mode: Load from file (Layer 3a)
-            all_observers, _ = observer_file.open_file()
+        # Load all observers from database (no KK filter)
+        all_observers = observer_db.load_all()
         
         if not all_observers:
             return jsonify({'error': 'no_observers'}), 404
-        
-        # No KK filter - return complete halobeo.csv
-        # This allows the file to be used locally
         
         # Generate CSV content
         csv_buffer = io.StringIO()
@@ -1865,7 +1823,6 @@ def download_observers() -> Dict[str, Any]:
         writer.writerows(all_observers)
         csv_content = csv_buffer.getvalue()
         
-        # Return CSV content for client-side download
         return jsonify({
             'success': True,
             'csv_content': csv_content,

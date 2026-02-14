@@ -4995,41 +4995,14 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
             showErrorDialog(i18nStrings.observers.error_missing_required);
             return;
         }
+
+        // Local Mode: No separate login call - credentials will be sent with upload/download request
+        // Just collect credentials and pass to callback
         
-        if (!cloudServerUrl) {
-            showErrorDialog(i18nStrings.messages.error_loading);
-            return;
-        }
-
-        const loginUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/login`;
-        try {
-            const loginResponse = await fetch(loginUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: observerKK,
-                    password: password
-                })
-            });
-
-            const loginResult = await loginResponse.json();
-
-            if (!loginResponse.ok || !loginResult.success) {
-                showErrorDialog(i18nStrings.messages[loginResult.error]);
-                return;
-            }
-        } catch (error) {
-            showErrorDialog(
-                i18nStrings.upload_download.server_unreachable_details.replace('{0}', loginUrl),
-                () => { window.navigateInternal('/'); }
-            );
-            return;
-        }
-
-        // Save password to halo.cfg (obfuscated)
+        // Save password to halo.cfg (obfuscated) for convenience
         try {
             await fetch('/api/config/upload_password', {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password: password })
             });

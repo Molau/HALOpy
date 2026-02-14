@@ -108,11 +108,16 @@
             <form id="login-form">
                 <div class="mb-3">
                     <label for="username" class="form-label">{{ g.i18n.get('login.username_label') }}</label>
-                    <input type="text" class="form-control" id="username" name="username" placeholder="{{ g.i18n.get('login.username_placeholder') }}" required autofocus>
+                    <select class="form-select" id="username" name="username" required autofocus></select>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">{{ g.i18n.get('login.password_label') }}</label>
-                    <input type="password" class="form-control" id="password" name="password" placeholder="{{ g.i18n.get('login.password_placeholder') }}" required>
+                    <div class="position-relative">
+                        <input type="password" class="form-control pe-5" id="password" name="password" placeholder="{{ g.i18n.get('login.password_placeholder') }}" required>
+                        <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-password" style="z-index: 10;">
+                            <i class="bi bi-eye text-secondary" id="password-icon"></i>
+                        </button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">{{ g.i18n.get('login.login_button') }}</button>
             </form>
@@ -157,6 +162,48 @@
             'username_password_required': '{{ g.i18n.get("login.error_username_password_required") }}',
             'server_unreachable': '{{ g.i18n.get("login.error_server_unreachable") }}'
         };
+        
+        // Load observers and populate dropdown
+        async function loadObservers() {
+            try {
+                const response = await fetch('/api/observers');
+                if (response.ok) {
+                    const data = await response.json();
+                    const observers = data.observers || [];
+                    const usernameSelect = document.getElementById('username');
+                    
+                    // Add admin option first
+                    const adminOption = document.createElement('option');
+                    adminOption.value = 'admin';
+                    adminOption.textContent = 'Admin';
+                    usernameSelect.appendChild(adminOption);
+                    
+                    // Add observer options (sorted by KK)
+                    observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
+                        const option = document.createElement('option');
+                        option.value = obs.KK;
+                        option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
+                        usernameSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load observers:', error);
+            }
+        }
+        
+        // Load observers on page load
+        loadObservers();
+        
+        // Toggle password visibility
+        const togglePasswordBtn = document.getElementById('toggle-password');
+        const passwordInput = document.getElementById('password');
+        const passwordIcon = document.getElementById('password-icon');
+        
+        togglePasswordBtn.addEventListener('click', () => {
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+            passwordIcon.className = type === 'password' ? 'bi bi-eye text-secondary' : 'bi bi-eye-slash text-secondary';
+        });
         
         // Login form submission
         document.getElementById('login-form').addEventListener('submit', async (e) => {

@@ -86,9 +86,9 @@ def create_app(config=None):
         
         if startup_enabled and startup_file:
             try:
-                observations = obs_file.open_file(startup_file)
+                observations, filepath = obs_file.open_file(startup_file)
                 app.config['OBSERVATIONS'] = observations
-                app.config['LOADED_FILE'] = startup_file
+                app.config['LOADED_FILE'] = filepath.name
                 app.config['DIRTY'] = False
                 app.config['AUTO_LOADED'] = True  # Flag for showing notification
             except Exception as e:
