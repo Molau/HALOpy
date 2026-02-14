@@ -5663,8 +5663,8 @@ async function showDownloadDialog() {
                 // Trigger file save dialog
                 const csvContent = result.csv_content;
                 const defaultFilename = result.is_admin && downloadAll
-                    ? 'beobachtungen_all.csv'
-                    : `beobachtungen_${result.observer_kk}.csv`;
+                    ? 'halobeo.csv'
+                    : 'observations.csv';
                 triggerFileSaveDialog(csvContent, defaultFilename);
                 
                 // Success notification
