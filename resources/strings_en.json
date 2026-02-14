@@ -129,6 +129,9 @@
     "invalid_credentials": "Invalid credentials",
     "no_observations_to_upload": "No observations to upload",
     "no_observer_data_to_upload": "No observer data to upload",
+    "password_required": "Password required",
+    "cloud_server_unreachable": "Cloud server unreachable",
+    "no_valid_observations": "No valid observations to upload",
     "observer_kk_missing": "Observer ID missing",
     "auth_not_required_local_mode": "Authentication not required in local mode",
     "username_password_required": "Username and password required",
@@ -202,7 +205,7 @@
   },
   "upload_download": {
       "upload_auth_title": "Login to HALO server",
-      "upload_auth_message": "Please enter your credentials to upload observations.",
+      "upload_auth_message": "Please enter your credentials.",
       "upload_auth_username": "Username:",
       "upload_auth_password": "Password:",
       "upload_auth_login": "Login",

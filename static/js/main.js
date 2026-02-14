@@ -298,7 +298,7 @@ async function loadObserverCodes() {
     // Load simplified observer list (just KK codes for initial validation)
     // Observer activity is checked via API endpoint when needed (g-field)
     const resp = await fetch('/api/observers/list');
-    if (!resp.ok) throw new Error(i18nStrings.errors?.observer_list_load_failed || 'Could not load observer list');
+    if (!resp.ok) throw new Error(i18nStrings.messages?.observer_list_load_failed || 'Could not load observer list');
     const data = await resp.json();
     const observers = data.observers || [];
     
@@ -2870,7 +2870,7 @@ async function processBulkUpdate(filteredObs, updates) {
             window.location.reload();
         }, 1500);
         
-    } catch (error) {showErrorDialog(`${i18nStrings.errors.bulk_update_failed}: ${error.message}`);
+    } catch (error) {showErrorDialog(`${i18nStrings.messages.bulk_update_failed}: ${error.message}`);
     }
 }
 
@@ -4900,10 +4900,6 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         <div class="modal fade" id="auth-modal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${i18nStrings.upload_download.upload_auth_title}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
                     <div class="modal-body">
                         <p>${i18nStrings.upload_download.upload_auth_message}</p>
                         <div class="mb-3">
@@ -4922,7 +4918,7 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-login">${i18nStrings.upload_download.upload_auth_login}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-login">${i18nStrings.common.ok}</button>
                     </div>
                 </div>
             </div>
@@ -5063,20 +5059,62 @@ async function showUploadDialog() {
 }
 
 function continueUpload(isCloudMode, cloudServerUrl, username) {
-    if (isCloudMode) {
-        // Cloud mode: Already authenticated via session, show file picker directly
-        showUploadFileDialog(null, null, isCloudMode, cloudServerUrl);
-    } else {
-        // Local mode: Show authentication dialog first, then file picker
-        showAuthenticationModal(async (observerKK, password) => {
-            showUploadFileDialog(observerKK, password, isCloudMode, cloudServerUrl);
-        }, cloudServerUrl);
-    }
+    // Show combined upload dialog (includes auth fields in Local Mode)
+    showUploadFileDialog(isCloudMode, cloudServerUrl);
 }
 
-// Upload in cloud mode: Select file from local disk
-async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServerUrl) {
-    // Create file input dialog
+// Upload: Combined dialog with auth fields (Local Mode only) + file selection + mode
+async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
+    // Load data for Local Mode auth fields
+    let observers = [];
+    let fixedObserver = '';
+    let savedPassword = '';
+    
+    if (!isCloudMode) {
+        try {
+            const [obsResponse, configResponse, passwordResponse] = await Promise.all([
+                fetch('/api/observers'),
+                fetch('/api/config/fixed_observer'),
+                fetch('/api/config/upload_password')
+            ]);
+            
+            if (obsResponse.ok) {
+                const data = await obsResponse.json();
+                observers = data.observers || [];
+            }
+            
+            if (configResponse.ok) {
+                const config = await configResponse.json();
+                fixedObserver = config.observer || '';
+            }
+            
+            if (passwordResponse.ok) {
+                const passwordData = await passwordResponse.json();
+                savedPassword = passwordData.password || '';
+            }
+        } catch (error) {}
+    }
+    
+    const observerDisabled = fixedObserver ? 'disabled' : '';
+    
+    // Auth fields section (only visible in Local Mode)
+    const authFieldsHtml = !isCloudMode ? `
+        <div class="mb-3">
+            <label for="upload-observer" class="form-label">${i18nStrings.upload_download.upload_auth_username}</label>
+            <select class="form-select" id="upload-observer" ${observerDisabled}></select>
+        </div>
+        <div class="mb-3">
+            <label for="upload-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
+            <div class="position-relative">
+                <input type="password" class="form-control pe-5" id="upload-password" autocomplete="current-password" value="${savedPassword}">
+                <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-upload-password" style="z-index: 10;">
+                    <i class="bi bi-eye text-secondary" id="upload-password-icon"></i>
+                </button>
+            </div>
+        </div>
+    ` : '';
+    
+    // Create combined dialog
     const modalHtml = `
         <div class="modal fade" id="upload-file-modal" tabindex="-1">
             <div class="modal-dialog">
@@ -5086,6 +5124,7 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        ${authFieldsHtml}
                         <div class="mb-3">
                             <label class="form-label">${i18nStrings.file.load}:</label>
                             <input type="file" class="form-control" id="upload-file-input" accept=".csv">
@@ -5113,7 +5152,68 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
     const modal = new bootstrap.Modal(modalEl);
     const fileInput = document.getElementById('upload-file-input');
     
+    // Setup auth fields (Local Mode only)
+    let observerKK = null;
+    let password = null;
+    
+    if (!isCloudMode) {
+        const observerSelect = document.getElementById('upload-observer');
+        const passwordInput = document.getElementById('upload-password');
+        const togglePasswordBtn = document.getElementById('toggle-upload-password');
+        const passwordIcon = document.getElementById('upload-password-icon');
+        
+        // Populate observer dropdown
+        const adminOption = document.createElement('option');
+        adminOption.value = 'admin';
+        adminOption.textContent = 'Admin';
+        observerSelect.appendChild(adminOption);
+        
+        observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
+            const option = document.createElement('option');
+            option.value = obs.KK;
+            const selected = obs.KK === fixedObserver ? 'selected' : '';
+            option.selected = selected === 'selected';
+            option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
+            observerSelect.appendChild(option);
+        });
+        
+        // Toggle password visibility
+        togglePasswordBtn.addEventListener('click', () => {
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+            passwordIcon.className = type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+        });
+        
+        // Handle Enter key in password field
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('btn-upload-file').click();
+            }
+        });
+    }
+    
     document.getElementById('btn-upload-file').addEventListener('click', async () => {
+        // Get credentials from form (Local Mode only)
+        if (!isCloudMode) {
+            observerKK = document.getElementById('upload-observer').value;
+            password = document.getElementById('upload-password').value;
+            
+            if (!observerKK || !password) {
+                showErrorDialog(i18nStrings.observers.error_missing_required);
+                return;
+            }
+            
+            // Save password to config for convenience
+            try {
+                await fetch('/api/config/upload_password', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password })
+                });
+            } catch (error) {}
+        }
+        
         const file = fileInput.files[0];
         if (!file) {
             showErrorDialog(i18nStrings.messages.no_file_selected);
@@ -5184,6 +5284,7 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
                 })
             });
             
+            // Always close spinner after response
             uploadSpinner.modal.hide();
             setTimeout(() => uploadSpinner.modalEl.remove(), 300);
             
@@ -5203,12 +5304,18 @@ async function showUploadFileDialog(observerKK, password, isCloudMode, cloudServ
                 await loadObservations();
             } else {
                 const error = await response.json();
-                showErrorDialog(i18nStrings.common.error + ': ' + (error.error || i18nStrings.errors.unknown_error));
+                // Translate error code to user-friendly message
+                const errorKey = error.error || 'unknown_error';
+                const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error || errorKey;
+                showErrorDialog(errorMsg);
             }
             
         } catch (error) {
-            loadingSpinner.modal.hide();
-            setTimeout(() => loadingSpinner.modalEl.remove(), 300);
+            // Close spinner if request failed completely
+            if (typeof uploadSpinner !== 'undefined' && uploadSpinner?.modal) {
+                uploadSpinner.modal.hide();
+                setTimeout(() => uploadSpinner.modalEl.remove(), 300);
+            }
             
             showErrorDialog(i18nStrings.common.error + ': ' + error.message);
         }

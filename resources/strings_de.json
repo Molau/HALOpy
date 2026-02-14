@@ -131,6 +131,9 @@
     "invalid_credentials": "Ungültige Anmeldedaten",
     "no_observations_to_upload": "Keine Beobachtungen zum Hochladen",
     "no_observer_data_to_upload": "Keine Beobachterdaten zum Hochladen",
+    "password_required": "Passwort erforderlich",
+    "cloud_server_unreachable": "Cloud-Server nicht erreichbar",
+    "no_valid_observations": "Keine gültigen Beobachtungen zum Hochladen",
     "observer_kk_missing": "Beobachter-Kennung fehlt",
     "auth_not_required_local_mode": "Authentifizierung im lokalen Modus nicht erforderlich",
     "username_password_required": "Benutzername und Passwort erforderlich",
@@ -204,7 +207,7 @@
   },
   "upload_download": {
       "upload_auth_title": "Anmeldung bei HALO Server",
-      "upload_auth_message": "Bitte geben Sie Ihre Zugangsdaten ein, um Beobachtungen hochzuladen.",
+      "upload_auth_message": "Bitte geben Sie Ihre Zugangsdaten ein.",
       "upload_auth_username": "Benutzername:",
       "upload_auth_password": "Passwort:",
       "upload_auth_login": "Anmelden",

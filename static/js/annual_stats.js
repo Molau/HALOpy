@@ -925,7 +925,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }, 500);
                 } catch (error) {
                     console.error('Error printing chart:', error);
-                    showErrorDialog(i18nStrings.errors.chart_print_failed);
+                    showErrorDialog(i18nStrings.messages.chart_print_failed);
                 }
             };
         }
@@ -952,7 +952,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     URL.revokeObjectURL(url);
                 } catch (error) {
                     console.error('Error saving chart:', error);
-                    showErrorDialog(i18nStrings.errors.chart_save_failed);
+                    showErrorDialog(i18nStrings.messages.chart_save_failed);
                 }
             };
         }
@@ -980,7 +980,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }, 500);
                 } catch (error) {
                     console.error('Error printing chart:', error);
-                    showErrorDialog(i18nStrings.errors.chart_print_failed);
+                    showErrorDialog(i18nStrings.messages.chart_print_failed);
                 }
             };
         }
@@ -1007,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     URL.revokeObjectURL(url);
                 } catch (error) {
                     console.error('Error saving chart:', error);
-                    showErrorDialog(i18nStrings.errors.chart_save_failed);
+                    showErrorDialog(i18nStrings.messages.chart_save_failed);
                 }
             };
         }

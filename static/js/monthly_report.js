@@ -709,7 +709,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         URL.revokeObjectURL(url);
                     } catch (error) {
                         console.error('Error fetching markdown for save:', error);
-                        showErrorDialog(i18nStrings.errors.markdown_save_failed);
+                        showErrorDialog(i18nStrings.messages.markdown_save_failed);
                     }
                 } else {
                     // Save as CSV file (lowercase filename) for H and P modes
