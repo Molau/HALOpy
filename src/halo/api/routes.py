@@ -770,7 +770,12 @@ def save_observations() -> Dict[str, Any]:
         return jsonify({'success': False, 'exists': True, 'filename': filename}), 200
     
     try:
+        print(f"🔍 DEBUG: About to save file - observations type: {type(observations)}, count: {len(observations)}")
+        print(f"🔍 DEBUG: filepath type: {type(filepath)}, value: {filepath}")
+        
         obs_file.save_file(observations, filepath)
+        
+        print(f"🔍 DEBUG: File saved successfully")
         
         return jsonify({
             'success': True,
@@ -778,6 +783,10 @@ def save_observations() -> Dict[str, Any]:
             'count': len(observations)
         })
     except Exception as e:
+        print(f"🔍 DEBUG: Error during save_file: {str(e)}")
+        print(f"🔍 DEBUG: Exception type: {type(e)}")
+        import traceback
+        print(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -1255,6 +1264,9 @@ def save_file() -> Dict[str, Any]:
     try:
         # Local Mode: Save to file and download
         filepath = obs_file.get_data_path(filename)
+        print(f"🔍 DEBUG: Download save - observations type: {type(observations)}, count: {len(observations)}")
+        print(f"🔍 DEBUG: Download save - filepath type: {type(filepath)}, value: {filepath}")
+        
         obs_file.save_file(observations, filepath)
         
         # Read file back for download
@@ -1412,13 +1424,20 @@ def download_file() -> Dict[str, Any]:
     Returns CSV content for client-side file save dialog.
     """
     
+    print("🔍 DEBUG: /api/file/download endpoint called")
+    
     data = request.get_json()
+    print(f"🔍 DEBUG: Request data: {data}")
+    
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
     use_session = data.get('use_session', False)
     download_all = data.get('download_all', False)
     
+    print(f"🔍 DEBUG: observer_kk={observer_kk}, use_session={use_session}, download_all={download_all}")
+    
     if not observer_kk:
+        print("🔍 DEBUG: Error - observer_kk missing")
         return jsonify({'error': 'observer_kk_missing'}), 400
     
     # Authentication (both Cloud Mode with session and Local Mode with password)
@@ -1448,11 +1467,16 @@ def download_file() -> Dict[str, Any]:
             is_admin = (user_kk is None)
             authenticated_kk = user_kk
         
-        # Load observations from database
+        # Load observations from database (Cloud Server)
+        print(f"🔍 DEBUG: Download file - authenticating with observer_kk: {observer_kk}, authenticated_kk: {authenticated_kk}")
+        print(f"🔍 DEBUG: is_admin: {is_admin}, download_all: {download_all}")
+        
         if is_admin or download_all:
             all_observations = obs_db.load_all()
         else:
             all_observations = obs_db.load_filtered(kk=int(authenticated_kk))
+        
+        print(f"🔍 DEBUG: Download file - found {len(all_observations)} observations from database")
         
         if not all_observations:
             return jsonify({'error': 'no_observations'}), 404
