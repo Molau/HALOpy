@@ -5812,8 +5812,8 @@ async function showObserverUploadDialog() {
         const { modal, modalEl } = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
         
         try {
-            // Load current observers
-            const observersResponse = await fetch('/api/observers');
+            // Load current observers (ALL records, not just latest)
+            const observersResponse = await fetch('/api/observers?latest_only=false');
             const observersData = await observersResponse.json();
             const allObservers = observersData.observers || [];
             console.log("🔍 DEBUG: Observer upload (Cloud) - observersData:", observersData, "allObservers length:", allObservers.length);
@@ -5869,7 +5869,7 @@ async function showObserverUploadDialog() {
         
         try {
             // Load current observers
-            const observersResponse = await fetch('/api/observers');
+            const observersResponse = await fetch('/api/observers?latest_only=false');
             const observersData = await observersResponse.json();
             const allObservers = observersData.observers || [];
             console.log("🔍 DEBUG: Observer upload - observersData:", observersData, "allObservers length:", allObservers.length);
@@ -5979,8 +5979,8 @@ async function uploadObserversLocalMode(cloudServerUrl) {
         try {
             spinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
             
-            // Load current observers from app
-            const observersResponse = await fetch('/api/observers');
+            // Load current observers from app (ALL records, not just latest)
+            const observersResponse = await fetch('/api/observers?latest_only=false');
             const observersData = await observersResponse.json();
             const allObservers = observersData.observers || [];
             
