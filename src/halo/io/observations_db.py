@@ -1007,6 +1007,9 @@ def execute_single_param_analysis(params: dict) -> dict:
                     GROUP BY octant
                 """
                 
+                logger.error(f"🔍 SE COMPLETE QUERY:\n{query_complete}")
+                logger.error(f"🔍 SE COMPLETE PARAMS: {complete_params}")
+                
                 # Query for all other halos: parse sectors field
                 query_other = f"""
                     SELECT 
@@ -1020,6 +1023,8 @@ def execute_single_param_analysis(params: dict) -> dict:
                         AND LOWER(TRIM(octant)) ~ '^[a-h]$'
                     GROUP BY LOWER(TRIM(octant))
                 """
+                
+                logger.error(f"🔍 SE OTHER QUERY:\n{query_other}")
                 
                 # Execute both queries
                 circular_halos_list = list(CIRCULAR_HALOS)
