@@ -6035,19 +6035,31 @@ def analyze_observations() -> Dict[str, Any]:
                         from_val = int(from_val)
                         to_val = int(to_val)
                         
-                        # Generate all values in range
-                        if param1 == 'JJ':
+                        # Generate all values in range based on parameter type
+                        if param1 == 'TT':
+                            # Day parameter - generate ALL days in the month (1 to max_day)
+                            month = params.get('param1_month')
+                            year = params.get('param1_year')
+                            if month is not None and year is not None:
+                                import calendar
+                                month = int(month)
+                                year = int(year)
+                                # Convert 2-digit year to 4-digit for calendar
+                                year = year if year >= 1900 else (year + 2000 if year < 50 else year + 1900)
+                                max_day = calendar.monthrange(year, month)[1]
+                                all_values = list(range(1, max_day + 1))
+                            else:
+                                all_values = list(range(1, 32))
+                        elif param1 == 'JJ':
                             # Year parameter - handle century boundary
                             from_year = from_val if from_val >= 1900 else (from_val + 2000 if from_val < 50 else from_val + 1900)
                             to_year = to_val if to_val >= 1900 else (to_val + 2000 if to_val < 50 else to_val + 1900)
-                            
                             if from_year > to_year:
-                                # Century boundary: e.g., 1980-2025
                                 all_values = list(range(from_year, 2100)) + list(range(1900, to_year + 1))
                             else:
                                 all_values = list(range(from_year, to_year + 1))
                         else:
-                            # Regular numeric range
+                            # Regular numeric range (MM, ZZ, DD, EE, C, etc.)
                             all_values = list(range(from_val, to_val + 1))
                         
                         # Add missing values with count=0
