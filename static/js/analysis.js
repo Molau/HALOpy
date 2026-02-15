@@ -3060,7 +3060,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += '╗\n';
         
         // First header row with param names combined, centered
-        const headerCombinedText = (param1Name + ' | ' + param2Name);
+        const headerCombinedText = (param1Name + ' \\ ' + param2Name);
         const headerCombinedLeftPad = Math.max(0, Math.floor((combinedWidth - headerCombinedText.length) / 2));
         const headerCombinedRightPad = Math.max(0, combinedWidth - headerCombinedLeftPad - headerCombinedText.length);
         const headerCombined = ' ' + ' '.repeat(headerCombinedLeftPad) + headerCombinedText + ' '.repeat(headerCombinedRightPad) + ' ';
