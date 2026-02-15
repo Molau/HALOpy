@@ -855,41 +855,68 @@ def execute_single_param_analysis(params: dict) -> dict:
         
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                # Build query with optional HAVING clause for range filter
-                having_clause = ""
-                having_params = []
-                
-                if from_alt is not None and to_alt is not None:
-                    having_clause = "HAVING altitude BETWEEN %s AND %s"
-                    having_params = [int(from_alt), int(to_alt)]
-                
-                query = f"""
-                    SELECT 
-                        calculate_solar_altitude(
-                            o."JJ", o."MM", o."TT", o."ZS", o."ZM", o."d",
-                            obs.primary_lon_deg, obs.primary_lon_min, obs.primary_lon_dir,
-                            obs.primary_lat_deg, obs.primary_lat_min, obs.primary_lat_dir,
-                            %s
-                        ) as altitude,
-                        COUNT(*) as count
-                    FROM observations o
-                    JOIN observers obs ON obs.kk = o."KK"
-                        AND CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
-                        AND obs.since = (
-                            SELECT MAX(obs2.since) 
-                            FROM observers obs2 
-                            WHERE obs2.kk = o."KK"
-                                AND CAST(SUBSTRING(obs2.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
-                        )
+                # Build subquery with optional WHERE clause for range filter
+                # Use subquery because PostgreSQL doesn't allow column aliases in HAVING
+                where_clause_inner = f"""
                     WHERE {where_sql}
                         AND o."O" = 1  -- Sun observations only
                         AND o."g" != 1  -- Not generalized observations
-                    GROUP BY altitude
-                    {having_clause}
-                    ORDER BY altitude
                 """
                 
-                cursor.execute(query, [sh_type] + sql_params + having_params)
+                if from_alt is not None and to_alt is not None:
+                    # Use subquery with WHERE on calculated altitude
+                    query = f"""
+                        SELECT altitude, COUNT(*) as count
+                        FROM (
+                            SELECT 
+                                calculate_solar_altitude(
+                                    o."JJ", o."MM", o."TT", o."ZS", o."ZM", o."d",
+                                    obs.primary_lon_deg, obs.primary_lon_min, obs.primary_lon_dir,
+                                    obs.primary_lat_deg, obs.primary_lat_min, obs.primary_lat_dir,
+                                    %s
+                                ) as altitude
+                            FROM observations o
+                            JOIN observers obs ON obs.kk = o."KK"
+                                AND CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                                AND obs.since = (
+                                    SELECT MAX(obs2.since) 
+                                    FROM observers obs2 
+                                    WHERE obs2.kk = o."KK"
+                                        AND CAST(SUBSTRING(obs2.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                                )
+                            {where_clause_inner}
+                        ) AS subquery
+                        WHERE altitude BETWEEN %s AND %s
+                        GROUP BY altitude
+                        ORDER BY altitude
+                    """
+                    cursor.execute(query, [sh_type] + sql_params + [int(from_alt), int(to_alt)])
+                else:
+                    # No range filter - simpler query without subquery
+                    query = f"""
+                        SELECT 
+                            calculate_solar_altitude(
+                                o."JJ", o."MM", o."TT", o."ZS", o."ZM", o."d",
+                                obs.primary_lon_deg, obs.primary_lon_min, obs.primary_lon_dir,
+                                obs.primary_lat_deg, obs.primary_lat_min, obs.primary_lat_dir,
+                                %s
+                            ) as altitude,
+                            COUNT(*) as count
+                        FROM observations o
+                        JOIN observers obs ON obs.kk = o."KK"
+                            AND CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                            AND obs.since = (
+                                SELECT MAX(obs2.since) 
+                                FROM observers obs2 
+                                WHERE obs2.kk = o."KK"
+                                    AND CAST(SUBSTRING(obs2.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                            )
+                        {where_clause_inner}
+                        GROUP BY altitude
+                        ORDER BY altitude
+                    """
+                    cursor.execute(query, [sh_type] + sql_params)
+                
                 rows = cursor.fetchall()
                 
                 result = {}
