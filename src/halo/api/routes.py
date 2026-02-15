@@ -6069,6 +6069,9 @@ def analyze_observations() -> Dict[str, Any]:
                 
             elif not param2:
                 # Single parameter analysis
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"🔍 CLOUD MODE: execute_single_param_analysis() with param1={params.get('param1')}")
                 data_dict = obs_db.execute_single_param_analysis(params)
                 
                 # Fill in missing values in range with count=0 (same as Local Mode)

@@ -832,6 +832,7 @@ def execute_single_param_analysis(params: dict) -> dict:
         >>> # result = {1: 45, 2: 38, 3: 52, ...}
     """
     param1 = params.get('param1')
+    logger.error(f"🔍 execute_single_param_analysis() called with param1={param1}")
     if not param1:
         return {}
     
@@ -967,6 +968,7 @@ def execute_single_param_analysis(params: dict) -> dict:
     
     # Special handling for SE (sectors) - extract octant letters
     if param1 == 'SE':
+        logger.error(f"🔍 SE special handling triggered!")
         # Parse sectors string and count each octant letter (a-h)
         # Split at any non-letter character (-, space, etc.) to handle formats like "a-b-c e-f"
         with get_connection() as conn:
