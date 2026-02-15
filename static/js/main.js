@@ -7303,7 +7303,7 @@ async function showEingabeartDialog() {
             
             if (newMode !== currentMode) {
                 await fetch('/api/config/inputmode', {
-                    method: 'POST',
+                    method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({mode: newMode})
                 });
