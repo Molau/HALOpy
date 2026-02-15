@@ -5268,7 +5268,7 @@ def update_observer(kk: str) -> Dict[str, Any]:
                     'first_name': data.get('VName', '')[:15],  # UPDATED
                     'last_name': data.get('NName', '')[:15],  # UPDATED
                     'primary_site': obs['HbOrt'],  # unchanged
-                    'primary_region': obs['HbReg'],  # unchanged
+                    'primary_region': obs['GH'],  # unchanged (was HbReg)
                     'primary_lon_deg': obs['HLG'],  # unchanged
                     'primary_lon_min': obs['HLM'],  # unchanged
                     'primary_lon_dir': obs['HOW'],  # unchanged
@@ -5276,7 +5276,7 @@ def update_observer(kk: str) -> Dict[str, Any]:
                     'primary_lat_min': obs['HBM'],  # unchanged
                     'primary_lat_dir': obs['HNS'],  # unchanged
                     'secondary_site': obs['NbOrt'],  # unchanged
-                    'secondary_region': obs['NbReg'],  # unchanged
+                    'secondary_region': obs['GN'],  # unchanged (was NbReg)
                     'secondary_lon_deg': obs['NLG'],  # unchanged
                     'secondary_lon_min': obs['NLM'],  # unchanged
                     'secondary_lon_dir': obs['NOW'],  # unchanged
