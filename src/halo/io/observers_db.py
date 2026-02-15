@@ -18,6 +18,7 @@ except ImportError:
 
 from typing import Any, Dict, List, Optional
 from halo.io.db_connection import get_connection
+from halo.models.constants import YEAR_MIN  # For century boundary calculation
 
 
 # ========================================
@@ -103,8 +104,15 @@ def load_all() -> List[Dict[str, Any]]:
                        secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
                        secondary_lat_deg, secondary_lat_min, secondary_lat_dir
                 FROM observers
-                ORDER BY kk, since
-            """)
+                ORDER BY kk,
+                         -- Sort by actual year (years < (YEAR_MIN-1900) are 2000+, >= (YEAR_MIN-1900) are 1900+)
+                         CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                         CASE 
+                             WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
+                             THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
+                             ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                         END
+            """, (YEAR_MIN - 1900,))
             
             rows = cursor.fetchall()
             
@@ -184,7 +192,7 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
                 # Calculate seit value for observation date
                 # Handle century boundary (YEAR_MIN = 1980, so YEAR_MIN-1900 = 80)
                 year = jj
-                if jj < 80:  # Years 00-79 are 2000-2079
+                if jj < (YEAR_MIN - 1900):  # Years 00-79 are 2000-2079
                     year += 100
                 obs_seit = mm + 13 * year
                 
@@ -192,12 +200,12 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
                 where_clauses.append("""
                     (CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
                      CASE 
-                         WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < 80 
+                         WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
                          THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
                          ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
                      END) <= %s
                 """)
-                params.append(obs_seit)
+                params.extend([YEAR_MIN - 1900, obs_seit])
             
             # Fields that use LIKE for partial matching
             like_fields = {'first_name', 'last_name', 'primary_site', 'primary_region', 
@@ -227,8 +235,15 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
                            secondary_lat_deg, secondary_lat_min, secondary_lat_dir
                     FROM observers
                     WHERE {where_sql}
-                    ORDER BY kk, since
+                    ORDER BY kk,
+                             CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                             CASE 
+                                 WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
+                                 THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
+                                 ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                             END
                 """
+                params.append(YEAR_MIN - 1900)  # Add to params for ORDER BY
             else:
                 query = """
                     SELECT kk, first_name, last_name, since, active,
@@ -239,8 +254,15 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
                            secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
                            secondary_lat_deg, secondary_lat_min, secondary_lat_dir
                     FROM observers
-                    ORDER BY kk, since
+                    ORDER BY kk,
+                             CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                             CASE 
+                                 WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
+                                 THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
+                                 ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                             END
                 """
+                params = [YEAR_MIN - 1900]  # Params for ORDER BY
             
             cursor.execute(query, params)
             rows = cursor.fetchall()
