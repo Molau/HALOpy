@@ -31,22 +31,25 @@ def _observation_to_tuple(obs: Observation) -> Tuple:
     Mappings:
     - Python uppercase fields → PostgreSQL lowercase columns
     - HO/HU fields → pillar column ("8HHHH" format)
-    - C field → cc column
-    - f field → ff column
+    - Python c → DB c (lower cloud AFTER)
+    - Python C → DB cc (UPPER cloud AFTER)
+    - Python F → DB f (color)
+    - Python f → DB ff (weather front)
     
     Args:
         obs: Observation object
         
     Returns:
-        Tuple of 23 values matching PostgreSQL column order
+        Tuple of 23 values matching PostgreSQL column order:
+        kk, o, jj, mm, tt, g, zs, zm, d, dd, n, c, cc, ee, h, f, v, ff, zz, gg, pillar, sectors, remarks
     """
     # Format pillar field: "8HHHH" where HH=HO, HH=HU
     pillar = f"8{obs.HO:02d}{obs.HU:02d}" if obs.HO > 0 or obs.HU > 0 else ""
     
     return (
         obs.KK, obs.O, obs.JJ, obs.MM, obs.TT, obs.g,
-        obs.ZS, obs.ZM, obs.d, obs.DD, obs.N, obs.C, obs.c,
-        obs.EE, obs.H, obs.F, obs.V, obs.f, obs.zz, obs.GG,
+        obs.ZS, obs.ZM, obs.d, obs.DD, obs.N, obs.c, obs.C,  # NOTE: c before C to match DB order (c, cc)
+        obs.EE, obs.H, obs.F, obs.V, obs.f, obs.zz, obs.GG,  # NOTE: F before f to match DB order (f, ff)
         pillar, obs.sectors, obs.remarks
     )
 
@@ -68,7 +71,11 @@ def _tuple_to_observation(row: Tuple) -> Observation:
     Returns:
         Observation object
     """
-    # Helper to convert NULL to -1
+    # Helper to convert NULL to -1 for OPTIONAL fields
+    # NOTE: Fields with NOT NULL in DB schema should NEVER be NULL:
+    #   KK, O, JJ, MM, TT, g, EE, GG (always have values)
+    # Optional fields with DEFAULT -1:
+    #   ZS, ZM, d, DD, N, C, c, H, F, V, f, zz
     def null_to_minus1(value):
         return value if value is not None else -1
     
@@ -85,27 +92,40 @@ def _tuple_to_observation(row: Tuple) -> Observation:
         HO = -1
         HU = -1
     
+    # SQL SELECT order: kk, o, jj, mm, tt, g, zs, zm, d, dd, n, c, cc, ee, h, f, v, ff, zz, gg, pillar, sectors, remarks
+    # Index mapping: 0   1  2   3   4   5  6   7   8  9   10  11 12  13  14 15 16 17  18  19  20      21       22
+    # NOTE: DB columns are lowercase (c, cc, f, ff), Python fields are C, c, F, f
+    #       DB 'c' (index 11) → Python 'c' (lower cloud AFTER)
+    #       DB 'cc' (index 12) → Python 'C' (UPPER cloud AFTER - note the swap!)
+    #       DB 'f' (index 15) → Python 'F' (color)
+    #       DB 'ff' (index 17) → Python 'f' (weather front)
+    
     return Observation(
-        KK=null_to_minus1(row[0]), 
-        O=null_to_minus1(row[1]), 
-        JJ=null_to_minus1(row[2]), 
-        MM=null_to_minus1(row[3]), 
-        TT=null_to_minus1(row[4]), 
-        g=null_to_minus1(row[5]),
+        # NOT NULL fields - use directly (never NULL in database)
+        KK=row[0], 
+        O=row[1], 
+        JJ=row[2], 
+        MM=row[3], 
+        TT=row[4], 
+        g=row[5],              # NOT NULL DEFAULT 0 in DB
+        EE=row[13],            # NOT NULL in DB
+        GG=row[19],            # NOT NULL in DB
+        
+        # Optional fields - convert NULL to -1
         ZS=null_to_minus1(row[6]), 
         ZM=null_to_minus1(row[7]), 
         d=null_to_minus1(row[8]), 
         DD=null_to_minus1(row[9]), 
         N=null_to_minus1(row[10]), 
-        C=null_to_minus1(row[11]), 
-        c=null_to_minus1(row[12]),
-        EE=null_to_minus1(row[13]), 
+        c=null_to_minus1(row[11]),  # DB column 'c' → Python field 'c' (lower cloud AFTER)
+        C=null_to_minus1(row[12]),  # DB column 'cc' → Python field 'C' (UPPER cloud AFTER)
         H=null_to_minus1(row[14]), 
-        F=null_to_minus1(row[15]), 
+        F=null_to_minus1(row[15]),  # DB column 'f' → Python field 'F' (color)
         V=null_to_minus1(row[16]), 
-        f=null_to_minus1(row[17]), 
+        f=null_to_minus1(row[17]),  # DB column 'ff' → Python field 'f' (weather front)
         zz=null_to_minus1(row[18]), 
-        GG=null_to_minus1(row[19]),
+        
+        # Pillar and text fields
         HO=HO, HU=HU, 
         sectors=row[21] or "", 
         remarks=row[22] or ""

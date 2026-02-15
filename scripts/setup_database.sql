@@ -171,8 +171,11 @@ CREATE TRIGGER update_observations_updated_at BEFORE UPDATE ON observations
 -- Import observers (halobeo.csv):
 -- \COPY observers(kk,first_name,last_name,since,active,primary_site,primary_region,primary_lon_deg,primary_lon_min,primary_lon_dir,primary_lat_deg,primary_lat_min,primary_lat_dir,secondary_site,secondary_region,secondary_lon_deg,secondary_lon_min,secondary_lon_dir,secondary_lat_deg,secondary_lat_min,secondary_lat_dir) FROM '/home/ubuntu/halopy/halobeo.csv' WITH (FORMAT csv, DELIMITER ',', NULL '');
 
--- Import observations (adjust field mapping based on your CSV structure):
--- \COPY observations(kk,o,jj,mm,tt,g,zs,zm,d,dd,n,c,cc,ee,h,f,v,ff,zz,gg,pillar,sectors,remarks) FROM '/home/ubuntu/halopy/observations.csv' WITH (FORMAT csv, DELIMITER ',', NULL '');
+-- Import observations with CORRECT field mapping (CSV columns → DB columns):
+-- CSV: KK,O,JJ,MM,TT,g,ZS,ZM,d,DD,N,C,c,EE,H,F,V,f,zz,GG,8HHHH,sectors,remarks
+-- DB:  kk,o,jj,mm,tt,g,zs,zm,d,dd,n,c,cc,ee,h,f,v,ff,zz,gg,pillar,sectors,remarks
+-- CRITICAL: CSV C→DB cc, CSV c→DB c, CSV F→DB f, CSV V→DB v, CSV f→DB ff
+\COPY observations(kk,o,jj,mm,tt,g,zs,zm,d,dd,n,cc,c,ee,h,f,v,ff,zz,gg,pillar,sectors,remarks) FROM '/home/ubuntu/halopy/data/1986-2025.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', NULL '');
 
 -- Note: For fields containing empty strings or special values:
 -- - Use sed/awk to convert empty fields to NULL in CSV before import

@@ -88,7 +88,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             const response = await fetch('/api/observations?limit=1');
             if (response.ok) {
                 const data = await response.json();
-                if (data.total > 0 && data.file) {
+                // Cloud Mode: Data always available from DB, no file check needed
+                // Local Mode: Check both data.total > 0 AND data.file exists
+                const hasData = data.total > 0 && (window.isCloudMode || data.file);
+                if (hasData) {
                     return true;
                 }
             }
@@ -96,8 +99,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.error('Error checking server data:', error);
         }
         
-        // No data loaded - show same warning as monthly_report
-        showWarningModal(i18nStrings.messages.no_data);
+        // No data loaded - show warning only in Local Mode
+        if (!window.isCloudMode) {
+            showWarningModal(i18nStrings.messages.no_data);
+        }
         return false;
     }
 
