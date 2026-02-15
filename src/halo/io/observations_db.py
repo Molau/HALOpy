@@ -202,9 +202,16 @@ def load_filtered(**filters) -> List[Observation]:
             params = []
             
             for field, value in filters.items():
-                # Use quoted identifiers for ALL HALO key fields (case-sensitive)
-                # Non-HALO fields (pillar, sectors, remarks) stay lowercase without quotes
-                db_field = f'"{field}"' if field not in ['pillar', 'sectors', 'remarks'] else field
+                # Normalize field name to match DB schema
+                # HALO key fields are uppercase in DB (except lowercase: g, d, c, f, zz)
+                # Non-HALO fields (pillar, sectors, remarks) stay lowercase
+                if field in ['pillar', 'sectors', 'remarks']:
+                    db_field = field  # No quotes for these
+                elif field in ['g', 'd', 'c', 'f', 'zz']:
+                    db_field = f'"{field}"'  # Keep lowercase with quotes
+                else:
+                    # All other HALO fields: uppercase with quotes
+                    db_field = f'"{field.upper()}"'
                 
                 if isinstance(value, tuple) and len(value) == 2:
                     # Range filter: (min, max)
