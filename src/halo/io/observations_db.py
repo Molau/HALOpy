@@ -972,6 +972,9 @@ def execute_single_param_analysis(params: dict) -> dict:
         # All other cases: parse sectors field
         from halo.models.constants import CIRCULAR_HALOS
         
+        logger.error(f"🔍 SE: where_sql = {where_sql}")
+        logger.error(f"🔍 SE: sql_params = {sql_params}")
+        
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 # Query for V=2 (complete) circular halos: count all 8 sectors
@@ -1008,9 +1011,9 @@ def execute_single_param_analysis(params: dict) -> dict:
                 query_other = f"""
                     SELECT 
                         LOWER(TRIM(octant)) as octant, 
-                        COUNT(DISTINCT o.ctid) as count
-                    FROM observations o
-                    CROSS JOIN LATERAL regexp_split_to_table(o.sectors, '[^a-hA-H]+') AS octant
+                        COUNT(*) as count
+                    FROM observations o, 
+                         LATERAL regexp_split_to_table(o.sectors, '[^a-hA-H]+') AS octant
                     WHERE {where_sql}
                         AND (o."V" != 2 OR o."EE" != ALL(%s))
                         AND TRIM(octant) != ''
