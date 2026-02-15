@@ -5091,8 +5091,14 @@ def get_observer_regions() -> Dict[str, Any]:
     # Get unique regions
     regions = set()
     for obs in observers:
-        regions.add(int(obs[6]))   # HbReg - Hauptbeobachtungsort Region
-        regions.add(int(obs[12]))  # NbReg - Nebenbeobachtungsort Region
+        if is_cloud_mode():
+            # Cloud mode: dictionary with named keys
+            regions.add(int(obs['primary_region']))
+            regions.add(int(obs['secondary_region']))
+        else:
+            # Local mode: list/tuple with numeric indices
+            regions.add(int(obs[6]))   # HbReg - Hauptbeobachtungsort Region
+            regions.add(int(obs[12]))  # NbReg - Nebenbeobachtungsort Region
     
     # Get region names from i18n (no fallbacks)
     i18n = g.i18n if hasattr(g, 'i18n') else get_i18n()
@@ -5389,13 +5395,49 @@ def get_observer_sites(kk):
         observers = current_app.config.get('OBSERVERS', [])
     
     # Find all entries for this observer
-    # Observers are lists: [KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS]
-    # Indices: 0=KK, 1=VName, 2=NName, 3=seit, 4=active, 5=H_Ort, 6=H_GG, 7=H_LaenGrad, 8=H_LaenMin, 
-    #          9=H_EW, 10=H_BreiGrad, 11=H_BreiMin, 12=H_NS, 13=N_Ort, 14=N_GG, 15=N_LaenGrad, 
-    #          16=N_LaenMin, 17=N_EW, 18=N_BreiGrad, 19=N_BreiMin, 20=N_NS
+    # Cloud mode: dict with keys (kk, first_name, last_name, since, active, primary_site, primary_region, ...)
+    # Local mode: list [KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS]
     sites = []
     for obs in observers:
-        if obs[0] == kk:  # obs[0] is KK
+        # Check KK match
+        obs_kk = str(obs['kk']).zfill(2) if is_cloud_mode() else obs[0]
+        if obs_kk != kk:
+            continue
+        
+        if is_cloud_mode():
+            # Cloud mode: dictionary with named keys
+            seit_str = obs['since']  # Format: 'MM/YY'
+            seit_parts = seit_str.split('/')
+            seit_month = int(seit_parts[0])
+            seit_year = int(seit_parts[1])
+            
+            sites.append({
+                'KK': str(obs['kk']).zfill(2),
+                'VName': obs['first_name'] or '',
+                'NName': obs['last_name'] or '',
+                'seit': seit_str,
+                'seit_month': seit_month,
+                'seit_year': seit_year,
+                'active': int(obs['active']),
+                'HbOrt': obs['primary_site'] or '',
+                'GH': obs['primary_region'],
+                'HLG': int(obs['primary_lon_deg']) if obs['primary_lon_deg'] else 0,
+                'HLM': int(obs['primary_lon_min']) if obs['primary_lon_min'] else 0,
+                'HOW': obs['primary_lon_dir'] or '',
+                'HBG': int(obs['primary_lat_deg']) if obs['primary_lat_deg'] else 0,
+                'HBM': int(obs['primary_lat_min']) if obs['primary_lat_min'] else 0,
+                'HNS': obs['primary_lat_dir'] or '',
+                'NbOrt': obs['secondary_site'] or '',
+                'GN': obs['secondary_region'],
+                'NLG': int(obs['secondary_lon_deg']) if obs['secondary_lon_deg'] else 0,
+                'NLM': int(obs['secondary_lon_min']) if obs['secondary_lon_min'] else 0,
+                'NOW': obs['secondary_lon_dir'] or '',
+                'NBG': int(obs['secondary_lat_deg']) if obs['secondary_lat_deg'] else 0,
+                'NBM': int(obs['secondary_lat_min']) if obs['secondary_lat_min'] else 0,
+                'NNS': obs['secondary_lat_dir'] or ''
+            })
+        else:
+            # Local mode: list with numeric indices
             # Parse seit to month/year
             seit_parts = obs[3].split('/')
             seit_month = int(seit_parts[0])
@@ -5481,17 +5523,26 @@ def check_observer_active(kk):
     # Find all site entries for this observer where seit <= check_date
     matching_records = []
     for obs in observers:
-        if obs[0] == kk:  # obs[0] is KK
-            # Parse seit (start date)
-            seit_parts = obs[3].split('/')
-            seit_month = int(seit_parts[0])
-            seit_year = int(seit_parts[1])
-            seit_year_4digit = jj_to_full_year(seit_year)
-            seit_date = seit_year_4digit * 100 + seit_month
-            
-            # Only consider records where seit <= check_date
-            if seit_date <= check_date:
-                matching_records.append((seit_date, obs))
+        # Check KK match
+        obs_kk = str(obs['kk']).zfill(2) if is_cloud_mode() else obs[0]
+        if obs_kk != kk:
+            continue
+        
+        # Parse seit (start date)
+        if is_cloud_mode():
+            seit_str = obs['since']  # Format: 'MM/YY'
+        else:
+            seit_str = obs[3]
+        
+        seit_parts = seit_str.split('/')
+        seit_month = int(seit_parts[0])
+        seit_year = int(seit_parts[1])
+        seit_year_4digit = jj_to_full_year(seit_year)
+        seit_date = seit_year_4digit * 100 + seit_month
+        
+        # Only consider records where seit <= check_date
+        if seit_date <= check_date:
+            matching_records.append((seit_date, obs))
 
     # No matching records found
     if not matching_records:
@@ -5502,7 +5553,10 @@ def check_observer_active(kk):
     latest_record = matching_records[0][1]
 
     # Check if that record is active (aktiv=1)
-    is_active = int(latest_record[4]) == 1
+    if is_cloud_mode():
+        is_active = int(latest_record['active']) == 1
+    else:
+        is_active = int(latest_record[4]) == 1
 
     return jsonify({'active': is_active})
 
