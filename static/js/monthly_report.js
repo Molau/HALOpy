@@ -778,13 +778,16 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Initialize
     async function initialize() {
-        // Check if data is already loaded on the server (same as observations.js)
+        // Check if data is available (Cloud Mode: always available from DB, Local Mode: check if file loaded)
         try {
             const response = await fetch('/api/observations?limit=1');
             if (response.ok) {
                 const data = await response.json();
-                if (data.total > 0 && data.file) {
-                    // Data is loaded on server
+                // Cloud Mode: data.total > 0 is sufficient (no file in cloud mode)
+                // Local Mode: data.total > 0 && data.file (file must be loaded)
+                const hasData = data.total > 0 && (window.isCloudMode || data.file);
+                if (hasData) {
+                    // Data is available
                     
                     // Update UI text to populate dropdowns
                     updateUIText();
@@ -807,9 +810,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.error('Error checking server data:', error);
         }
         
-        // No data loaded
-        const msg = i18nStrings.messages.no_data;
-        showWarningModal(msg);
+        // No data loaded (only show warning in Local Mode)
+        if (!window.isCloudMode) {
+            const msg = i18nStrings.messages.no_data;
+            showWarningModal(msg);
+        }
     }
 
     initialize();
