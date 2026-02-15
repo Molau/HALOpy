@@ -34,6 +34,7 @@ from halo.io.csv_handler import ObservationCSV
 from halo.models.constants import (
     COMBINED_TO_INDIVIDUAL_HALOS,
     DEFAULT_OBSERVATION_LIMIT,
+    YEAR_CUTOFF,
     YEAR_MIN,
     YEAR_MAX,
     jj_to_full_year,
@@ -6094,8 +6095,8 @@ def analyze_observations() -> Dict[str, Any]:
                                 all_values = list(range(1, 32))
                         elif param1 == 'JJ':
                             # Year parameter - handle century boundary
-                            from_year = from_val if from_val >= 1900 else (from_val + 2000 if from_val < 50 else from_val + 1900)
-                            to_year = to_val if to_val >= 1900 else (to_val + 2000 if to_val < 50 else to_val + 1900)
+                            from_year = from_val if from_val >= 1900 else (from_val + 2000 if from_val < YEAR_CUTOFF else from_val + 1900)
+                            to_year = to_val if to_val >= 1900 else (to_val + 2000 if to_val < YEAR_CUTOFF else to_val + 1900)
                             if from_year > to_year:
                                 all_values = list(range(from_year, 2100)) + list(range(1900, to_year + 1))
                             else:

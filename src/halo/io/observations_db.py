@@ -849,8 +849,20 @@ def execute_single_param_analysis(params: dict) -> dict:
         # Get altitude type (min, mean, max)
         sh_type = params.get('sh_type', 'mean')
         
+        # Get range limits if specified
+        from_alt = params.get('param1_from')
+        to_alt = params.get('param1_to')
+        
         with get_connection() as conn:
             with conn.cursor() as cursor:
+                # Build query with optional HAVING clause for range filter
+                having_clause = ""
+                having_params = []
+                
+                if from_alt is not None and to_alt is not None:
+                    having_clause = "HAVING altitude BETWEEN %s AND %s"
+                    having_params = [int(from_alt), int(to_alt)]
+                
                 query = f"""
                     SELECT 
                         calculate_solar_altitude(
@@ -873,10 +885,11 @@ def execute_single_param_analysis(params: dict) -> dict:
                         AND o."O" = 1  -- Sun observations only
                         AND o."g" != 1  -- Not generalized observations
                     GROUP BY altitude
+                    {having_clause}
                     ORDER BY altitude
                 """
                 
-                cursor.execute(query, [sh_type] + sql_params)
+                cursor.execute(query, [sh_type] + sql_params + having_params)
                 rows = cursor.fetchall()
                 
                 result = {}
