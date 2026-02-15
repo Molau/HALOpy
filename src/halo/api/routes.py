@@ -5297,10 +5297,10 @@ def update_observer(kk: str) -> Dict[str, Any]:
                 'success': True,
                 'observer': {
                     'KK': kk,
-                    'VName': first_updated[3] if first_updated else '',
-                    'NName': first_updated[4] if first_updated else '',
-                    'seit': first_updated[2] if first_updated else '',
-                    'active': int(first_updated[1]) if first_updated else 0
+                    'VName': first_updated['VName'] if first_updated else '',
+                    'NName': first_updated['NName'] if first_updated else '',
+                    'seit': first_updated['seit'] if first_updated else '',
+                    'active': int(first_updated['aktiv']) if first_updated else 0
                 }
             })
         else:
