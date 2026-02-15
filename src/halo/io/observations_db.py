@@ -832,7 +832,6 @@ def execute_single_param_analysis(params: dict) -> dict:
         >>> # result = {1: 45, 2: 38, 3: 52, ...}
     """
     param1 = params.get('param1')
-    logger.error(f"🔍 execute_single_param_analysis() called with param1={param1}")
     if not param1:
         return {}
     
@@ -968,29 +967,89 @@ def execute_single_param_analysis(params: dict) -> dict:
     
     # Special handling for SE (sectors) - extract octant letters
     if param1 == 'SE':
-        logger.error(f"🔍 SE special handling triggered!")
         # Parse sectors string and count each octant letter (a-h)
-        # Split at any non-letter character (-, space, etc.) to handle formats like "a-b-c e-f"
+        # V=2 (complete halo) + circular halo type (EE): all 8 sectors a-h visible
+        # All other cases: parse sectors field
+        from halo.models.constants import CIRCULAR_HALOS
+        
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                query = f"""
+                # Query for V=2 (complete) circular halos: count all 8 sectors
+                query_complete = f"""
+                    SELECT octant, COUNT(*) as count FROM (
+                        SELECT 'a' as octant FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'b' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'c' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'd' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'e' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'f' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'g' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'h' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                    ) complete_sectors
+                    GROUP BY octant
+                """
+                
+                # Query for all other halos: parse sectors field
+                query_other = f"""
                     SELECT 
                         LOWER(TRIM(octant)) as octant, 
                         COUNT(DISTINCT o.ctid) as count
                     FROM observations o
                     CROSS JOIN LATERAL regexp_split_to_table(o.sectors, '[^a-hA-H]+') AS octant
                     WHERE {where_sql}
+                        AND (o."V" != 2 OR o."EE" != ALL(%s))
                         AND TRIM(octant) != ''
                         AND LOWER(TRIM(octant)) ~ '^[a-h]$'
                     GROUP BY LOWER(TRIM(octant))
-                    ORDER BY octant
                 """
                 
-                logger.info(f"🔍 SE Query SQL:\n{query}")
-                logger.info(f"🔍 SE Query Params: {sql_params}")
+                # Execute both queries
+                circular_halos_list = list(CIRCULAR_HALOS)
                 
-                cursor.execute(query, sql_params)
-                rows = cursor.fetchall()
+                # Complete halos: 8 copies of sql_params + circular_halos_list
+                complete_params = []
+                for _ in range(8):
+                    complete_params.extend(sql_params)
+                    complete_params.append(circular_halos_list)
+                
+                cursor.execute(query_complete, complete_params)
+                rows_complete = cursor.fetchall()
+                
+                # Other halos
+                other_params = sql_params + [circular_halos_list]
+                cursor.execute(query_other, other_params)
+                rows_other = cursor.fetchall()
+                
+                # Combine results
+                result = {}
+                for row in rows_complete:
+                    octant = row[0]
+                    count = row[1]
+                    if octant and count > 0:
+                        result[octant] = result.get(octant, 0) + count
+                
+                for row in rows_other:
+                    octant = row[0]
+                    count = row[1]
+                    if octant and count > 0:
+                        result[octant] = result.get(octant, 0) + count
+                
+                return result
                 
                 # Convert to dict {octant: count}
                 result = {}
