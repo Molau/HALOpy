@@ -202,8 +202,9 @@ def load_filtered(**filters) -> List[Observation]:
             params = []
             
             for field, value in filters.items():
-                # Use quoted identifiers for case-sensitive field names
-                db_field = f'"{field}"' if field.upper() == field or field in ['g', 'c', 'd', 'f', 'zz'] else field
+                # Use quoted identifiers for ALL HALO key fields (case-sensitive)
+                # Non-HALO fields (pillar, sectors, remarks) stay lowercase without quotes
+                db_field = f'"{field}"' if field not in ['pillar', 'sectors', 'remarks'] else field
                 
                 if isinstance(value, tuple) and len(value) == 2:
                     # Range filter: (min, max)
