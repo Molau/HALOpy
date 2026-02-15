@@ -977,40 +977,28 @@ def execute_single_param_analysis(params: dict) -> dict:
         
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                # Query for V=2 (complete) circular halos: count all 8 sectors
+                circular_halos_list = list(CIRCULAR_HALOS)
+                
+                # Query 1: V=2 + circular halos with EMPTY sectors = all 8 sectors visible
                 query_complete = f"""
-                    SELECT octant, COUNT(*) as count FROM (
-                        SELECT 'a' as octant FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                        UNION ALL
-                        SELECT 'b' FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                        UNION ALL
-                        SELECT 'c' FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                        UNION ALL
-                        SELECT 'd' FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                        UNION ALL
-                        SELECT 'e' FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                        UNION ALL
-                        SELECT 'f' FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                        UNION ALL
-                        SELECT 'g' FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                        UNION ALL
-                        SELECT 'h' FROM observations o
-                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
-                    ) complete_sectors
-                    GROUP BY octant
+                    SELECT COUNT(*) 
+                    FROM observations o
+                    WHERE {where_sql} 
+                      AND o."V" = 2 
+                      AND o."EE" = ANY(%s)
+                      AND (o.sectors IS NULL OR o.sectors = '' OR TRIM(o.sectors) = '')
                 """
+                complete_params = sql_params + [circular_halos_list]
                 
                 logger.error(f"🔍 SE COMPLETE QUERY:\n{query_complete}")
                 logger.error(f"🔍 SE COMPLETE PARAMS: {complete_params}")
                 
-                # Query for all other halos: parse sectors field
+                cursor.execute(query_complete, complete_params)
+                complete_count = cursor.fetchone()[0]
+                
+                logger.error(f"🔍 SE complete count: {complete_count}")
+                
+                # Query 2: All other halos (including V=2 with explicit sectors): parse sectors field
                 query_other = f"""
                     SELECT 
                         LOWER(TRIM(octant)) as octant, 
@@ -1018,31 +1006,15 @@ def execute_single_param_analysis(params: dict) -> dict:
                     FROM observations o, 
                          LATERAL regexp_split_to_table(o.sectors, '[^a-hA-H]+') AS octant
                     WHERE {where_sql}
-                        AND (o."V" != 2 OR o."EE" != ALL(%s))
                         AND TRIM(octant) != ''
                         AND LOWER(TRIM(octant)) ~ '^[a-h]$'
                     GROUP BY LOWER(TRIM(octant))
                 """
+                other_params = sql_params
                 
                 logger.error(f"🔍 SE OTHER QUERY:\n{query_other}")
+                logger.error(f"🔍 SE OTHER PARAMS: {other_params}")
                 
-                # Execute both queries
-                circular_halos_list = list(CIRCULAR_HALOS)
-                
-                # Complete halos: 8 copies of sql_params + circular_halos_list
-                complete_params = []
-                for _ in range(8):
-                    complete_params.extend(sql_params)
-                    complete_params.append(circular_halos_list)
-                
-                cursor.execute(query_complete, complete_params)
-                rows_complete = cursor.fetchall()
-                
-                logger.error(f"🔍 SE complete query executed, rows: {len(rows_complete)}")
-                logger.error(f"🔍 SE complete results: {rows_complete}")
-                
-                # Other halos
-                other_params = sql_params + [circular_halos_list]
                 cursor.execute(query_other, other_params)
                 rows_other = cursor.fetchall()
                 
@@ -1051,12 +1023,12 @@ def execute_single_param_analysis(params: dict) -> dict:
                 
                 # Combine results
                 result = {}
-                for row in rows_complete:
-                    octant = row[0]
-                    count = row[1]
-                    if octant and count > 0:
-                        result[octant] = result.get(octant, 0) + count
                 
+                # All 8 sectors get the complete count
+                for octant in 'abcdefgh':
+                    result[octant] = complete_count
+                
+                # Add explicit sector counts
                 for row in rows_other:
                     octant = row[0]
                     count = row[1]
