@@ -1001,12 +1001,13 @@ def execute_single_param_analysis(params: dict) -> dict:
                 """
                 
                 # Query for V=1 (incomplete) halos: parse sectors field
+                # Split at any non-letter character (-, space, etc.) to handle formats like "a-b-c e-f"
                 query_incomplete = f"""
                     SELECT 
                         LOWER(TRIM(octant)) as octant, 
                         COUNT(DISTINCT o.ctid) as count
                     FROM observations o
-                    CROSS JOIN LATERAL regexp_split_to_table(o.sectors, '-') AS octant
+                    CROSS JOIN LATERAL regexp_split_to_table(o.sectors, '[^a-hA-H]+') AS octant
                     WHERE {where_sql}
                         AND (o."V" != 2 OR o."EE" != ALL(%s))
                         AND TRIM(octant) != ''
