@@ -6026,8 +6026,39 @@ def analyze_observations() -> Dict[str, Any]:
             if not param2:
                 # Single parameter analysis
                 data_dict = obs_db.execute_single_param_analysis(params)
-                # Convert dict {value: count} to array [{key: value, count: count}]
-                data = [{"key": str(k), "count": v} for k, v in data_dict.items()]
+                
+                # Fill in missing values in range with count=0 (same as Local Mode)
+                from_val = params.get('param1_from')
+                to_val = params.get('param1_to')
+                if from_val is not None and to_val is not None:
+                    try:
+                        from_val = int(from_val)
+                        to_val = int(to_val)
+                        
+                        # Generate all values in range
+                        if param1 == 'JJ':
+                            # Year parameter - handle century boundary
+                            from_year = from_val if from_val >= 1900 else (from_val + 2000 if from_val < 50 else from_val + 1900)
+                            to_year = to_val if to_val >= 1900 else (to_val + 2000 if to_val < 50 else to_val + 1900)
+                            
+                            if from_year > to_year:
+                                # Century boundary: e.g., 1980-2025
+                                all_values = list(range(from_year, 2100)) + list(range(1900, to_year + 1))
+                            else:
+                                all_values = list(range(from_year, to_year + 1))
+                        else:
+                            # Regular numeric range
+                            all_values = list(range(from_val, to_val + 1))
+                        
+                        # Add missing values with count=0
+                        for val in all_values:
+                            if val not in data_dict:
+                                data_dict[val] = 0
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Convert dict {value: count} to array [{key: value, count: count}], sorted
+                data = [{"key": str(k), "count": v} for k, v in sorted(data_dict.items())]
                 total = sum(data_dict.values())
             else:
                 # Two parameter analysis (cross-tabulation)
