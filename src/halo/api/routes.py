@@ -5058,15 +5058,21 @@ def get_observer_regions() -> Dict[str, Any]:
     
     # Get observers based on deployment mode
     if is_cloud_mode():
-        observers = observer_db.load_filtered()  # All observer records
+        observers = observer_db.load_filtered()  # All observer records (returns dicts)
     else:
-        observers = current_app.config.get('OBSERVERS', [])
+        observers = current_app.config.get('OBSERVERS', [])  # Returns lists
     
-    # Get unique regions (both modes use same format now: dict with 'GH'/'GN' keys)
+    # Get unique regions
     regions = set()
     for obs in observers:
-        regions.add(int(obs['GH']))   # HbReg - Hauptbeobachtungsort Region
-        regions.add(int(obs['GN']))   # NbReg - Nebenbeobachtungsort Region
+        if is_cloud_mode():
+            # Cloud mode: dict with CSV-format keys
+            regions.add(int(obs['GH']))   # HbReg - Hauptbeobachtungsort Region
+            regions.add(int(obs['GN']))   # NbReg - Nebenbeobachtungsort Region
+        else:
+            # Local mode: list with numeric indices
+            regions.add(int(obs[6]))   # HbReg - Hauptbeobachtungsort Region
+            regions.add(int(obs[12]))  # NbReg - Nebenbeobachtungsort Region
     
     # Get region names from i18n (no fallbacks)
     i18n = g.i18n if hasattr(g, 'i18n') else get_i18n()
@@ -5363,43 +5369,76 @@ def get_observer_sites(kk):
         observers = current_app.config.get('OBSERVERS', [])
     
     # Find all entries for this observer
-    # Both modes use CSV-compatible format: dict with keys KK, VName, NName, seit, aktiv, HbOrt, GH, etc.
     sites = []
     for obs in observers:
-        # Check KK match
-        if obs['KK'] != kk:
-            continue
-        
-        # Parse seit to month/year
-        seit_parts = obs['seit'].split('/')
-        seit_month = int(seit_parts[0])
-        seit_year = int(seit_parts[1])
-        
-        sites.append({
-            'KK': obs['KK'],
-            'VName': obs['VName'],
-            'NName': obs['NName'],
-            'seit': obs['seit'],
-            'seit_month': seit_month,
-            'seit_year': seit_year,
-            'active': int(obs['aktiv']),
-            'HbOrt': obs['HbOrt'],
-            'GH': obs['GH'],
-            'HLG': int(obs['HLG']) if obs['HLG'] else 0,
-            'HLM': int(obs['HLM']) if obs['HLM'] else 0,
-            'HOW': obs['HOW'],
-            'HBG': int(obs['HBG']) if obs['HBG'] else 0,
-            'HBM': int(obs['HBM']) if obs['HBM'] else 0,
-            'HNS': obs['HNS'],
-            'NbOrt': obs['NbOrt'],
-            'GN': obs['GN'],
-            'NLG': int(obs['NLG']) if obs['NLG'] else 0,
-            'NLM': int(obs['NLM']) if obs['NLM'] else 0,
-            'NOW': obs['NOW'],
-            'NBG': int(obs['NBG']) if obs['NBG'] else 0,
-            'NBM': int(obs['NBM']) if obs['NBM'] else 0,
-            'NNS': obs['NNS']
-        })
+        if is_cloud_mode():
+            # Cloud mode: dict with CSV-format keys
+            if obs['KK'] != kk:
+                continue
+            
+            seit_parts = obs['seit'].split('/')
+            seit_month = int(seit_parts[0])
+            seit_year = int(seit_parts[1])
+            
+            sites.append({
+                'KK': obs['KK'],
+                'VName': obs['VName'],
+                'NName': obs['NName'],
+                'seit': obs['seit'],
+                'seit_month': seit_month,
+                'seit_year': seit_year,
+                'active': int(obs['aktiv']),
+                'HbOrt': obs['HbOrt'],
+                'GH': obs['GH'],
+                'HLG': int(obs['HLG']) if obs['HLG'] else 0,
+                'HLM': int(obs['HLM']) if obs['HLM'] else 0,
+                'HOW': obs['HOW'],
+                'HBG': int(obs['HBG']) if obs['HBG'] else 0,
+                'HBM': int(obs['HBM']) if obs['HBM'] else 0,
+                'HNS': obs['HNS'],
+                'NbOrt': obs['NbOrt'],
+                'GN': obs['GN'],
+                'NLG': int(obs['NLG']) if obs['NLG'] else 0,
+                'NLM': int(obs['NLM']) if obs['NLM'] else 0,
+                'NOW': obs['NOW'],
+                'NBG': int(obs['NBG']) if obs['NBG'] else 0,
+                'NBM': int(obs['NBM']) if obs['NBM'] else 0,
+                'NNS': obs['NNS']
+            })
+        else:
+            # Local mode: list with numeric indices
+            if obs[0] != kk:
+                continue
+            
+            seit_parts = obs[3].split('/')
+            seit_month = int(seit_parts[0])
+            seit_year = int(seit_parts[1])
+            
+            sites.append({
+                'KK': obs[0],
+                'VName': obs[1],
+                'NName': obs[2],
+                'seit': obs[3],
+                'seit_month': seit_month,
+                'seit_year': seit_year,
+                'active': int(obs[4]),
+                'HbOrt': obs[5],
+                'GH': obs[6],
+                'HLG': int(obs[7]) if obs[7] else 0,
+                'HLM': int(obs[8]) if obs[8] else 0,
+                'HOW': obs[9],
+                'HBG': int(obs[10]) if obs[10] else 0,
+                'HBM': int(obs[11]) if obs[11] else 0,
+                'HNS': obs[12],
+                'NbOrt': obs[13],
+                'GN': obs[14],
+                'NLG': int(obs[15]) if obs[15] else 0,
+                'NLM': int(obs[16]) if obs[16] else 0,
+                'NOW': obs[17],
+                'NBG': int(obs[18]) if obs[18] else 0,
+                'NBM': int(obs[19]) if obs[19] else 0,
+                'NNS': obs[20]
+            })
     
     if not sites:
         return jsonify({'error': 'Observer not found'}), 404
@@ -5455,12 +5494,18 @@ def check_observer_active(kk):
     # Find all site entries for this observer where seit <= check_date
     matching_records = []
     for obs in observers:
-        # Check KK match (both modes use CSV format now)
-        if obs['KK'] != kk:
-            continue
+        if is_cloud_mode():
+            # Cloud mode: dict with CSV-format keys
+            if obs['KK'] != kk:
+                continue
+            seit_str = obs['seit']
+        else:
+            # Local mode: list with numeric indices
+            if obs[0] != kk:
+                continue
+            seit_str = obs[3]
         
         # Parse seit (start date)
-        seit_str = obs['seit']
         seit_parts = seit_str.split('/')
         seit_month = int(seit_parts[0])
         seit_year = int(seit_parts[1])
@@ -5479,8 +5524,11 @@ def check_observer_active(kk):
     matching_records.sort(key=lambda x: x[0], reverse=True)
     latest_record = matching_records[0][1]
 
-    # Check if that record is active (aktiv=1, both modes use 0/1 now)
-    is_active = int(latest_record['aktiv']) == 1
+    # Check if that record is active (aktiv=1)
+    if is_cloud_mode():
+        is_active = int(latest_record['aktiv']) == 1
+    else:
+        is_active = int(latest_record[4]) == 1
 
     return jsonify({'active': is_active})
 
