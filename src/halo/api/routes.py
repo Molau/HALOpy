@@ -6025,19 +6025,15 @@ def analyze_observations() -> Dict[str, Any]:
             
             if not param2:
                 # Single parameter analysis
-                data = obs_db.execute_single_param_analysis(params)
+                data_dict = obs_db.execute_single_param_analysis(params)
+                # Convert dict {value: count} to array [{key: value, count: count}]
+                data = [{"key": str(k), "count": v} for k, v in data_dict.items()]
+                total = sum(data_dict.values())
             else:
                 # Two parameter analysis (cross-tabulation)
                 data = obs_db.execute_two_param_analysis(params)
-            
-            # Calculate total from data (sum of all counts)
-            if isinstance(data, dict):
-                if not param2:
-                    total = sum(data.values())
-                else:
-                    total = sum(sum(inner.values()) for inner in data.values())
-            else:
-                total = 0
+                # Data is nested dict - keep as is for cross-tabulation
+                total = sum(sum(inner.values()) for inner in data.values())
             
             debug_info = None  # DB analysis doesn't provide debug info yet
             
