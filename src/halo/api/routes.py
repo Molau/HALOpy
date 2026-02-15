@@ -5176,9 +5176,14 @@ def add_observer() -> Dict[str, Any]:
     
     # Add observer using io module
     try:
+        print(f"🔍 DEBUG add_observer: Cloud mode={is_cloud_mode()}, KK={kk}, seit={seit_str}")
+        print(f"🔍 DEBUG add_observer: new_row={new_row}")
+        
         if is_cloud_mode():
             # Cloud Mode: Direct SQL INSERT
+            print(f"🔍 DEBUG add_observer: Calling observer_db.save_one()")
             success = observer_db.save_one(new_row)
+            print(f"🔍 DEBUG add_observer: save_one returned success={success}")
             if not success:
                 return jsonify({'error': 'observer_site_exists', 'kk': kk, 'seit': seit_str}), 400
         else:
@@ -5197,6 +5202,11 @@ def add_observer() -> Dict[str, Any]:
             }
         })
     except Exception as e:
+        import traceback
+        print(f"🔍 DEBUG add_observer: Exception occurred!")
+        print(f"🔍 DEBUG add_observer: Error: {str(e)}")
+        print(f"🔍 DEBUG add_observer: Traceback:")
+        traceback.print_exc()
         return jsonify({'error': 'observer_save_failed', 'details': str(e)}), 500
 
 
