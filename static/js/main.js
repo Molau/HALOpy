@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (configResponse.ok) {
             const config = await configResponse.json();
             isCloudMode = config.cloud_mode; // Initialize global variable
+            window.isCloudMode = config.cloud_mode; // Make available to other scripts
             window.haloConfig.cloud_mode = config.cloud_mode;
         }
     } catch (e) {

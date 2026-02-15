@@ -73,17 +73,22 @@
             right: 10px;
         }
         
-        /* Enhanced native password toggle visibility */
+        /* Password field with proper spacing for native toggle */
         #password {
-            /* Ensure native browser password toggle is visible */
-            padding-right: 3rem !important;
+            padding-right: 2.5rem;
         }
         
-        /* Force display of native browser password toggle */
-        #password::-ms-reveal,
+        /* Ensure native browser password toggle is visible and positioned correctly */
+        #password::-ms-reveal {
+            display: block;
+            position: absolute;
+            right: 0.75rem;
+        }
+        
         #password::-webkit-credentials-auto-fill-button {
-            display: block !important;
-            opacity: 1 !important;
+            display: block;
+            position: absolute;
+            right: 0.75rem;
         }
     </style>
 </head>
