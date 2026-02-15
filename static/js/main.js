@@ -6558,7 +6558,7 @@ function showErrorDialog(message, onClose = null) {
                         <p>${message}</p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="${modalId}-ok">${i18nStrings.common.ok}</button>
                     </div>
                 </div>
             </div>
@@ -6568,6 +6568,16 @@ function showErrorDialog(message, onClose = null) {
     const modalEl = document.getElementById(modalId);
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
+    
+    // Track if OK button was clicked
+    let okClicked = false;
+    
+    // OK button handler
+    const okButton = document.getElementById(`${modalId}-ok`);
+    okButton.addEventListener('click', () => {
+        okClicked = true;
+        modal.hide();
+    });
     
     modalEl.addEventListener('hidden.bs.modal', () => {
         // Clean up modal element
@@ -6588,7 +6598,8 @@ function showErrorDialog(message, onClose = null) {
             }
         }, 100);
         
-        if (onClose) {
+        // Only call onClose if OK button was clicked, not on ESC/Close
+        if (onClose && okClicked) {
             onClose();
         }
     });

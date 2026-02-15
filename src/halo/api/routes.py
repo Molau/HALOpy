@@ -5144,7 +5144,8 @@ def add_observer() -> Dict[str, Any]:
     
     # Check if this KK already exists (any observer with this KK)
     for obs in observers:
-        if obs[0] == kk:
+        obs_kk = obs['KK'] if is_cloud_mode() else obs[0]  # Cloud: dict, Local: list
+        if obs_kk == kk:
             return jsonify({'error': 'observer_code_exists', 'kk': kk}), 400
     
     # Build the CSV row
@@ -5560,7 +5561,8 @@ def add_observer_site(kk):
     # Find an existing entry for this observer to get VName/NName
     existing = None
     for obs in observers:
-        if obs[0] == kk:  # obs[0] is KK
+        obs_kk = obs['KK'] if is_cloud_mode() else obs[0]
+        if obs_kk == kk:
             existing = obs
             break
     
@@ -5569,15 +5571,17 @@ def add_observer_site(kk):
     
     # Check if entry with this seit already exists
     for obs in observers:
-        if obs[0] == kk and obs[3] == seit:  # obs[0]=KK, obs[3]=seit
+        obs_kk = obs['KK'] if is_cloud_mode() else obs[0]
+        obs_seit = obs['seit'] if is_cloud_mode() else obs[3]
+        if obs_kk == kk and obs_seit == seit:
             return jsonify({'error': 'site_date_exists', 'kk': kk, 'seit': seit}), 400
     
     # Create new CSV row
     # Format: KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
     new_row = [
         kk,                                      # 0: KK
-        existing[1],                             # 1: VName
-        existing[2],                             # 2: NName
+        existing['VName'] if is_cloud_mode() else existing[1],  # 1: VName
+        existing['NName'] if is_cloud_mode() else existing[2],  # 2: NName
         seit,                                    # 3: seit
         str(data['active']),                     # 4: active
         data['HbOrt'],                           # 5: HbOrt (H_Ort)
@@ -5668,7 +5672,7 @@ def update_observer_site(kk):
             # Cloud Mode: True SQL UPDATE (no delete+insert)
             matching_obs = None
             for obs in observers:
-                if obs[0] == kk and obs[3] == seit:
+                if obs['KK'] == kk and obs['seit'] == seit:
                     matching_obs = obs
                     entry_found = True
                     break
@@ -5682,8 +5686,8 @@ def update_observer_site(kk):
             # Build complete updated row (21 fields)
             updated_row = [
                 kk,
-                data.get('VName', matching_obs[1]),
-                data.get('NName', matching_obs[2]),
+                data.get('VName', matching_obs['VName']),
+                data.get('NName', matching_obs['NName']),
                 new_seit,
                 str(data.get('active', 1)),
                 data.get('HbOrt', ''),
@@ -5787,7 +5791,10 @@ def delete_observer_site(kk):
         observers = current_app.config.get('OBSERVERS', [])
     
     # Count how many entries exist for this observer
-    observer_entries = [obs for obs in observers if obs[0] == kk]
+    if is_cloud_mode():
+        observer_entries = [obs for obs in observers if obs['KK'] == kk]
+    else:
+        observer_entries = [obs for obs in observers if obs[0] == kk]
     
     if len(observer_entries) <= 1:
         return jsonify({'error': 'cannot_delete_last_site', 'kk': kk}), 400
@@ -5844,7 +5851,10 @@ def delete_observer():
         observers = current_app.config.get('OBSERVERS', [])
     
     # Find all entries for this observer
-    observer_entries = [obs for obs in observers if obs[0] == kk]
+    if is_cloud_mode():
+        observer_entries = [obs for obs in observers if obs['KK'] == kk]
+    else:
+        observer_entries = [obs for obs in observers if obs[0] == kk]
     
     if not observer_entries:
         return jsonify({'error': 'observer_not_found', 'kk': kk}), 404
@@ -5855,7 +5865,7 @@ def delete_observer():
             # Cloud Mode: Delete all entries for this KK
             deleted_count = 0
             for obs in observer_entries:
-                seit = obs[3]  # obs[3] = seit
+                seit = obs['seit']  # Cloud mode uses dict keys
                 success = observer_db.delete_one(kk, seit)
                 if success:
                     deleted_count += 1
