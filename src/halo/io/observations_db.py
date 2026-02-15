@@ -862,10 +862,8 @@ def execute_single_param_analysis(params: dict) -> dict:
                         COUNT(*) as count
                     FROM observations o
                     JOIN observers obs ON o."KK" = obs.kk
-                        AND o."JJ" >= EXTRACT(YEAR FROM obs.since) - 
-                            CASE WHEN EXTRACT(YEAR FROM obs.since) >= 2000 THEN 2000 ELSE 1900 END
-                        AND (obs.until IS NULL OR o."JJ" <= EXTRACT(YEAR FROM obs.until) - 
-                            CASE WHEN EXTRACT(YEAR FROM obs.until) >= 2000 THEN 2000 ELSE 1900 END)
+                        AND o."JJ" >= CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER)
+                        AND (obs.until IS NULL OR o."JJ" <= CAST(SUBSTRING(obs.until FROM 4 FOR 2) AS INTEGER))
                     WHERE {where_sql}
                         AND o."O" = 1  -- Sun observations only
                         AND o."g" != 1  -- Not generalized observations
