@@ -1033,10 +1033,16 @@ def execute_single_param_analysis(params: dict) -> dict:
                 cursor.execute(query_complete, complete_params)
                 rows_complete = cursor.fetchall()
                 
+                logger.error(f"🔍 SE complete query executed, rows: {len(rows_complete)}")
+                logger.error(f"🔍 SE complete results: {rows_complete}")
+                
                 # Other halos
                 other_params = sql_params + [circular_halos_list]
                 cursor.execute(query_other, other_params)
                 rows_other = cursor.fetchall()
+                
+                logger.error(f"🔍 SE other query executed, rows: {len(rows_other)}")
+                logger.error(f"🔍 SE other results: {rows_other}")
                 
                 # Combine results
                 result = {}
