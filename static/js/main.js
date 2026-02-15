@@ -9233,7 +9233,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     document.getElementById('confirm-edit-site-seit-year').value = fullYear;
     document.getElementById('confirm-edit-site-active').value = site.active;
     document.getElementById('confirm-edit-site-hb-ort').value = site.HbOrt;
-    document.getElementById('confirm-edit-site-gh').value = site.GH.padStart(2, '0');
+    document.getElementById('confirm-edit-site-gh').value = String(site.GH).padStart(2, '0');
     document.getElementById('confirm-edit-site-hlg').value = site.HLG;
     document.getElementById('confirm-edit-site-hlm').value = site.HLM;
     document.getElementById('confirm-edit-site-how').value = site.HOW;
@@ -9241,7 +9241,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     document.getElementById('confirm-edit-site-hbm').value = site.HBM;
     document.getElementById('confirm-edit-site-hns').value = site.HNS;
     document.getElementById('confirm-edit-site-nb-ort').value = site.NbOrt;
-    document.getElementById('confirm-edit-site-gn').value = site.GN.padStart(2, '0');
+    document.getElementById('confirm-edit-site-gn').value = String(site.GN).padStart(2, '0');
     document.getElementById('confirm-edit-site-nlg').value = site.NLG;
     document.getElementById('confirm-edit-site-nlm').value = site.NLM;
     document.getElementById('confirm-edit-site-now').value = site.NOW;
