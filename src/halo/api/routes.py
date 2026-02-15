@@ -5072,7 +5072,7 @@ def get_observer_regions() -> Dict[str, Any]:
         else:
             # Local mode: list with numeric indices
             regions.add(int(obs[6]))   # HbReg - Hauptbeobachtungsort Region
-            regions.add(int(obs[12]))  # NbReg - Nebenbeobachtungsort Region
+            regions.add(int(obs[14]))  # NbReg - Nebenbeobachtungsort Region (GN)
     
     # Get region names from i18n (no fallbacks)
     i18n = g.i18n if hasattr(g, 'i18n') else get_i18n()
