@@ -986,7 +986,6 @@ def execute_single_param_analysis(params: dict) -> dict:
                     WHERE {where_sql} 
                       AND o."V" = 2 
                       AND o."EE" = ANY(%s)
-                      AND (o.sectors IS NULL OR o.sectors = '' OR TRIM(o.sectors) = '')
                 """
                 complete_params = sql_params + [circular_halos_list]
                 
@@ -998,7 +997,7 @@ def execute_single_param_analysis(params: dict) -> dict:
                 
                 logger.error(f"🔍 SE complete count: {complete_count}")
                 
-                # Query 2: All other halos (including V=2 with explicit sectors): parse sectors field
+                # Query 2: V=1 + circular halos: parse sectors field
                 query_other = f"""
                     SELECT 
                         LOWER(TRIM(octant)) as octant, 
@@ -1006,11 +1005,13 @@ def execute_single_param_analysis(params: dict) -> dict:
                     FROM observations o, 
                          LATERAL regexp_split_to_table(o.sectors, '[^a-hA-H]+') AS octant
                     WHERE {where_sql}
+                        AND o."V" = 1
+                        AND o."EE" = ANY(%s)
                         AND TRIM(octant) != ''
                         AND LOWER(TRIM(octant)) ~ '^[a-h]$'
                     GROUP BY LOWER(TRIM(octant))
                 """
-                other_params = sql_params
+                other_params = sql_params + [circular_halos_list]
                 
                 logger.error(f"🔍 SE OTHER QUERY:\n{query_other}")
                 logger.error(f"🔍 SE OTHER PARAMS: {other_params}")

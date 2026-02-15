@@ -7019,21 +7019,29 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         # Handle C (cirrus) splitting for param1
         if param1_name == 'SE':
             # Sectors: count octants present or visible
-            # V=2 (complete halo) + circular halo type: all segments a-h are visible
-            # V=1 (incomplete halo) OR non-circular: only explicitly listed segments are visible
+            # V=2 + circular halo type: all 8 segments a-h are visible
+            # V=1 + circular halo type: parse sectors field
+            # Non-circular halos: should NOT have sectors (would be error)
             v = getattr(obs, 'V', None)
             ee = getattr(obs, 'EE', None)
             
             # Check if this is a circular halo type
             is_circular = ee in CIRCULAR_HALOS if ee is not None else False
             
-            if v == 2 and is_circular:
-                # Complete circular halo: count all segments a-h
-                val1_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+            if is_circular:
+                if v == 2:
+                    # V=2 + circular: all 8 segments visible
+                    val1_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+                elif v == 1:
+                    # V=1 + circular: parse sectors field
+                    sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
+                    val1_list = sector_letters if sector_letters else []
+                else:
+                    # Other V values: skip
+                    val1_list = []
             else:
-                # Incomplete halo or non-circular: extract explicit sectors
-                sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
-                val1_list = sector_letters if sector_letters else []
+                # Non-circular halos: no sectors
+                val1_list = []
         elif param1_name == 'HO_HU':
             ho = getattr(obs, 'HO', None)
             hu = getattr(obs, 'HU', None)
@@ -7073,21 +7081,29 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         # Handle C (cirrus) splitting for param2
         if param2_name == 'SE':
             # Sectors: count octants present or visible
-            # V=2 (complete halo) + circular halo type: all segments a-h are visible
-            # V=1 (incomplete halo) OR non-circular: only explicitly listed segments are visible
+            # V=2 + circular halo type: all 8 segments a-h are visible
+            # V=1 + circular halo type: parse sectors field
+            # Non-circular halos: should NOT have sectors (would be error)
             v = getattr(obs, 'V', None)
             ee = getattr(obs, 'EE', None)
             
             # Check if this is a circular halo type
             is_circular = ee in CIRCULAR_HALOS if ee is not None else False
             
-            if v == 2 and is_circular:
-                # Complete circular halo: count all segments a-h
-                val2_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+            if is_circular:
+                if v == 2:
+                    # V=2 + circular: all 8 segments visible
+                    val2_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+                elif v == 1:
+                    # V=1 + circular: parse sectors field
+                    sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
+                    val2_list = sector_letters if sector_letters else []
+                else:
+                    # Other V values: skip
+                    val2_list = []
             else:
-                # Incomplete halo: extract explicit sectors
-                sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
-                val2_list = sector_letters if sector_letters else []
+                # Non-circular halos: no sectors
+                val2_list = []
         elif param2_name == 'HO_HU':
             ho = getattr(obs, 'HO', None)
             hu = getattr(obs, 'HU', None)
