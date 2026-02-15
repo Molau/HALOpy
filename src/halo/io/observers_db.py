@@ -21,6 +21,50 @@ from halo.io.db_connection import get_connection
 
 
 # ========================================
+# Format Conversion
+# ========================================
+
+def _db_to_csv_format(db_record: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert database record format to CSV-like format for compatibility.
+    
+    This ensures Cloud Mode uses same format as Local Mode (CSV):
+    - Convert boolean True/False to int 0/1
+    - Use same field names as CSV
+    - Convert None to empty string or 0
+    
+    Args:
+        db_record: Record from database (RealDictRow converted to dict)
+        
+    Returns:
+        Record in CSV-compatible format
+    """
+    return {
+        'KK': str(db_record['kk']).zfill(2),
+        'VName': db_record['first_name'] or '',
+        'NName': db_record['last_name'] or '',
+        'seit': db_record['since'],
+        'aktiv': 1 if db_record['active'] else 0,  # Convert bool to 0/1
+        'HbOrt': db_record['primary_site'] or '',
+        'GH': db_record['primary_region'],
+        'HLG': int(db_record['primary_lon_deg']) if db_record['primary_lon_deg'] else 0,
+        'HLM': int(db_record['primary_lon_min']) if db_record['primary_lon_min'] else 0,
+        'HOW': db_record['primary_lon_dir'] or '',
+        'HBG': int(db_record['primary_lat_deg']) if db_record['primary_lat_deg'] else 0,
+        'HBM': int(db_record['primary_lat_min']) if db_record['primary_lat_min'] else 0,
+        'HNS': db_record['primary_lat_dir'] or '',
+        'NbOrt': db_record['secondary_site'] or '',
+        'GN': db_record['secondary_region'],
+        'NLG': int(db_record['secondary_lon_deg']) if db_record['secondary_lon_deg'] else 0,
+        'NLM': int(db_record['secondary_lon_min']) if db_record['secondary_lon_min'] else 0,
+        'NOW': db_record['secondary_lon_dir'] or '',
+        'NBG': int(db_record['secondary_lat_deg']) if db_record['secondary_lat_deg'] else 0,
+        'NBM': int(db_record['secondary_lat_min']) if db_record['secondary_lat_min'] else 0,
+        'NNS': db_record['secondary_lat_dir'] or ''
+    }
+
+
+# ========================================
 # READ Operations
 # ========================================
 
@@ -29,7 +73,7 @@ def load_all() -> List[Dict[str, Any]]:
     Load all observer records from database, sorted by kk, since.
     
     Returns:
-        List of observer records (each record is a dict with column names as keys)
+        List of observer records in CSV-compatible format (same as Local Mode)
         
     Example:
         >>> records = load_all()
@@ -51,8 +95,8 @@ def load_all() -> List[Dict[str, Any]]:
             
             rows = cursor.fetchall()
             
-            # Convert RealDictRow to regular dict
-            return [dict(row) for row in rows]
+            # Convert to CSV-compatible format
+            return [_db_to_csv_format(dict(row)) for row in rows]
 
 
 def load_filtered(**filters) -> List[Dict[str, Any]]:
@@ -188,15 +232,15 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             
-            # Convert RealDictRow to regular dict
-            records = [dict(row) for row in rows]
+            # Convert to CSV-compatible format
+            records = [_db_to_csv_format(dict(row)) for row in rows]
             
             # Handle latest_only filter (done in Python for simplicity)
             if latest_only:
                 latest_records = {}
                 for record in records:
-                    kk = record['kk']
-                    since = record['since']
+                    kk = record['KK']  # Now using CSV format keys
+                    since = record['seit']
                     
                     # Parse seit (MM/YY) to compare dates
                     try:
@@ -213,8 +257,8 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
                             latest_records[kk] = (record, (0, 0))
                 
                 records = [rec_tuple[0] for rec_tuple in latest_records.values()]
-                # Re-sort by kk
-                records.sort(key=lambda x: x['kk'])
+                # Re-sort by KK (now using CSV format)
+                records.sort(key=lambda x: x['KK'])
             
             return records
 

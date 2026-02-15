@@ -4862,34 +4862,28 @@ def get_observers() -> Dict[str, Any]:
         # DB returns dicts with column names as keys
         result = []
         for obs in observers:
-            # Format coordinates as strings: "deg° min' dir"
-            primary_lon = f"{obs['primary_lon_deg']}° {obs['primary_lon_min']}' {obs['primary_lon_dir']}" if obs.get('primary_lon_deg') and obs.get('primary_lon_min') else ""
-            primary_lat = f"{obs['primary_lat_deg']}° {obs['primary_lat_min']}' {obs['primary_lat_dir']}" if obs.get('primary_lat_deg') and obs.get('primary_lat_min') else ""
-            secondary_lon = f"{obs['secondary_lon_deg']}° {obs['secondary_lon_min']}' {obs['secondary_lon_dir']}" if obs.get('secondary_lon_deg') and obs.get('secondary_lon_min') else ""
-            secondary_lat = f"{obs['secondary_lat_deg']}° {obs['secondary_lat_min']}' {obs['secondary_lat_dir']}" if obs.get('secondary_lat_deg') and obs.get('secondary_lat_min') else ""
-            
             result.append({
                 'KK': obs['kk'],
                 'VName': obs['first_name'],
                 'NName': obs['last_name'],
                 'seit': obs['since'],
-                'aktiv': obs['active'],
+                'aktiv': str(int(obs['active'])),  # Convert to '0' or '1' string for consistency with Local Mode
                 'HbOrt': obs['primary_site'],
-                'HbReg': obs['primary_region'],
-                'HbLon': primary_lon,
-                'HbLat': primary_lat,
-                'HbHoehe': '',             # Not in DB schema
+                'GH': obs['primary_region'],
+                'HLG': obs['primary_lon_deg'] or 0,
+                'HLM': obs['primary_lon_min'] or 0,
+                'HOW': obs['primary_lon_dir'] or '',
+                'HBG': obs['primary_lat_deg'] or 0,
+                'HBM': obs['primary_lat_min'] or 0,
+                'HNS': obs['primary_lat_dir'] or '',
                 'NbOrt': obs['secondary_site'],
-                'NbReg': obs['secondary_region'],
-                'NbLon': secondary_lon,
-                'NbLat': secondary_lat,
-                'NbHoehe': '',             # Not in DB schema
-                'GH': obs['primary_region'],  # same as HbReg
-                'Publ': '',                # Not in DB schema
-                'Institut': '',            # Not in DB schema
-                'Anschrift': '',           # Not in DB schema
-                'Email': '',               # Not in DB schema
-                'Telefon': ''              # Not in DB schema
+                'GN': obs['secondary_region'],
+                'NLG': obs['secondary_lon_deg'] or 0,
+                'NLM': obs['secondary_lon_min'] or 0,
+                'NOW': obs['secondary_lon_dir'] or '',
+                'NBG': obs['secondary_lat_deg'] or 0,
+                'NBM': obs['secondary_lat_min'] or 0,
+                'NNS': obs['secondary_lat_dir'] or ''
             })
         
         return jsonify({'observers': result})
@@ -5088,17 +5082,11 @@ def get_observer_regions() -> Dict[str, Any]:
     else:
         observers = current_app.config.get('OBSERVERS', [])
     
-    # Get unique regions
+    # Get unique regions (both modes use same format now: dict with 'GH'/'GN' keys)
     regions = set()
     for obs in observers:
-        if is_cloud_mode():
-            # Cloud mode: dictionary with named keys
-            regions.add(int(obs['primary_region']))
-            regions.add(int(obs['secondary_region']))
-        else:
-            # Local mode: list/tuple with numeric indices
-            regions.add(int(obs[6]))   # HbReg - Hauptbeobachtungsort Region
-            regions.add(int(obs[12]))  # NbReg - Nebenbeobachtungsort Region
+        regions.add(int(obs['GH']))   # HbReg - Hauptbeobachtungsort Region
+        regions.add(int(obs['GN']))   # NbReg - Nebenbeobachtungsort Region
     
     # Get region names from i18n (no fallbacks)
     i18n = g.i18n if hasattr(g, 'i18n') else get_i18n()
@@ -5395,79 +5383,43 @@ def get_observer_sites(kk):
         observers = current_app.config.get('OBSERVERS', [])
     
     # Find all entries for this observer
-    # Cloud mode: dict with keys (kk, first_name, last_name, since, active, primary_site, primary_region, ...)
-    # Local mode: list [KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS]
+    # Both modes use CSV-compatible format: dict with keys KK, VName, NName, seit, aktiv, HbOrt, GH, etc.
     sites = []
     for obs in observers:
         # Check KK match
-        obs_kk = str(obs['kk']).zfill(2) if is_cloud_mode() else obs[0]
-        if obs_kk != kk:
+        if obs['KK'] != kk:
             continue
         
-        if is_cloud_mode():
-            # Cloud mode: dictionary with named keys
-            seit_str = obs['since']  # Format: 'MM/YY'
-            seit_parts = seit_str.split('/')
-            seit_month = int(seit_parts[0])
-            seit_year = int(seit_parts[1])
-            
-            sites.append({
-                'KK': str(obs['kk']).zfill(2),
-                'VName': obs['first_name'] or '',
-                'NName': obs['last_name'] or '',
-                'seit': seit_str,
-                'seit_month': seit_month,
-                'seit_year': seit_year,
-                'active': int(obs['active']),
-                'HbOrt': obs['primary_site'] or '',
-                'GH': obs['primary_region'],
-                'HLG': int(obs['primary_lon_deg']) if obs['primary_lon_deg'] else 0,
-                'HLM': int(obs['primary_lon_min']) if obs['primary_lon_min'] else 0,
-                'HOW': obs['primary_lon_dir'] or '',
-                'HBG': int(obs['primary_lat_deg']) if obs['primary_lat_deg'] else 0,
-                'HBM': int(obs['primary_lat_min']) if obs['primary_lat_min'] else 0,
-                'HNS': obs['primary_lat_dir'] or '',
-                'NbOrt': obs['secondary_site'] or '',
-                'GN': obs['secondary_region'],
-                'NLG': int(obs['secondary_lon_deg']) if obs['secondary_lon_deg'] else 0,
-                'NLM': int(obs['secondary_lon_min']) if obs['secondary_lon_min'] else 0,
-                'NOW': obs['secondary_lon_dir'] or '',
-                'NBG': int(obs['secondary_lat_deg']) if obs['secondary_lat_deg'] else 0,
-                'NBM': int(obs['secondary_lat_min']) if obs['secondary_lat_min'] else 0,
-                'NNS': obs['secondary_lat_dir'] or ''
-            })
-        else:
-            # Local mode: list with numeric indices
-            # Parse seit to month/year
-            seit_parts = obs[3].split('/')
-            seit_month = int(seit_parts[0])
-            seit_year = int(seit_parts[1])
-            
-            sites.append({
-                'KK': obs[0],
-                'VName': obs[1],
-                'NName': obs[2],
-                'seit': obs[3],
-                'seit_month': seit_month,
-                'seit_year': seit_year,
-                'active': int(obs[4]),
-                'HbOrt': obs[5],
-                'GH': obs[6],
-                'HLG': int(obs[7]) if obs[7] else 0,
-                'HLM': int(obs[8]) if obs[8] else 0,
-                'HOW': obs[9],
-                'HBG': int(obs[10]) if obs[10] else 0,
-                'HBM': int(obs[11]) if obs[11] else 0,
-                'HNS': obs[12],
-                'NbOrt': obs[13],
-                'GN': obs[14],
-                'NLG': int(obs[15]) if obs[15] else 0,
-                'NLM': int(obs[16]) if obs[16] else 0,
-                'NOW': obs[17],
-                'NBG': int(obs[18]) if obs[18] else 0,
-                'NBM': int(obs[19]) if obs[19] else 0,
-                'NNS': obs[20]
-            })
+        # Parse seit to month/year
+        seit_parts = obs['seit'].split('/')
+        seit_month = int(seit_parts[0])
+        seit_year = int(seit_parts[1])
+        
+        sites.append({
+            'KK': obs['KK'],
+            'VName': obs['VName'],
+            'NName': obs['NName'],
+            'seit': obs['seit'],
+            'seit_month': seit_month,
+            'seit_year': seit_year,
+            'active': int(obs['aktiv']),
+            'HbOrt': obs['HbOrt'],
+            'GH': obs['GH'],
+            'HLG': int(obs['HLG']) if obs['HLG'] else 0,
+            'HLM': int(obs['HLM']) if obs['HLM'] else 0,
+            'HOW': obs['HOW'],
+            'HBG': int(obs['HBG']) if obs['HBG'] else 0,
+            'HBM': int(obs['HBM']) if obs['HBM'] else 0,
+            'HNS': obs['HNS'],
+            'NbOrt': obs['NbOrt'],
+            'GN': obs['GN'],
+            'NLG': int(obs['NLG']) if obs['NLG'] else 0,
+            'NLM': int(obs['NLM']) if obs['NLM'] else 0,
+            'NOW': obs['NOW'],
+            'NBG': int(obs['NBG']) if obs['NBG'] else 0,
+            'NBM': int(obs['NBM']) if obs['NBM'] else 0,
+            'NNS': obs['NNS']
+        })
     
     if not sites:
         return jsonify({'error': 'Observer not found'}), 404
@@ -5523,17 +5475,12 @@ def check_observer_active(kk):
     # Find all site entries for this observer where seit <= check_date
     matching_records = []
     for obs in observers:
-        # Check KK match
-        obs_kk = str(obs['kk']).zfill(2) if is_cloud_mode() else obs[0]
-        if obs_kk != kk:
+        # Check KK match (both modes use CSV format now)
+        if obs['KK'] != kk:
             continue
         
         # Parse seit (start date)
-        if is_cloud_mode():
-            seit_str = obs['since']  # Format: 'MM/YY'
-        else:
-            seit_str = obs[3]
-        
+        seit_str = obs['seit']
         seit_parts = seit_str.split('/')
         seit_month = int(seit_parts[0])
         seit_year = int(seit_parts[1])
@@ -5552,11 +5499,8 @@ def check_observer_active(kk):
     matching_records.sort(key=lambda x: x[0], reverse=True)
     latest_record = matching_records[0][1]
 
-    # Check if that record is active (aktiv=1)
-    if is_cloud_mode():
-        is_active = int(latest_record['active']) == 1
-    else:
-        is_active = int(latest_record[4]) == 1
+    # Check if that record is active (aktiv=1, both modes use 0/1 now)
+    is_active = int(latest_record['aktiv']) == 1
 
     return jsonify({'active': is_active})
 

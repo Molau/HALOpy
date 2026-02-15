@@ -277,7 +277,7 @@ function displayObservers() {
             <div class="modal-dialog modal-dialog-centered modal-xl">
                 <div class="modal-content">
                     <div class="modal-header py-1">
-                        <h6 class="modal-title mb-0">${(i18nStrings.observers.title)} (${filteredObservers.length} ${i18nStrings.common.no})</h6>
+                        <h6 class="modal-title mb-0">${(i18nStrings.observers.title)} (${filteredObservers.length})</h6>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body py-2" style="max-height: 70vh; overflow-y: auto;">

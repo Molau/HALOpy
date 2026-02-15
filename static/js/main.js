@@ -5385,7 +5385,6 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 const result = await response.json();
                 
                 // Build success message with details
-                // Format: "44 Beobachtungen hinzugefügt (25 Duplikate übersprungen)"
                 let message = `✓ ${result.count || 0} ${i18nStrings.common.observations} `;
                 message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;
                 if (result.duplicates && result.duplicates > 0) {
