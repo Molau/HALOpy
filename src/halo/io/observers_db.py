@@ -183,15 +183,43 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
             # Fields that use LIKE for partial matching
             like_fields = {'VName', 'NName', 'HbOrt', 'GH', 'NbOrt', 'GN'}
             
+            # Map API parameter names to DB column names
+            field_mapping = {
+                'kk': 'KK',
+                'vname': 'VName',
+                'nname': 'NName',
+                'seit': 'seit',
+                'aktiv': 'aktiv',
+                'hbort': 'HbOrt',
+                'gh': 'GH',
+                'hlg': 'HLG',
+                'hlm': 'HLM',
+                'how': 'HOW',
+                'hbg': 'HBG',
+                'hbm': 'HBM',
+                'hns': 'HNS',
+                'nbort': 'NbOrt',
+                'gn': 'GN',
+                'nlg': 'NLG',
+                'nlm': 'NLM',
+                'now': 'NOW',
+                'nbg': 'NBG',
+                'nbm': 'NBM',
+                'nns': 'NNS'
+            }
+            
             # Handle remaining standard filters
             for field, value in filters.items():
-                if field in like_fields:
+                # Map API parameter to DB column name
+                db_field = field_mapping.get(field, field)
+                
+                if db_field in like_fields:
                     # Partial match with LIKE
-                    where_clauses.append(f'"{field}" LIKE %s')
+                    where_clauses.append(f'"{db_field}" LIKE %s')
                     params.append(f"%{value}%")
                 else:
                     # Exact match
-                    where_clauses.append(f'"{field}" = %s')
+                    where_clauses.append(f'"{db_field}" = %s')
                     params.append(value)
             
             # Build query
