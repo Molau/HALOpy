@@ -6027,7 +6027,8 @@ def analyze_observations() -> Dict[str, Any]:
             
             # Special parameters that require Python calculation (not yet implemented in SQL)
             # SH is now implemented in SQL with calculate_solar_altitude() function
-            needs_python_fallback = (param1 in ['HO_HU', 'SE']) or (param2 and param2 in ['HO_HU', 'SE'])
+            # SE is now implemented in SQL with regexp_split_to_table()
+            needs_python_fallback = (param1 in ['HO_HU']) or (param2 and param2 in ['HO_HU'])
             
             if needs_python_fallback:
                 # Fall back to Python filtering for complex parameters
