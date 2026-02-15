@@ -8383,10 +8383,10 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                 <td>${seitDisplay}</td>
                 <td>${aktivDisplay}</td>
                 <td>${site.HbOrt}</td>
-                <td>${site.GH.padStart(2, '0')}</td>
+                <td>${String(site.GH).padStart(2, '0')}</td>
                 <td>${site.HLG}° ${site.HLM}' ${site.HOW} / ${site.HBG}° ${site.HBM}' ${site.HNS}</td>
                 <td>${site.NbOrt}</td>
-                <td>${site.GN.padStart(2, '0')}</td>
+                <td>${String(site.GN).padStart(2, '0')}</td>
                 <td>${site.NLG}° ${site.NLM}' ${site.NOW} / ${site.NBG}° ${site.NBM}' ${site.NNS}</td>
             </tr>`;
     }).join('');
@@ -9804,7 +9804,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     document.getElementById('delete-site-seit-year').value = fullYear;
     document.getElementById('delete-site-active').value = site.active;
     document.getElementById('delete-site-hb-ort').value = site.HbOrt;
-    document.getElementById('delete-site-gh').value = site.GH.padStart(2, '0');
+    document.getElementById('delete-site-gh').value = String(site.GH).padStart(2, '0');
     document.getElementById('delete-site-hlg').value = site.HLG;
     document.getElementById('delete-site-hlm').value = site.HLM;
     document.getElementById('delete-site-how').value = site.HOW;
@@ -9812,7 +9812,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     document.getElementById('delete-site-hbm').value = site.HBM;
     document.getElementById('delete-site-hns').value = site.HNS;
     document.getElementById('delete-site-nb-ort').value = site.NbOrt;
-    document.getElementById('delete-site-gn').value = site.GN.padStart(2, '0');
+    document.getElementById('delete-site-gn').value = String(site.GN).padStart(2, '0');
     document.getElementById('delete-site-nlg').value = site.NLG;
     document.getElementById('delete-site-nlm').value = site.NLM;
     document.getElementById('delete-site-now').value = site.NOW;
