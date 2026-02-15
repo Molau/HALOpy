@@ -964,33 +964,86 @@ def execute_single_param_analysis(params: dict) -> dict:
     # Special handling for SE (sectors) - extract octant letters
     if param1 == 'SE':
         # Parse sectors string and count each octant letter (a-h)
-        # Sectors format: "a-b-c" or "e-f-g-h" etc.
+        # V=2 (complete halo) + circular halo type (EE): all 8 sectors a-h visible
+        # V=1 (incomplete halo): only explicitly listed sectors
+        from halo.models.constants import CIRCULAR_HALOS
+        
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                # Use regexp_split_to_table to extract individual octants from sectors field
-                # Then count occurrences of each octant
-                query = f"""
+                # Query for V=2 (complete) circular halos: count all 8 sectors
+                query_complete = f"""
+                    SELECT octant, COUNT(*) as count FROM (
+                        SELECT 'a' as octant FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'b' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'c' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'd' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'e' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'f' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'g' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                        UNION ALL
+                        SELECT 'h' FROM observations o
+                        WHERE {where_sql} AND o."V" = 2 AND o."EE" = ANY(%s)
+                    ) complete_sectors
+                    GROUP BY octant
+                """
+                
+                # Query for V=1 (incomplete) halos: parse sectors field
+                query_incomplete = f"""
                     SELECT 
                         LOWER(TRIM(octant)) as octant, 
                         COUNT(DISTINCT o.ctid) as count
                     FROM observations o
                     CROSS JOIN LATERAL regexp_split_to_table(o.sectors, '-') AS octant
                     WHERE {where_sql}
+                        AND (o."V" != 2 OR o."EE" != ALL(%s))
                         AND TRIM(octant) != ''
                         AND LOWER(TRIM(octant)) ~ '^[a-h]$'
                     GROUP BY LOWER(TRIM(octant))
-                    ORDER BY octant
                 """
                 
-                cursor.execute(query, sql_params)
-                rows = cursor.fetchall()
+                # Execute both queries and combine results
+                circular_halos_list = list(CIRCULAR_HALOS)
                 
+                # Complete halos: 8 copies of sql_params + circular_halos_list
+                complete_params = []
+                for _ in range(8):
+                    complete_params.extend(sql_params)
+                    complete_params.append(circular_halos_list)
+                
+                cursor.execute(query_complete, complete_params)
+                rows_complete = cursor.fetchall()
+                
+                # Incomplete halos
+                incomplete_params = sql_params + [circular_halos_list]
+                cursor.execute(query_incomplete, incomplete_params)
+                rows_incomplete = cursor.fetchall()
+                
+                # Combine results
                 result = {}
-                for row in rows:
+                for row in rows_complete:
                     octant = row[0]
                     count = row[1]
                     if octant and count > 0:
-                        result[octant] = count
+                        result[octant] = result.get(octant, 0) + count
+                
+                for row in rows_incomplete:
+                    octant = row[0]
+                    count = row[1]
+                    if octant and count > 0:
+                        result[octant] = result.get(octant, 0) + count
                 
                 return result
     
