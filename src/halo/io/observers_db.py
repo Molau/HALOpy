@@ -27,22 +27,17 @@ from halo.models.constants import YEAR_MIN  # For century boundary calculation
 
 def _db_to_csv_format(db_record: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Convert database record format to CSV-like format for compatibility.
-    
-    This ensures Cloud Mode uses same format as Local Mode (CSV):
-    - Convert boolean True/False to int 0/1
-    - Use same field names as CSV
-    - Convert None to empty string or 0
-    - Normalize seit to MM/JJ format (2-digit year)
+    Minimal format normalization for database records.
+    Since DB now uses Python field names, just normalize types and formats.
     
     Args:
-        db_record: Record from database (RealDictRow converted to dict)
+        db_record: Record from database (already has correct field names)
         
     Returns:
-        Record in CSV-compatible format
+        Normalized record in Python format
     """
     # Normalize seit to MM/JJ format (ensure 2-digit year)
-    seit = db_record['since']
+    seit = db_record.get('seit', '')
     if seit and '/' in seit:
         parts = seit.split('/')
         if len(parts) == 2:
@@ -53,29 +48,11 @@ def _db_to_csv_format(db_record: Dict[str, Any]) -> Dict[str, Any]:
                 year = year[-2:]
             seit = f"{month}/{year.zfill(2)}"  # Ensure 2-digit year
     
-    return {
-        'KK': str(db_record['kk']).zfill(2),
-        'VName': db_record['first_name'] or '',
-        'NName': db_record['last_name'] or '',
-        'seit': seit,
-        'aktiv': 1 if db_record['active'] else 0,  # Convert bool to 0/1
-        'HbOrt': db_record['primary_site'] or '',
-        'GH': db_record['primary_region'],
-        'HLG': int(db_record['primary_lon_deg']) if db_record['primary_lon_deg'] else 0,
-        'HLM': int(db_record['primary_lon_min']) if db_record['primary_lon_min'] else 0,
-        'HOW': db_record['primary_lon_dir'] or '',
-        'HBG': int(db_record['primary_lat_deg']) if db_record['primary_lat_deg'] else 0,
-        'HBM': int(db_record['primary_lat_min']) if db_record['primary_lat_min'] else 0,
-        'HNS': db_record['primary_lat_dir'] or '',
-        'NbOrt': db_record['secondary_site'] or '',
-        'GN': db_record['secondary_region'],
-        'NLG': int(db_record['secondary_lon_deg']) if db_record['secondary_lon_deg'] else 0,
-        'NLM': int(db_record['secondary_lon_min']) if db_record['secondary_lon_min'] else 0,
-        'NOW': db_record['secondary_lon_dir'] or '',
-        'NBG': int(db_record['secondary_lat_deg']) if db_record['secondary_lat_deg'] else 0,
-        'NBM': int(db_record['secondary_lat_min']) if db_record['secondary_lat_min'] else 0,
-        'NNS': db_record['secondary_lat_dir'] or ''
-    }
+    # DB now returns correct field names, just normalize types
+    result = dict(db_record)  # Copy all fields
+    result['KK'] = str(result['KK']).zfill(2)  # Ensure 2-digit string
+    result['seit'] = seit
+    return result
 
 
 # ========================================
@@ -96,21 +73,17 @@ def load_all() -> List[Dict[str, Any]]:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute("""
-                SELECT kk, first_name, last_name, since, active,
-                       primary_site, primary_region,
-                       primary_lon_deg, primary_lon_min, primary_lon_dir,
-                       primary_lat_deg, primary_lat_min, primary_lat_dir,
-                       secondary_site, secondary_region,
-                       secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
-                       secondary_lat_deg, secondary_lat_min, secondary_lat_dir
+                SELECT "KK", "VName", "NName", "seit", "aktiv",
+                       "HbOrt", "GH", "HLG", "HLM", "HOW", "HBG", "HBM", "HNS",
+                       "NbOrt", "GN", "NLG", "NLM", "NOW", "NBG", "NBM", "NNS"
                 FROM observers
-                ORDER BY kk,
+                ORDER BY "KK",
                          -- Sort by actual year (years < (YEAR_MIN-1900) are 2000+, >= (YEAR_MIN-1900) are 1900+)
-                         CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                         CAST(SPLIT_PART("seit", '/', 1) AS INTEGER) + 13 * 
                          CASE 
-                             WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
-                             THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
-                             ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                             WHEN CAST(SPLIT_PART("seit", '/', 2) AS INTEGER) < %s
+                             THEN CAST(SPLIT_PART("seit", '/', 2) AS INTEGER) + 100
+                             ELSE CAST(SPLIT_PART("seit", '/', 2) AS INTEGER)
                          END
             """, (YEAR_MIN - 1900,))
             
@@ -125,14 +98,14 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
     Load observer records with filters.
     
     Supported filters:
-    - kk: Observer code (int)
-    - active: Active status (bool or int: 0/1)
-    - since: Validity date (str, exact match)
-    - first_name, last_name: Name (str, LIKE partial match)
-    - primary_site, primary_region: Primary site (str, LIKE partial match)
-    - secondary_site, secondary_region: Secondary site (str, LIKE partial match)
-    - standort: Site search (str, searches both primary_site and secondary_site)
-    - region: Region search (int, searches both primary_region and secondary_region)
+    - KK: Observer code (int)
+    - aktiv: Active status (int: 0/1)
+    - seit: Validity date (str, exact match)
+    - VName, NName: Name (str, LIKE partial match)
+    - HbOrt, GH: Primary site (str, LIKE partial match)
+    - NbOrt, GN: Secondary site (str, LIKE partial match)
+    - standort: Site search (str, searches both HbOrt and NbOrt)
+    - region: Region search (int, searches both GH and GN)
     - latest_only: If True, returns only latest record per KK (bool)
     - jj, mm: Year/Month for date-based validity filtering (int)
     
@@ -177,14 +150,14 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
             where_clauses = []
             params = []
             
-            # Handle site search (both primary_site and secondary_site)
+            # Handle site search (both HbOrt and NbOrt)
             if standort:
-                where_clauses.append("(primary_site LIKE %s OR secondary_site LIKE %s)")
+                where_clauses.append("(\"HbOrt\" LIKE %s OR \"NbOrt\" LIKE %s)")
                 params.extend([f"%{standort}%", f"%{standort}%"])
             
-            # Handle region search (both primary_region and secondary_region)
+            # Handle region search (both GH and GN)
             if region:
-                where_clauses.append("(primary_region = %s OR secondary_region = %s)")
+                where_clauses.append("(\"GH\" = %s OR \"GN\" = %s)")
                 params.extend([region, region])
             
             # Handle date-based validity filtering
@@ -196,70 +169,61 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
                     year += 100
                 obs_seit = mm + 13 * year
                 
-                # Convert database since (MM/YY format) to seit value for comparison
+                # Convert database seit (MM/YY format) to seit value for comparison
                 where_clauses.append("""
-                    (CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                    (CAST(SPLIT_PART(\"seit\", '/', 1) AS INTEGER) + 13 * 
                      CASE 
-                         WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
-                         THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
-                         ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                         WHEN CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER) < %s
+                         THEN CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER) + 100
+                         ELSE CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER)
                      END) <= %s
                 """)
                 params.extend([YEAR_MIN - 1900, obs_seit])
             
             # Fields that use LIKE for partial matching
-            like_fields = {'first_name', 'last_name', 'primary_site', 'primary_region', 
-                          'secondary_site', 'secondary_region'}
+            like_fields = {'VName', 'NName', 'HbOrt', 'GH', 'NbOrt', 'GN'}
             
             # Handle remaining standard filters
             for field, value in filters.items():
                 if field in like_fields:
                     # Partial match with LIKE
-                    where_clauses.append(f"{field} LIKE %s")
+                    where_clauses.append(f'"{field}" LIKE %s')
                     params.append(f"%{value}%")
                 else:
                     # Exact match
-                    where_clauses.append(f"{field} = %s")
+                    where_clauses.append(f'"{field}" = %s')
                     params.append(value)
             
             # Build query
             if where_clauses:
                 where_sql = " AND ".join(where_clauses)
                 query = f"""
-                    SELECT kk, first_name, last_name, since, active,
-                           primary_site, primary_region,
-                           primary_lon_deg, primary_lon_min, primary_lon_dir,
-                           primary_lat_deg, primary_lat_min, primary_lat_dir,
-                           secondary_site, secondary_region,
-                           secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
-                           secondary_lat_deg, secondary_lat_min, secondary_lat_dir
+                    SELECT "KK", "VName", "NName", "seit", "aktiv",
+                           "HbOrt", "GH", "HLG", "HLM", "HOW", "HBG", "HBM", "HNS",
+                           "NbOrt", "GN", "NLG", "NLM", "NOW", "NBG", "NBM", "NNS"
                     FROM observers
                     WHERE {where_sql}
-                    ORDER BY kk,
-                             CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                    ORDER BY "KK",
+                             CAST(SPLIT_PART(\"seit\", '/', 1) AS INTEGER) + 13 * 
                              CASE 
-                                 WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
-                                 THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
-                                 ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                                 WHEN CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER) < %s
+                                 THEN CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER) + 100
+                                 ELSE CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER)
                              END
                 """
                 params.append(YEAR_MIN - 1900)  # Add to params for ORDER BY
             else:
                 query = """
-                    SELECT kk, first_name, last_name, since, active,
-                           primary_site, primary_region,
-                           primary_lon_deg, primary_lon_min, primary_lon_dir,
-                           primary_lat_deg, primary_lat_min, primary_lat_dir,
-                           secondary_site, secondary_region,
-                           secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
-                           secondary_lat_deg, secondary_lat_min, secondary_lat_dir
+                    SELECT "KK", "VName", "NName", "seit", "aktiv",
+                           "HbOrt", "GH", "HLG", "HLM", "HOW", "HBG", "HBM", "HNS",
+                           "NbOrt", "GN", "NLG", "NLM", "NOW", "NBG", "NBM", "NNS"
                     FROM observers
-                    ORDER BY kk,
-                             CAST(SPLIT_PART(since, '/', 1) AS INTEGER) + 13 * 
+                    ORDER BY "KK",
+                             CAST(SPLIT_PART(\"seit\", '/', 1) AS INTEGER) + 13 * 
                              CASE 
-                                 WHEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) < %s
-                                 THEN CAST(SPLIT_PART(since, '/', 2) AS INTEGER) + 100
-                                 ELSE CAST(SPLIT_PART(since, '/', 2) AS INTEGER)
+                                 WHEN CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER) < %s
+                                 THEN CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER) + 100
+                                 ELSE CAST(SPLIT_PART(\"seit\", '/', 2) AS INTEGER)
                              END
                 """
                 params = [YEAR_MIN - 1900]  # Params for ORDER BY
@@ -267,14 +231,14 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             
-            # Convert to CSV-compatible format
+            # Convert to Python format (minimal conversion needed)
             records = [_db_to_csv_format(dict(row)) for row in rows]
             
             # Handle latest_only filter (done in Python for simplicity)
             if latest_only:
                 latest_records = {}
                 for record in records:
-                    kk = record['KK']  # Now using CSV format keys
+                    kk = record['KK']  # Using Python format keys
                     since = record['seit']
                     
                     # Parse seit (MM/YY) to compare dates
@@ -343,21 +307,13 @@ def save_one(record: Dict[str, Any]) -> bool:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO observers (
-                        kk, first_name, last_name, since, active,
-                        primary_site, primary_region,
-                        primary_lon_deg, primary_lon_min, primary_lon_dir,
-                        primary_lat_deg, primary_lat_min, primary_lat_dir,
-                        secondary_site, secondary_region,
-                        secondary_lon_deg, secondary_lon_min, secondary_lon_dir,
-                        secondary_lat_deg, secondary_lat_min, secondary_lat_dir
+                        "KK", "VName", "NName", "seit", "aktiv",
+                        "HbOrt", "GH", "HLG", "HLM", "HOW", "HBG", "HBM", "HNS",
+                        "NbOrt", "GN", "NLG", "NLM", "NOW", "NBG", "NBM", "NNS"
                     ) VALUES (
-                        %(kk)s, %(first_name)s, %(last_name)s, %(since)s, %(active)s,
-                        %(primary_site)s, %(primary_region)s,
-                        %(primary_lon_deg)s, %(primary_lon_min)s, %(primary_lon_dir)s,
-                        %(primary_lat_deg)s, %(primary_lat_min)s, %(primary_lat_dir)s,
-                        %(secondary_site)s, %(secondary_region)s,
-                        %(secondary_lon_deg)s, %(secondary_lon_min)s, %(secondary_lon_dir)s,
-                        %(secondary_lat_deg)s, %(secondary_lat_min)s, %(secondary_lat_dir)s
+                        %(KK)s, %(VName)s, %(NName)s, %(seit)s, %(aktiv)s,
+                        %(HbOrt)s, %(GH)s, %(HLG)s, %(HLM)s, %(HOW)s, %(HBG)s, %(HBM)s, %(HNS)s,
+                        %(NbOrt)s, %(GN)s, %(NLG)s, %(NLM)s, %(NOW)s, %(NBG)s, %(NBM)s, %(NNS)s
                     )
                 """, record)
                 
@@ -384,7 +340,7 @@ def update_one(kk: int, seit: str, record: Dict[str, Any]) -> bool:
         False if not found (0 rows affected)
         
     Example:
-        >>> record = {'kk': '44', 'first_name': 'Max', ...}
+        >>> record = {'KK': '44', 'VName': 'Max', ...}
         >>> if update_one(44, '04/26', record):
         ...     print("Observer record updated")
         ... else:
@@ -399,15 +355,15 @@ def update_one(kk: int, seit: str, record: Dict[str, Any]) -> bool:
             
             cursor.execute("""
                 UPDATE observers SET
-                    kk=%(kk)s, first_name=%(first_name)s, last_name=%(last_name)s,
-                    since=%(since)s, active=%(active)s,
-                    primary_site=%(primary_site)s, primary_region=%(primary_region)s,
-                    primary_lon_deg=%(primary_lon_deg)s, primary_lon_min=%(primary_lon_min)s, primary_lon_dir=%(primary_lon_dir)s,
-                    primary_lat_deg=%(primary_lat_deg)s, primary_lat_min=%(primary_lat_min)s, primary_lat_dir=%(primary_lat_dir)s,
-                    secondary_site=%(secondary_site)s, secondary_region=%(secondary_region)s,
-                    secondary_lon_deg=%(secondary_lon_deg)s, secondary_lon_min=%(secondary_lon_min)s, secondary_lon_dir=%(secondary_lon_dir)s,
-                    secondary_lat_deg=%(secondary_lat_deg)s, secondary_lat_min=%(secondary_lat_min)s, secondary_lat_dir=%(secondary_lat_dir)s
-                WHERE kk=%(_where_kk)s AND since=%(_where_seit)s
+                    "KK"=%(KK)s, "VName"=%(VName)s, "NName"=%(NName)s,
+                    "seit"=%(seit)s, "aktiv"=%(aktiv)s,
+                    "HbOrt"=%(HbOrt)s, "GH"=%(GH)s,
+                    "HLG"=%(HLG)s, "HLM"=%(HLM)s, "HOW"=%(HOW)s,
+                    "HBG"=%(HBG)s, "HBM"=%(HBM)s, "HNS"=%(HNS)s,
+                    "NbOrt"=%(NbOrt)s, "GN"=%(GN)s,
+                    "NLG"=%(NLG)s, "NLM"=%(NLM)s, "NOW"=%(NOW)s,
+                    "NBG"=%(NBG)s, "NBM"=%(NBM)s, "NNS"=%(NNS)s
+                WHERE "KK"=%(_where_kk)s AND "seit"=%(_where_seit)s
             """, params)
             
             affected_rows = cursor.rowcount
@@ -437,7 +393,7 @@ def delete_one(kk: int, seit: str) -> bool:
         with conn.cursor() as cursor:
             cursor.execute("""
                 DELETE FROM observers
-                WHERE kk=%s AND since=%s
+                WHERE "KK"=%s AND "seit"=%s
             """, (kk, seit))
             
             affected_rows = cursor.rowcount

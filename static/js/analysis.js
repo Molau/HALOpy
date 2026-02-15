@@ -2963,7 +2963,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // First pass: calculate actual column widths
         // Combined first column: param1Name + row label + total
-        let maxCombinedWidth = param1Name.length + 3 + param2Name.length + 2; // ' ' + name1 + ' | ' + name2 + ' '
+        let maxCombinedWidth = param1Name.length + 3 + param2Name.length + 2; // ' ' + name1 + ' \ ' + name2 + ' '
         let labelWidth = 0; // width for row label in first column
         let totalCountWidthFirst = 0; // width for Σ count in first column
         let totalPercWidthFirst = 0; // width for percentage in first column
@@ -2999,7 +2999,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         // Ensure combined width fits aligned first-column core content
-        const firstColCoreLen = labelWidth + 3 + (2 + totalCountWidthFirst + 1 + totalPercWidthFirst); // label + ' | ' + 'Σ=' + total + ' ' + perc
+        const firstColCoreLen = labelWidth + 3 + (2 + totalCountWidthFirst + 1 + totalPercWidthFirst); // label + ' \ ' + 'Σ=' + total + ' ' + perc
         maxCombinedWidth = Math.max(maxCombinedWidth, firstColCoreLen);
         
         // Calculate data cell widths (one width per column)

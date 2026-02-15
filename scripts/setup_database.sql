@@ -21,49 +21,49 @@ CREATE DATABASE halodb;
 DROP TABLE IF EXISTS observers CASCADE;
 
 CREATE TABLE observers (
-    -- Observer identification
-    kk SMALLINT NOT NULL,                    -- Observer number (01-99)
-    first_name VARCHAR(20) NOT NULL,         -- First name
-    last_name VARCHAR(20) NOT NULL,          -- Last name
+    -- Observer identification (EXACT Python field names with quotes for case-sensitivity)
+    "KK" SMALLINT NOT NULL,                    -- Observer number (01-99)
+    "VName" VARCHAR(20) NOT NULL,             -- First name (Vorname)
+    "NName" VARCHAR(20) NOT NULL,             -- Last name (Nachname)
     
     -- Validity period (format: MM/YY, e.g., "01/19")
-    since VARCHAR(5) NOT NULL,               -- Valid since date in MM/YY format
+    "seit" VARCHAR(5) NOT NULL,               -- Valid since date in MM/YY format
     
     -- Active status
-    active SMALLINT NOT NULL DEFAULT 1,      -- 0=inactive, 1=active
+    "aktiv" SMALLINT NOT NULL DEFAULT 1,      -- 0=inactive, 1=active
     
-    -- Primary observing site
-    primary_site VARCHAR(50),                -- Primary site name
-    primary_region SMALLINT,                 -- Region code for primary site (1-39)
-    primary_lon_deg SMALLINT,                -- Longitude degrees (primary)
-    primary_lon_min SMALLINT,                -- Longitude minutes (primary)
-    primary_lon_dir CHAR(1),                 -- Longitude direction E/W (primary)
-    primary_lat_deg SMALLINT,                -- Latitude degrees (primary)
-    primary_lat_min SMALLINT,                -- Latitude minutes (primary)
-    primary_lat_dir CHAR(1),                 -- Latitude direction N/S (primary)
+    -- Primary observing site (Hauptbeobachtungsort)
+    "HbOrt" VARCHAR(50),                      -- Primary site name
+    "GH" SMALLINT,                            -- Region code for primary site (1-39)
+    "HLG" SMALLINT,                           -- Longitude degrees (primary) (Haupt-Längengrad)
+    "HLM" SMALLINT,                           -- Longitude minutes (primary) (Haupt-Längenminuten)
+    "HOW" CHAR(1),                            -- Longitude direction E/W (primary) (Haupt-Ost/West)
+    "HBG" SMALLINT,                           -- Latitude degrees (primary) (Haupt-Breitengrad)
+    "HBM" SMALLINT,                           -- Latitude minutes (primary) (Haupt-Breitenminuten)
+    "HNS" CHAR(1),                            -- Latitude direction N/S (primary) (Haupt-Nord/Süd)
     
-    -- Secondary observing site
-    secondary_site VARCHAR(50),              -- Secondary site name
-    secondary_region SMALLINT,               -- Region code for secondary site (1-39)
-    secondary_lon_deg SMALLINT,              -- Longitude degrees (secondary)
-    secondary_lon_min SMALLINT,              -- Longitude minutes (secondary)
-    secondary_lon_dir CHAR(1),               -- Longitude direction E/W (secondary)
-    secondary_lat_deg SMALLINT,              -- Latitude degrees (secondary)
-    secondary_lat_min SMALLINT,              -- Latitude minutes (secondary)
-    secondary_lat_dir CHAR(1),               -- Latitude direction N/S (secondary)
+    -- Secondary observing site (Nebenbeobachtungsort)
+    "NbOrt" VARCHAR(50),                      -- Secondary site name
+    "GN" SMALLINT,                            -- Region code for secondary site (1-39)
+    "NLG" SMALLINT,                           -- Longitude degrees (secondary) (Neben-Längengrad)
+    "NLM" SMALLINT,                           -- Longitude minutes (secondary) (Neben-Längenminuten)
+    "NOW" CHAR(1),                            -- Longitude direction E/W (secondary) (Neben-Ost/West)
+    "NBG" SMALLINT,                           -- Latitude degrees (secondary) (Neben-Breitengrad)
+    "NBM" SMALLINT,                           -- Latitude minutes (secondary) (Neben-Breitenminuten)
+    "NNS" CHAR(1),                            -- Latitude direction N/S (secondary) (Neben-Nord/Süd)
     
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- Composite key: observer + validity date
-    PRIMARY KEY (kk, since)
+    PRIMARY KEY ("KK", "seit")
 );
 
 -- Indexes for observers
-CREATE INDEX idx_observers_kk ON observers(kk);
-CREATE INDEX idx_observers_active ON observers(active);
-CREATE INDEX idx_observers_since ON observers(kk, since);
+CREATE INDEX idx_observers_kk ON observers("KK");
+CREATE INDEX idx_observers_aktiv ON observers("aktiv");
+CREATE INDEX idx_observers_seit ON observers("KK", "seit");
 
 -- ============================================================================
 -- Observations Table (observations CSV files)
@@ -341,8 +341,11 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 -- ============================================================================
 -- After creating the tables, import CSV data using these commands:
 
--- Import observers (halobeo.csv):
--- \COPY observers(kk,first_name,last_name,since,active,primary_site,primary_region,primary_lon_deg,primary_lon_min,primary_lon_dir,primary_lat_deg,primary_lat_min,primary_lat_dir,secondary_site,secondary_region,secondary_lon_deg,secondary_lon_min,secondary_lon_dir,secondary_lat_deg,secondary_lat_min,secondary_lat_dir) FROM '/home/ubuntu/halopy/halobeo.csv' WITH (FORMAT csv, DELIMITER ',', NULL '');
+-- Import observers (halobeo.csv) - CSV columns map 1:1 to DB columns (exact names)
+-- CSV: KK,VName,NName,seit,aktiv,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
+-- DB:  "KK","VName","NName","seit","aktiv","HbOrt","GH","HLG","HLM","HOW","HBG","HBM","HNS","NbOrt","GN","NLG","NLM","NOW","NBG","NBM","NNS"
+-- NO MAPPING NEEDED - Python names == DB names!
+\COPY observers("KK","VName","NName","seit","aktiv","HbOrt","GH","HLG","HLM","HOW","HBG","HBM","HNS","NbOrt","GN","NLG","NLM","NOW","NBG","NBM","NNS") FROM '/home/ubuntu/halopy/halobeo.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', NULL '');
 
 -- Import observations - CSV columns map 1:1 to DB columns (exact names)
 -- CSV: KK,O,JJ,MM,TT,g,ZS,ZM,d,DD,N,C,c,EE,H,F,V,f,zz,GG,8HHHH,sectors,remarks
