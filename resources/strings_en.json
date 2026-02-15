@@ -272,12 +272,14 @@
     "select_processing": "Filtering observations...",
     "select_no_filter": "Please select a filter criterion!",
     "add_another_title": "Add another observation?",
-    "add_another_message": "Would you like to add another observation?",    "attributes_label": "Special Attributes",
+    "add_another_message": "Would you like to add another observation?",
+    "attributes_label": "Special Attributes",
     "attribute_star": "* (part of halo phenomenon)",
     "attribute_ka": "kA (no beginning)",
     "attribute_ke": "kE (no end)",
     "attribute_ub": "UB (observation interrupted)",
-    "attribute_uh": "UH (halo interrupted)",    "detail_labels": {
+    "attribute_uh": "UH (halo interrupted)",
+    "detail_labels": {
       "observer": "observer          : ",
       "date": "date              : ",
       "start_time": "start of observation :",
@@ -463,7 +465,9 @@
     "y_axis": "Activity"
   },
   "annual_stats": {
-    "title": "Annual Statistics",    "year_prompt": "Please enter the year!",    "error_year_required": "Please enter year",
+    "title": "Annual Statistics",
+    "year_prompt": "Please enter the year!",
+    "error_year_required": "Please enter year",
     "error_no_data": "No data for this year",
     "error_fetching": "Error fetching statistics",
     "title_with_year": "Annual Statistics {year}",

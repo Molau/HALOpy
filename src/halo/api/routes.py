@@ -1671,29 +1671,7 @@ def upload_observers() -> Dict[str, Any]:
             try:
                 # Convert array to dict if needed (database expects dict format)
                 if isinstance(obs_record, list):
-                    observer_dict = {
-                        'kk': obs_record[0],
-                        'first_name': obs_record[1],
-                        'last_name': obs_record[2],
-                        'since': obs_record[3],
-                        'active': obs_record[4],
-                        'primary_site': obs_record[5],
-                        'primary_region': obs_record[6],
-                        'primary_lon_deg': obs_record[7],
-                        'primary_lon_min': obs_record[8],
-                        'primary_lon_dir': obs_record[9],
-                        'primary_lat_deg': obs_record[10],
-                        'primary_lat_min': obs_record[11],
-                        'primary_lat_dir': obs_record[12],
-                        'secondary_site': obs_record[13],
-                        'secondary_region': obs_record[14],
-                        'secondary_lon_deg': obs_record[15],
-                        'secondary_lon_min': obs_record[16],
-                        'secondary_lon_dir': obs_record[17],
-                        'secondary_lat_deg': obs_record[18],
-                        'secondary_lat_min': obs_record[19],
-                        'secondary_lat_dir': obs_record[20]
-                    }
+                    observer_dict = _observer_row_to_dict(obs_record)
                 else:
                     observer_dict = obs_record
                 
@@ -5088,6 +5066,42 @@ def get_observer_regions() -> Dict[str, Any]:
     return jsonify({'regions': region_list})
 
 
+def _observer_row_to_dict(row: list) -> Dict[str, Any]:
+    """Convert observer CSV row (list) to database record (dict).
+    
+    Args:
+        row: List with 21 elements in CSV format:
+             [KK, VName, NName, seit, active, HbOrt, GH, HLG, HLM, HOW, HBG, HBM, HNS,
+              NbOrt, GN, NLG, NLM, NOW, NBG, NBM, NNS]
+    
+    Returns:
+        Dict with database column names as keys
+    """
+    return {
+        'kk': row[0],
+        'first_name': row[1],
+        'last_name': row[2],
+        'since': row[3],
+        'active': int(row[4]) if row[4] else 1,
+        'primary_site': row[5],
+        'primary_region': int(row[6]) if row[6] else 0,
+        'primary_lon_deg': int(row[7]) if row[7] else 0,
+        'primary_lon_min': int(row[8]) if row[8] else 0,
+        'primary_lon_dir': row[9],
+        'primary_lat_deg': int(row[10]) if row[10] else 0,
+        'primary_lat_min': int(row[11]) if row[11] else 0,
+        'primary_lat_dir': row[12],
+        'secondary_site': row[13],
+        'secondary_region': int(row[14]) if row[14] else 0,
+        'secondary_lon_deg': int(row[15]) if row[15] else 0,
+        'secondary_lon_min': int(row[16]) if row[16] else 0,
+        'secondary_lon_dir': row[17],
+        'secondary_lat_deg': int(row[18]) if row[18] else 0,
+        'secondary_lat_min': int(row[19]) if row[19] else 0,
+        'secondary_lat_dir': row[20]
+    }
+
+
 @api_blueprint.route('/observers', methods=['POST'])
 def add_observer() -> Dict[str, Any]:
     """Add a new observer to halobeo.csv.
@@ -5176,14 +5190,10 @@ def add_observer() -> Dict[str, Any]:
     
     # Add observer using io module
     try:
-        print(f"🔍 DEBUG add_observer: Cloud mode={is_cloud_mode()}, KK={kk}, seit={seit_str}")
-        print(f"🔍 DEBUG add_observer: new_row={new_row}")
-        
         if is_cloud_mode():
-            # Cloud Mode: Direct SQL INSERT
-            print(f"🔍 DEBUG add_observer: Calling observer_db.save_one()")
-            success = observer_db.save_one(new_row)
-            print(f"🔍 DEBUG add_observer: save_one returned success={success}")
+            # Cloud Mode: Direct SQL INSERT - convert list to dict
+            record_dict = _observer_row_to_dict(new_row)
+            success = observer_db.save_one(record_dict)
             if not success:
                 return jsonify({'error': 'observer_site_exists', 'kk': kk, 'seit': seit_str}), 400
         else:
@@ -5247,34 +5257,35 @@ def update_observer(kk: str) -> Dict[str, Any]:
     try:
         if is_cloud_mode():
             # Cloud Mode: True SQL UPDATE (no delete+insert needed)
+            # observers is a list of dicts from load_filtered()
             updated_count = 0
             for obs in observers:
-                # Build updated record (21 fields) with new VName/NName
-                updated_record = [
-                    kk,                               # 0: KK
-                    obs[1],                           # 1: aktiv (unchanged)
-                    obs[2],                           # 2: seit (unchanged)
-                    data.get('VName', '')[:15],       # 3: VName (UPDATED)
-                    data.get('NName', '')[:15],       # 4: NName (UPDATED)
-                    obs[5],                           # 5: HbOrt (unchanged)
-                    obs[6],                           # 6: HbReg (unchanged)
-                    obs[7],                           # 7: HLG (unchanged)
-                    obs[8],                           # 8: HLM (unchanged)
-                    obs[9],                           # 9: HOW (unchanged)
-                    obs[10],                          # 10: HBG (unchanged)
-                    obs[11],                          # 11: HBM (unchanged)
-                    obs[12],                          # 12: HNS (unchanged)
-                    obs[13],                          # 13: NbOrt (unchanged)
-                    obs[14],                          # 14: NbReg (unchanged)
-                    obs[15],                          # 15: NLG (unchanged)
-                    obs[16],                          # 16: NLM (unchanged)
-                    obs[17],                          # 17: NOW (unchanged)
-                    obs[18],                          # 18: NBG (unchanged)
-                    obs[19],                          # 19: NBM (unchanged)
-                    obs[20]                           # 20: NNS (unchanged)
-                ]
+                # Build updated record dict with new VName/NName
+                updated_record = {
+                    'kk': kk,
+                    'active': obs['aktiv'],  # unchanged
+                    'since': obs['seit'],  # unchanged
+                    'first_name': data.get('VName', '')[:15],  # UPDATED
+                    'last_name': data.get('NName', '')[:15],  # UPDATED
+                    'primary_site': obs['HbOrt'],  # unchanged
+                    'primary_region': obs['HbReg'],  # unchanged
+                    'primary_lon_deg': obs['HLG'],  # unchanged
+                    'primary_lon_min': obs['HLM'],  # unchanged
+                    'primary_lon_dir': obs['HOW'],  # unchanged
+                    'primary_lat_deg': obs['HBG'],  # unchanged
+                    'primary_lat_min': obs['HBM'],  # unchanged
+                    'primary_lat_dir': obs['HNS'],  # unchanged
+                    'secondary_site': obs['NbOrt'],  # unchanged
+                    'secondary_region': obs['NbReg'],  # unchanged
+                    'secondary_lon_deg': obs['NLG'],  # unchanged
+                    'secondary_lon_min': obs['NLM'],  # unchanged
+                    'secondary_lon_dir': obs['NOW'],  # unchanged
+                    'secondary_lat_deg': obs['NBG'],  # unchanged
+                    'secondary_lat_min': obs['NBM'],  # unchanged
+                    'secondary_lat_dir': obs['NNS']  # unchanged
+                }
                 
-                success = observer_db.update_one(kk, obs[2], updated_record)  # obs[2] = seit
+                success = observer_db.update_one(kk, obs['seit'], updated_record)
                 if success:
                     updated_count += 1
             
@@ -5615,8 +5626,9 @@ def add_observer_site(kk):
     # Save using io module
     try:
         if is_cloud_mode():
-            # Cloud Mode: Direct SQL INSERT
-            success = observer_db.save_one(new_row)
+            # Cloud Mode: Direct SQL INSERT - convert list to dict
+            record_dict = _observer_row_to_dict(new_row)
+            success = observer_db.save_one(record_dict)
             if not success:
                 return jsonify({'error': 'site_date_exists', 'seit': seit}), 400
         else:
@@ -5718,7 +5730,9 @@ def update_observer_site(kk):
                 data.get('NNS', 'N')
             ]
             
-            success = observer_db.update_one(kk, seit, updated_row)
+            # Convert list to dict for database update
+            updated_dict = _observer_row_to_dict(updated_row)
+            success = observer_db.update_one(kk, seit, updated_dict)
             if not success:
                 return jsonify({'error': 'site_update_failed', 'kk': kk, 'seit': seit}), 500
             
