@@ -2577,15 +2577,6 @@ def get_monthly_report() -> Dict[str, Any]:
         mm: Month 1-12 (required)
         jj: Year 0-99 (required)
     """
-    # TODO: CLOUD MODE - Replace with obs_db.load_filtered(kk=kk, mm=mm, jj=jj)
-    # Filter must be done in SQL WHERE clause, not Python
-    
-    
-    # Check if observations are loaded
-    observations = current_app.config.get('OBSERVATIONS', [])
-    if not observations:
-        return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
-    
     kk = request.args.get('kk', '').strip()
     mm = request.args.get('mm', '').strip()
     jj = request.args.get('jj', '').strip()
@@ -2605,15 +2596,30 @@ def get_monthly_report() -> Dict[str, Any]:
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameters'}), 400
     
-    # Filter observations for this observer and month
-    filtered_obs = [obs for obs in observations 
-                    if obs.KK == kk_int and obs.MM == mm_int and obs.JJ == jj_int]
-    
-    # Sort by day and time
-    filtered_obs.sort(key=lambda o: (o.TT, o.ZS if o.ZS != -1 else 0, o.ZM if o.ZM != -1 else 0))
+    # Load observations - CLOUD MODE: Filter in SQL, LOCAL MODE: Filter in memory
+    if is_cloud_mode():
+        # Layer 3b: Direct database query with SQL filtering
+        filtered_obs = obs_db.load_filtered(kk=kk_int, mm=mm_int, jj=jj_int)
+    else:
+        # Local Mode: Load from memory cache, filter in Python
+        observations = current_app.config.get('OBSERVATIONS', [])
+        if not observations:
+            return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
+        
+        filtered_obs = [obs for obs in observations 
+                        if obs.KK == kk_int and obs.MM == mm_int and obs.JJ == jj_int]
+        
+        # Local Mode: Sort with Python (Cloud Mode already sorted by SQL ORDER BY)
+        filtered_obs.sort(key=lambda o: (o.TT, o.ZS if o.ZS != -1 else 0, o.ZM if o.ZM != -1 else 0))
     
     # Get observer info - find the record valid for this month/year
-    observers = current_app.config.get('OBSERVERS', [])
+    if is_cloud_mode():
+        # Layer 3b: Query database for observer records
+        observers = observer_db.load_filtered(kk=kk_int)
+    else:
+        # Local Mode: Load from memory cache
+        observers = current_app.config.get('OBSERVERS', [])
+    
     observer_name = ''
     observer_hbort = ''
     observer_nbort = ''
@@ -2624,12 +2630,29 @@ def get_monthly_report() -> Dict[str, Any]:
     obs_year = jj_to_full_year(jj_int)
     month_year_comparable = obs_year * 100 + mm_int
     
+    # Helper function to access observer record fields (supports both dict and list format)
+    def get_observer_field(obs_rec, key, index):
+        """Get field from observer record (dict from DB or list from file)."""
+        if isinstance(obs_rec, dict):
+            return obs_rec.get(key, '')
+        else:
+            return obs_rec[index] if len(obs_rec) > index else ''
+    
     # Find the observer record valid for this month/year
     candidates = []
     for obs_rec in observers:
-        if len(obs_rec) >= 21 and obs_rec[0] == kk:
+        # Get KK field (dict key 'KK' or array index 0)
+        rec_kk = get_observer_field(obs_rec, 'KK', 0)
+        try:
+            rec_kk_int = int(rec_kk)
+        except (ValueError, TypeError):
+            continue
+        
+        if rec_kk_int == kk_int:
             try:
-                seit_parts = obs_rec[3].split('/')
+                # Get seit field (dict key 'seit' or array index 3)
+                seit_str = get_observer_field(obs_rec, 'seit', 3)
+                seit_parts = seit_str.split('/')
                 seit_month = int(seit_parts[0])
                 seit_year_2digit = int(seit_parts[1])
                 seit_year = jj_to_full_year(seit_year_2digit)
@@ -2637,7 +2660,7 @@ def get_monthly_report() -> Dict[str, Any]:
                 
                 if rec_seit_comparable <= month_year_comparable:
                     candidates.append((rec_seit_comparable, obs_rec))
-            except (ValueError, IndexError):
+            except (ValueError, IndexError, AttributeError):
                 pass
     
     if candidates:
@@ -2645,14 +2668,20 @@ def get_monthly_report() -> Dict[str, Any]:
         candidates.sort(key=lambda x: x[0], reverse=True)
         obs_rec = candidates[0][1]
         
-        observer_name = f"{obs_rec[1]} {obs_rec[2]}"
-        observer_hbort = obs_rec[5]
-        observer_nbort = obs_rec[13]
-        # Get region indices - obs_rec[6] is GH, obs_rec[14] is GN
+        # Extract observer data (dict keys or array indices)
+        vname = get_observer_field(obs_rec, 'VName', 1)
+        nname = get_observer_field(obs_rec, 'NName', 2)
+        observer_name = f"{vname} {nname}".strip()
+        observer_hbort = get_observer_field(obs_rec, 'HbOrt', 5)
+        observer_nbort = get_observer_field(obs_rec, 'NbOrt', 13)
+        
+        # Get region indices (dict keys 'GH', 'GN' or array indices 6, 14)
         try:
-            gh_idx = int(obs_rec[6]) if obs_rec[6] else 0
-            gn_idx = int(obs_rec[14]) if obs_rec[14] else 0
-        except (ValueError, IndexError):
+            gh_str = get_observer_field(obs_rec, 'GH', 6)
+            gn_str = get_observer_field(obs_rec, 'GN', 14)
+            gh_idx = int(gh_str) if gh_str else 0
+            gn_idx = int(gn_str) if gn_str else 0
+        except (ValueError, TypeError):
             gh_idx = 0
             gn_idx = 0
     else:
