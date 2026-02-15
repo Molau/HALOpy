@@ -3183,14 +3183,6 @@ def get_monthly_stats() -> Dict[str, Any]:
     their individual components (EE 02 + EE 03) for statistical counting.
     """
     
-    # Check if observations are loaded
-    observations = current_app.config.get('OBSERVATIONS', [])
-    observers = current_app.config.get('OBSERVERS', [])
-    active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
-    
-    if not observations:
-        return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
-    
     mm = request.args.get('mm', '').strip()
     jj = request.args.get('jj', '').strip()
     
@@ -3208,9 +3200,30 @@ def get_monthly_stats() -> Dict[str, Any]:
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameters'}), 400
     
-    # Filter observations for this month
-    filtered_obs = [obs for obs in observations 
-                    if obs.MM == mm_int and obs.JJ == jj_int]
+    # Load observations - CLOUD MODE: Filter in SQL, LOCAL MODE: Filter in memory
+    if is_cloud_mode():
+        # Layer 3b: Direct database query with SQL filtering
+        filtered_obs = obs_db.load_filtered(mm=mm_int, jj=jj_int)
+        observers = observer_db.load_all()
+        active_observers_only = False  # In Cloud Mode, admin can see all
+    else:
+        # Local Mode: Load from memory cache, filter in Python
+        observations = current_app.config.get('OBSERVATIONS', [])
+        if not observations:
+            return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
+        
+        filtered_obs = [obs for obs in observations 
+                        if obs.MM == mm_int and obs.JJ == jj_int]
+        observers = current_app.config.get('OBSERVERS', [])
+        active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
+    
+    # Helper function to access observer record fields (supports both dict and list format)
+    def get_observer_field(obs_rec, key, index):
+        """Get field from observer record (dict from DB or list from file)."""
+        if isinstance(obs_rec, dict):
+            return obs_rec.get(key, '')
+        else:
+            return obs_rec[index] if len(obs_rec) > index else ''
     
     # Get all active observers at the end of this month/year (SEIT <= MMJJ)
     # Build SEIT value for comparison using same formula as _parse_seit: mm + 13 * jj
@@ -3219,9 +3232,9 @@ def get_monthly_stats() -> Dict[str, Any]:
     # Get unique active observers up to this month/year
     active_observers = {}
     for obs_record in observers:
-        kk = obs_record[0]  # Column 0: KK
-        seit_str = obs_record[3]  # Column 3: seit (MM/JJ format)
-        aktiv_str = obs_record[4]  # Column 4: aktiv (0 or 1)
+        kk = get_observer_field(obs_record, 'KK', 0)
+        seit_str = get_observer_field(obs_record, 'seit', 3)
+        aktiv_str = get_observer_field(obs_record, 'aktiv', 4)
         
         # Parse seit from "MM/JJ" to integer MMJJ
         seit = _parse_seit(seit_str) if seit_str else 0
@@ -3239,7 +3252,8 @@ def get_monthly_stats() -> Dict[str, Any]:
         if seit <= month_year_value:
             if not active_observers_only or aktiv == 1:
                 # Keep the most recent record for each KK
-                if kk not in active_observers or seit > _parse_seit(active_observers[kk][3]):
+                kk_seit_str = get_observer_field(active_observers.get(kk, {}), 'seit', 3) if kk in active_observers else None
+                if kk not in active_observers or seit > _parse_seit(kk_seit_str if kk_seit_str else ''):
                     active_observers[kk] = obs_record
     
     # Build observer overview table
@@ -3255,13 +3269,14 @@ def get_monthly_stats() -> Dict[str, Any]:
     
     # Initialize all active observers with empty data
     for kk, obs_record in active_observers.items():
+        gh_str = get_observer_field(obs_record, 'GH', 6)
         observer_data[kk] = {
             'days': {},
             'total_solar': 0,
             'days_solar': 0,
             'days_lunar': 0,
             'total_days': 0,
-            'region': int(obs_record[6]) if obs_record[6] else 0  # Column 6: GH (home region)
+            'region': int(gh_str) if gh_str else 0  # GH (home region)
         }
     
     # Process each observation to fill in observation data
@@ -3333,14 +3348,17 @@ def get_monthly_stats() -> Dict[str, Any]:
             # Most observations at "other" location -> display //
             predominant_region = 39
         elif predominant_g == 0:
-            # Most observations at primary site -> use GH from observer record (column 6)
-            predominant_region = int(active_observers[kk][6]) if active_observers[kk][6] else 39
+            # Most observations at primary site -> use GH from observer record
+            gh_str = get_observer_field(active_observers[kk], 'GH', 6)
+            predominant_region = int(gh_str) if gh_str else 39
         elif predominant_g == 2:
-            # Most observations at secondary site -> use GN from observer record (column 14)
-            predominant_region = int(active_observers[kk][14]) if active_observers[kk][14] else 39
+            # Most observations at secondary site -> use GN from observer record
+            gn_str = get_observer_field(active_observers[kk], 'GN', 14)
+            predominant_region = int(gn_str) if gn_str else 39
         else:
             # Fallback
-            predominant_region = int(active_observers[kk][6]) if active_observers[kk][6] else 39
+            gh_str = get_observer_field(active_observers[kk], 'GH', 6)
+            predominant_region = int(gh_str) if gh_str else 39
         
         observer_data[kk]['region'] = predominant_region
         
@@ -4408,18 +4426,6 @@ def get_annual_stats() -> Dict[str, Any]:
         - format=text: Pseudographic output with box-drawing characters
         - format=markdown: Markdown tables for all statistics
     """
-    # TODO: CLOUD MODE - Replace with obs_db.load_filtered(jj=jj)
-    # Filter must be done in SQL WHERE clause, not Python
-    # Consider SQL GROUP BY for monthly aggregation instead of Python loops
-    
-    # Check if observations are loaded
-    observations = current_app.config.get('OBSERVATIONS', [])
-    observers = current_app.config.get('OBSERVERS', [])
-    active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
-    
-    if not observations:
-        return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
-    
     jj = request.args.get('jj', '').strip()
     
     if not jj:
@@ -4439,8 +4445,29 @@ def get_annual_stats() -> Dict[str, Any]:
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameter'}), 400
     
-    # Filter observations for this year (all months)
-    filtered_obs = [obs for obs in observations if obs.JJ == jj_int]
+    # Load observations - CLOUD MODE: Filter in SQL, LOCAL MODE: Filter in memory
+    if is_cloud_mode():
+        # Layer 3b: Direct database query with SQL filtering
+        filtered_obs = obs_db.load_filtered(jj=jj_int)
+        observers = observer_db.load_all()
+        active_observers_only = False  # In Cloud Mode, admin can see all
+    else:
+        # Local Mode: Load from memory cache, filter in Python
+        observations = current_app.config.get('OBSERVATIONS', [])
+        if not observations:
+            return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
+        
+        filtered_obs = [obs for obs in observations if obs.JJ == jj_int]
+        observers = current_app.config.get('OBSERVERS', [])
+        active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
+    
+    # Helper function to access observer record fields (supports both dict and list format)
+    def get_observer_field(obs_rec, key, index):
+        """Get field from observer record (dict from DB or list from file)."""
+        if isinstance(obs_rec, dict):
+            return obs_rec.get(key, '')
+        else:
+            return obs_rec[index] if len(obs_rec) > index else ''
     
     # Get all active observers up to end of year
     # Use December of the year as reference (month 12)
@@ -4449,9 +4476,9 @@ def get_annual_stats() -> Dict[str, Any]:
     # Get unique active observers up to this year
     active_observers = {}
     for obs_record in observers:
-        kk = obs_record[0]  # Column 0: KK
-        seit_str = obs_record[3]  # Column 3: seit (MM/JJ format)
-        aktiv_str = obs_record[4]  # Column 4: aktiv (0 or 1)
+        kk = get_observer_field(obs_record, 'KK', 0)
+        seit_str = get_observer_field(obs_record, 'seit', 3)
+        aktiv_str = get_observer_field(obs_record, 'aktiv', 4)
         
         # Parse seit from "MM/JJ" to integer MMJJ
         seit = _parse_seit(seit_str) if seit_str else 0
@@ -4468,7 +4495,8 @@ def get_annual_stats() -> Dict[str, Any]:
         if seit <= month_year_value:
             if not active_observers_only or aktiv == 1:
                 # Keep the most recent record for each KK
-                if kk not in active_observers or seit > _parse_seit(active_observers[kk][3]):
+                kk_seit_str = get_observer_field(active_observers.get(kk, {}), 'seit', 3) if kk in active_observers else None
+                if kk not in active_observers or seit > _parse_seit(kk_seit_str if kk_seit_str else ''):
                     active_observers[kk] = obs_record
     
     # Calculate statistics per month using deduplication algorithm
