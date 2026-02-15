@@ -4809,19 +4809,19 @@ def get_observers() -> Dict[str, Any]:
             
             if kk_records:
                 if is_cloud_mode():
-                    # Database returns dicts - use column names
-                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs['since'])) if kk_records else None
+                    # Cloud mode returns CSV-format dicts
+                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs['seit'])) if kk_records else None
                     
                     if latest_record:
                         result = {
-                            'KK': latest_record['kk'],
-                            'VName': latest_record['first_name'],
-                            'NName': latest_record['last_name'],
-                            'seit': latest_record['since'],
-                            'aktiv': latest_record['active'],
-                            'HbOrt': latest_record['primary_site'],
-                            'GH': latest_record['primary_region'],
-                            'GN': latest_record['secondary_region']
+                            'KK': latest_record['KK'],
+                            'VName': latest_record['VName'],
+                            'NName': latest_record['NName'],
+                            'seit': latest_record['seit'],
+                            'aktiv': str(latest_record['aktiv']),
+                            'HbOrt': latest_record['HbOrt'],
+                            'GH': latest_record['GH'],
+                            'GN': latest_record['GN']
                         }
                         return jsonify({'observer': result})
                 else:
@@ -4858,33 +4858,13 @@ def get_observers() -> Dict[str, Any]:
         else:
             observers = observer_db.load_filtered(latest_only=latest_only)
         
-        # Convert to dict format for JSON (DB format)
-        # DB returns dicts with column names as keys
+        # observer_db now returns CSV-compatible format directly
+        # Convert aktiv from int to string for consistency
         result = []
         for obs in observers:
-            result.append({
-                'KK': obs['kk'],
-                'VName': obs['first_name'],
-                'NName': obs['last_name'],
-                'seit': obs['since'],
-                'aktiv': str(int(obs['active'])),  # Convert to '0' or '1' string for consistency with Local Mode
-                'HbOrt': obs['primary_site'],
-                'GH': obs['primary_region'],
-                'HLG': obs['primary_lon_deg'] or 0,
-                'HLM': obs['primary_lon_min'] or 0,
-                'HOW': obs['primary_lon_dir'] or '',
-                'HBG': obs['primary_lat_deg'] or 0,
-                'HBM': obs['primary_lat_min'] or 0,
-                'HNS': obs['primary_lat_dir'] or '',
-                'NbOrt': obs['secondary_site'],
-                'GN': obs['secondary_region'],
-                'NLG': obs['secondary_lon_deg'] or 0,
-                'NLM': obs['secondary_lon_min'] or 0,
-                'NOW': obs['secondary_lon_dir'] or '',
-                'NBG': obs['secondary_lat_deg'] or 0,
-                'NBM': obs['secondary_lat_min'] or 0,
-                'NNS': obs['secondary_lat_dir'] or ''
-            })
+            obs_copy = obs.copy()
+            obs_copy['aktiv'] = str(obs_copy['aktiv'])  # Convert 0/1 to '0'/'1'
+            result.append(obs_copy)
         
         return jsonify({'observers': result})
     else:
