@@ -6245,16 +6245,13 @@ async function showObserverDownloadDialog() {
             }
             
             // Save password AND observer_kk to halo.cfg for convenience
-            console.log("🔍 DEBUG: Observer download - saving password for KK:", observerKK, "password length:", password.length);
             try {
                 await fetch('/api/config/upload_password', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password: password, observer_kk: observerKK })
                 });
-                console.log("🔍 DEBUG: Observer download - password save request completed");
             } catch (error) {
-                console.log("🔍 DEBUG: Observer download - password save failed:", error);
             }
         }
         
@@ -6280,8 +6277,6 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
     try {
         spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
-        console.log("🔍 DEBUG: Cloud Mode observer download - starting, downloadAll:", downloadAll);
-        
         // Download from server with session authentication
         const response = await fetch(downloadUrl, {
             method: 'POST',
@@ -6292,16 +6287,12 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
             })
         });
         
-        console.log("🔍 DEBUG: Cloud Mode observer download - response status:", response.status, "ok:", response.ok);
-        
         const result = await response.json();
-        console.log("🔍 DEBUG: Cloud Mode observer download - result:", result);
         
         if (response.ok && result.success) {
             // Trigger file save dialog - pass spinner so it can close it after save/cancel
             const csvContent = result.csv_content;
             const defaultFilename = 'halobeo.csv';
-            console.log("🔍 DEBUG: Cloud Mode observer download - triggering file save dialog, content length:", csvContent.length);
             triggerFileSaveDialog(csvContent, defaultFilename, spinner);
             
             // Note: Success notification shown immediately, but spinner stays until file dialog closes
@@ -6311,8 +6302,6 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
                 spinner.modal.hide();
                 setTimeout(() => spinner.modalEl.remove(), 300);
             }
-            
-            console.log("🔍 DEBUG: Cloud Mode observer download - error:", result.error);
             
             // Show specific error message from server
             const errorKey = result.error || 'unknown_error';
@@ -6324,7 +6313,6 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
             spinner.modal.hide();
             setTimeout(() => spinner.modalEl.remove(), 300);
         }
-        console.error("🔍 DEBUG: Cloud Mode observer download - exception:", error);
         showErrorDialog(
             i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
             () => { window.navigateInternal('/'); }
