@@ -861,9 +861,14 @@ def execute_single_param_analysis(params: dict) -> dict:
                         ) as altitude,
                         COUNT(*) as count
                     FROM observations o
-                    JOIN observers obs ON o."KK" = obs.kk
-                        AND o."JJ" >= CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER)
-                        AND (obs.until IS NULL OR o."JJ" <= CAST(SUBSTRING(obs.until FROM 4 FOR 2) AS INTEGER))
+                    JOIN observers obs ON obs.kk = o."KK"
+                        AND CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                        AND obs.since = (
+                            SELECT MAX(obs2.since) 
+                            FROM observers obs2 
+                            WHERE obs2.kk = o."KK"
+                                AND CAST(SUBSTRING(obs2.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                        )
                     WHERE {where_sql}
                         AND o."O" = 1  -- Sun observations only
                         AND o."g" != 1  -- Not generalized observations
