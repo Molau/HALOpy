@@ -1,6 +1,7 @@
 {
   "app": {
     "title": "Haloerfassungsprogramm",
+    "window_title": "HALO 3.0",
     "version": "3.0.9",
     "version_date": "2026-02-02",
     "copyright_years": "1992-2026",
