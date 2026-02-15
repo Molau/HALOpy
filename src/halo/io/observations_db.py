@@ -8,6 +8,8 @@ Author: HALOpy Team
 Date: 2026-02-09
 """
 
+import logging
+
 # Optional import - only needed for cloud mode
 try:
     import psycopg2  # type: ignore[import-untyped]
@@ -18,6 +20,8 @@ from typing import List, Optional, Tuple
 from halo.models.types import Observation
 from halo.models.constants import YEAR_CUTOFF
 from halo.io.db_connection import get_connection
+
+logger = logging.getLogger(__name__)
 
 
 # ========================================
@@ -980,8 +984,8 @@ def execute_single_param_analysis(params: dict) -> dict:
                     ORDER BY octant
                 """
                 
-                print(f"🔍 DEBUG: SE Query SQL:\n{query}")
-                print(f"🔍 DEBUG: SE Query Params: {sql_params}")
+                logger.info(f"🔍 SE Query SQL:\n{query}")
+                logger.info(f"🔍 SE Query Params: {sql_params}")
                 
                 cursor.execute(query, sql_params)
                 rows = cursor.fetchall()
