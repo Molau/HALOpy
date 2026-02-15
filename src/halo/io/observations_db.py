@@ -967,13 +967,16 @@ def execute_single_param_analysis(params: dict) -> dict:
     
     # Special handling for SE (sectors) - extract octant letters
     if param1 == 'SE':
+        # DEFECT: Es gibt kleine Abweichungen zwischen Local Mode und Cloud Mode
+        # bei Sektoren-Zählung (z.B. 'c': 66197 vs 66193, Differenz: 4 Beobachtungen)
+        # Vermutlich unterschiedliches Whitespace-Handling zwischen Python regex
+        # (_extract_sector_letters in routes.py) und PostgreSQL regexp_split_to_table.
+        # Muss später untersucht werden.
+        #
         # Parse sectors string and count each octant letter (a-h)
         # V=2 (complete halo) + circular halo type (EE): all 8 sectors a-h visible
         # All other cases: parse sectors field
         from halo.models.constants import CIRCULAR_HALOS
-        
-        logger.error(f"🔍 SE: where_sql = {where_sql}")
-        logger.error(f"🔍 SE: sql_params = {sql_params}")
         
         with get_connection() as conn:
             with conn.cursor() as cursor:
@@ -989,13 +992,8 @@ def execute_single_param_analysis(params: dict) -> dict:
                 """
                 complete_params = sql_params + [circular_halos_list]
                 
-                logger.error(f"🔍 SE COMPLETE QUERY:\n{query_complete}")
-                logger.error(f"🔍 SE COMPLETE PARAMS: {complete_params}")
-                
                 cursor.execute(query_complete, complete_params)
                 complete_count = cursor.fetchone()[0]
-                
-                logger.error(f"🔍 SE complete count: {complete_count}")
                 
                 # Query 2: V=1 + circular halos: parse sectors field
                 query_other = f"""
@@ -1018,9 +1016,6 @@ def execute_single_param_analysis(params: dict) -> dict:
                 
                 cursor.execute(query_other, other_params)
                 rows_other = cursor.fetchall()
-                
-                logger.error(f"🔍 SE other query executed, rows: {len(rows_other)}")
-                logger.error(f"🔍 SE other results: {rows_other}")
                 
                 # Combine results
                 result = {}

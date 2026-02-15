@@ -7018,6 +7018,11 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         
         # Handle C (cirrus) splitting for param1
         if param1_name == 'SE':
+            # DEFECT: Es gibt kleine Abweichungen zwischen Local Mode und Cloud Mode
+            # bei Sektoren-Zählung (z.B. 'c': 66197 vs 66193, Differenz: 4 Beobachtungen)
+            # Vermutlich unterschiedliches Whitespace-Handling zwischen Python regex
+            # und PostgreSQL regexp_split_to_table. Muss später untersucht werden.
+            # 
             # Sectors: count octants present or visible
             # V=2 + circular halo type: all 8 segments a-h are visible
             # V=1 + circular halo type: parse sectors field
