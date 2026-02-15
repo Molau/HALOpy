@@ -6789,15 +6789,20 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
                     value = None  # Don't count again below
         elif param_name == 'SE':
             # Sectors: count octants present or visible
-            # V=2 (complete halo): all segments a-h are visible
-            # V=1 (incomplete halo): only explicitly listed segments are visible
+            # V=2 (complete halo) + circular halo type: all segments a-h are visible
+            # V=1 (incomplete halo) OR non-circular: only explicitly listed segments are visible
             # No segments: "nicht zutreffend" - skip this observation entirely
             v = getattr(obs, 'V', None)
-            if v == 2:
-                # Complete halo: count all segments a-h
+            ee = getattr(obs, 'EE', None)
+            
+            # Check if this is a circular halo type
+            is_circular = ee in CIRCULAR_HALOS if ee is not None else False
+            
+            if v == 2 and is_circular:
+                # Complete circular halo: count all segments a-h
                 sector_letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
             else:
-                # Incomplete halo: extract explicit sectors
+                # Incomplete halo or non-circular: extract explicit sectors
                 sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
             
             # Only count observations that have sectors (skip "nicht zutreffend")
@@ -7012,14 +7017,19 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         # Handle C (cirrus) splitting for param1
         if param1_name == 'SE':
             # Sectors: count octants present or visible
-            # V=2 (complete halo): all segments a-h are visible
-            # V=1 (incomplete halo): only explicitly listed segments are visible
+            # V=2 (complete halo) + circular halo type: all segments a-h are visible
+            # V=1 (incomplete halo) OR non-circular: only explicitly listed segments are visible
             v = getattr(obs, 'V', None)
-            if v == 2:
-                # Complete halo: count all segments a-h
+            ee = getattr(obs, 'EE', None)
+            
+            # Check if this is a circular halo type
+            is_circular = ee in CIRCULAR_HALOS if ee is not None else False
+            
+            if v == 2 and is_circular:
+                # Complete circular halo: count all segments a-h
                 val1_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
             else:
-                # Incomplete halo: extract explicit sectors
+                # Incomplete halo or non-circular: extract explicit sectors
                 sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
                 val1_list = sector_letters if sector_letters else []
         elif param1_name == 'HO_HU':
@@ -7061,11 +7071,16 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         # Handle C (cirrus) splitting for param2
         if param2_name == 'SE':
             # Sectors: count octants present or visible
-            # V=2 (complete halo): all segments a-h are visible
-            # V=1 (incomplete halo): only explicitly listed segments are visible
+            # V=2 (complete halo) + circular halo type: all segments a-h are visible
+            # V=1 (incomplete halo) OR non-circular: only explicitly listed segments are visible
             v = getattr(obs, 'V', None)
-            if v == 2:
-                # Complete halo: count all segments a-h
+            ee = getattr(obs, 'EE', None)
+            
+            # Check if this is a circular halo type
+            is_circular = ee in CIRCULAR_HALOS if ee is not None else False
+            
+            if v == 2 and is_circular:
+                # Complete circular halo: count all segments a-h
                 val2_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
             else:
                 # Incomplete halo: extract explicit sectors
