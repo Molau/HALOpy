@@ -967,31 +967,29 @@ def execute_single_param_analysis(params: dict) -> dict:
         # Sectors format: "a-b-c" or "e-f-g-h" etc.
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                # Use UNION ALL to count each octant letter separately
-                # This counts each occurrence of each letter a-h in the sectors field
-                octants = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-                union_queries = []
-                all_params = []
+                # Use regexp_split_to_table to extract individual octants from sectors field
+                # Then count occurrences of each octant
+                query = f"""
+                    SELECT 
+                        LOWER(TRIM(octant)) as octant, 
+                        COUNT(DISTINCT o.ctid) as count
+                    FROM observations o
+                    CROSS JOIN LATERAL regexp_split_to_table(o.sectors, '-') AS octant
+                    WHERE {where_sql}
+                        AND TRIM(octant) != ''
+                        AND LOWER(TRIM(octant)) ~ '^[a-h]$'
+                    GROUP BY LOWER(TRIM(octant))
+                    ORDER BY octant
+                """
                 
-                for octant in octants:
-                    union_queries.append(f"""
-                        SELECT '{octant}' as octant, COUNT(*) as count
-                        FROM observations
-                        WHERE {where_sql} 
-                            AND LOWER(sectors) LIKE %s
-                    """)
-                    all_params.extend(sql_params + [f'%{octant}%'])
-                
-                query = " UNION ALL ".join(union_queries)
-                
-                cursor.execute(query, all_params)
+                cursor.execute(query, sql_params)
                 rows = cursor.fetchall()
                 
                 result = {}
                 for row in rows:
                     octant = row[0]
                     count = row[1]
-                    if count > 0:  # Only include octants that actually appear
+                    if octant and count > 0:
                         result[octant] = count
                 
                 return result
