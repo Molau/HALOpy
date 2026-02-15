@@ -289,8 +289,7 @@
 82,Alexander,Haußmann,01/19,1,Hörlitz,4,13,57,O,51,32,N,Dresden-Langebrück,8,13,50,O,51,8,N
 83,Rainer,Timm,01/19,1,Haar,11,11,44,O,48,6,N,München-Ost,11,11,37,O,48,8,N
 84,Ansgar,Kuhl,02/22,1,Lohne,2,8,13,O,52,40,N,Lohne,2,8,14,O,52,40,N
-88,Vorname 2,Nachname 2,01/26,1,Testhausen,01,0,1,O,2,3,N,Teststadt,02,3,4,W,5,6,S
-88,Vorname 2,Nachname 2,02/26,1,hb3,04,0,0,O,0,0,N,nb3,04,0,0,W,0,0,S
+88,Vorname,Nachname,01/80,1,Testhausen,01,0,0,O,0,0,N,Teststadt,02,0,0,O,0,0,N
 89,Ina,Rendtel,10/20,1,Potsdam,4,12,59,O,52,25,N,Potsdam,4,12,59,O,52,25,N
 90,Alastair,Mc Beath,05/96,1,Morpeth/England,35,1,36,W,55,15,N,Manchester/England,35,1,36,W,55,15,N
 90,Alastair,Mc Beath,01/09,0,Morpeth,35,1,36,W,55,15,N,Manchster,35,1,36,W,55,15,N

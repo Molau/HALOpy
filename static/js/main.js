@@ -8471,11 +8471,9 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             // Show success message
             showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
             
-            // Reload page after 2 seconds if on observers page
+            // Return to main page after 2 seconds
             setTimeout(() => {
-                if (window.location.pathname === '/observers') {
-                    window.location.reload();
-                }
+                window.navigateInternal('/');
             }, 2000);
             
         } catch (e) {
