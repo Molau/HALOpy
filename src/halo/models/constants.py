@@ -211,16 +211,16 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
             # Primary site (g=0): columns 10, 11, 12 = lat_deg, lat_min, lat_dir
             # Secondary site (g=2): columns 18, 19, 20 = lat_deg, lat_min, lat_dir
             if obs.g == 0:  # Primary site
-                lat_deg_str = get_observer_field(observer_record, 'primary_lat_deg', 10)
-                lat_min_str = get_observer_field(observer_record, 'primary_lat_min', 11)
-                lat_ns = get_observer_field(observer_record, 'primary_lat_dir', 12)
+                lat_deg_str = get_observer_field(observer_record, 'HBG', 10)
+                lat_min_str = get_observer_field(observer_record, 'HBM', 11)
+                lat_ns = get_observer_field(observer_record, 'HNS', 12)
                 lat_deg = int(lat_deg_str) if lat_deg_str and lat_deg_str != '' else 50
                 lat_min = int(lat_min_str) if lat_min_str and lat_min_str != '' else 0
                 lat_ns = lat_ns if lat_ns else 'N'
             else:  # Secondary site (g=2)
-                lat_deg_str = get_observer_field(observer_record, 'secondary_lat_deg', 18)
-                lat_min_str = get_observer_field(observer_record, 'secondary_lat_min', 19)
-                lat_ns = get_observer_field(observer_record, 'secondary_lat_dir', 20)
+                lat_deg_str = get_observer_field(observer_record, 'NBG', 18)
+                lat_min_str = get_observer_field(observer_record, 'NBM', 19)
+                lat_ns = get_observer_field(observer_record, 'NNS', 20)
                 lat_deg = int(lat_deg_str) if lat_deg_str and lat_deg_str != '' else 50
                 lat_min = int(lat_min_str) if lat_min_str and lat_min_str != '' else 0
                 lat_ns = lat_ns if lat_ns else 'N'

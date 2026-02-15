@@ -5003,19 +5003,19 @@ def get_observers_list() -> Dict[str, Any]:
             with db_connection.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Get latest record per observer (highest 'since' value)
+                # Get latest record per observer (highest 'seit' value)
                 # PostgreSQL: DISTINCT ON syntax
                 query = """
-                    SELECT DISTINCT ON (kk) 
-                        kk, first_name, last_name, since
+                    SELECT DISTINCT ON (\"KK\") 
+                        \"KK\", \"VName\", \"NName\", \"seit\"
                     FROM observers
-                    ORDER BY kk, since DESC
+                    ORDER BY \"KK\", \"seit\" DESC
                 """
                 cursor.execute(query)
                 db_observers = cursor.fetchall()
                 cursor.close()
                 
-                # Convert to standardized format (rows are tuples: (kk, first_name, last_name, since))
+                # Convert to standardized format (rows are tuples: (KK, VName, NName, seit))
                 observers = []
                 for obs in db_observers:
                     observers.append({
@@ -5126,38 +5126,39 @@ def get_observer_regions() -> Dict[str, Any]:
 
 
 def _observer_row_to_dict(row: list) -> Dict[str, Any]:
-    """Convert observer CSV row (list) to database record (dict).
+    """Convert observer CSV row (list) to Python field name dict.
+    Since database now uses Python field names, return them directly.
     
     Args:
         row: List with 21 elements in CSV format:
-             [KK, VName, NName, seit, active, HbOrt, GH, HLG, HLM, HOW, HBG, HBM, HNS,
+             [KK, VName, NName, seit, aktiv, HbOrt, GH, HLG, HLM, HOW, HBG, HBM, HNS,
               NbOrt, GN, NLG, NLM, NOW, NBG, NBM, NNS]
     
     Returns:
-        Dict with database column names as keys
+        Dict with Python field names as keys (matching database column names)
     """
     return {
-        'kk': row[0],
-        'first_name': row[1],
-        'last_name': row[2],
-        'since': row[3],
-        'active': int(row[4]) if row[4] else 1,
-        'primary_site': row[5],
-        'primary_region': int(row[6]) if row[6] else 0,
-        'primary_lon_deg': int(row[7]) if row[7] else 0,
-        'primary_lon_min': int(row[8]) if row[8] else 0,
-        'primary_lon_dir': row[9],
-        'primary_lat_deg': int(row[10]) if row[10] else 0,
-        'primary_lat_min': int(row[11]) if row[11] else 0,
-        'primary_lat_dir': row[12],
-        'secondary_site': row[13],
-        'secondary_region': int(row[14]) if row[14] else 0,
-        'secondary_lon_deg': int(row[15]) if row[15] else 0,
-        'secondary_lon_min': int(row[16]) if row[16] else 0,
-        'secondary_lon_dir': row[17],
-        'secondary_lat_deg': int(row[18]) if row[18] else 0,
-        'secondary_lat_min': int(row[19]) if row[19] else 0,
-        'secondary_lat_dir': row[20]
+        'KK': row[0],
+        'VName': row[1],
+        'NName': row[2],
+        'seit': row[3],
+        'aktiv': int(row[4]) if row[4] else 1,
+        'HbOrt': row[5],
+        'GH': int(row[6]) if row[6] else 0,
+        'HLG': int(row[7]) if row[7] else 0,
+        'HLM': int(row[8]) if row[8] else 0,
+        'HOW': row[9],
+        'HBG': int(row[10]) if row[10] else 0,
+        'HBM': int(row[11]) if row[11] else 0,
+        'HNS': row[12],
+        'NbOrt': row[13],
+        'GN': int(row[14]) if row[14] else 0,
+        'NLG': int(row[15]) if row[15] else 0,
+        'NLM': int(row[16]) if row[16] else 0,
+        'NOW': row[17],
+        'NBG': int(row[18]) if row[18] else 0,
+        'NBM': int(row[19]) if row[19] else 0,
+        'NNS': row[20]
     }
 
 
@@ -5319,29 +5320,29 @@ def update_observer(kk: str) -> Dict[str, Any]:
             # observers is a list of dicts from load_filtered()
             updated_count = 0
             for obs in observers:
-                # Build updated record dict with new VName/NName
+                # Build updated record dict with new VName/NName (all Python field names)
                 updated_record = {
-                    'kk': kk,
-                    'active': obs['aktiv'],  # unchanged
-                    'since': obs['seit'],  # unchanged
-                    'first_name': data.get('VName', '')[:15],  # UPDATED
-                    'last_name': data.get('NName', '')[:15],  # UPDATED
-                    'primary_site': obs['HbOrt'],  # unchanged
-                    'primary_region': obs['GH'],  # unchanged (was HbReg)
-                    'primary_lon_deg': obs['HLG'],  # unchanged
-                    'primary_lon_min': obs['HLM'],  # unchanged
-                    'primary_lon_dir': obs['HOW'],  # unchanged
-                    'primary_lat_deg': obs['HBG'],  # unchanged
-                    'primary_lat_min': obs['HBM'],  # unchanged
-                    'primary_lat_dir': obs['HNS'],  # unchanged
-                    'secondary_site': obs['NbOrt'],  # unchanged
-                    'secondary_region': obs['GN'],  # unchanged (was NbReg)
-                    'secondary_lon_deg': obs['NLG'],  # unchanged
-                    'secondary_lon_min': obs['NLM'],  # unchanged
-                    'secondary_lon_dir': obs['NOW'],  # unchanged
-                    'secondary_lat_deg': obs['NBG'],  # unchanged
-                    'secondary_lat_min': obs['NBM'],  # unchanged
-                    'secondary_lat_dir': obs['NNS']  # unchanged
+                    'KK': kk,
+                    'aktiv': obs['aktiv'],  # unchanged
+                    'seit': obs['seit'],  # unchanged
+                    'VName': data.get('VName', '')[:15],  # Python field name
+                    'NName': data.get('NName', '')[:15],  # Python field name
+                    'HbOrt': obs['HbOrt'],  # unchanged
+                    'GH': obs['GH'],  # unchanged
+                    'HLG': obs['HLG'],  # unchanged
+                    'HLM': obs['HLM'],  # unchanged
+                    'HOW': obs['HOW'],  # unchanged
+                    'HBG': obs['HBG'],  # unchanged
+                    'HBM': obs['HBM'],  # unchanged
+                    'HNS': obs['HNS'],  # unchanged
+                    'NbOrt': obs['NbOrt'],  # unchanged
+                    'GN': obs['GN'],  # unchanged
+                    'NLG': obs['NLG'],  # unchanged
+                    'NLM': obs['NLM'],  # unchanged
+                    'NOW': obs['NOW'],  # unchanged
+                    'NBG': obs['NBG'],  # unchanged
+                    'NBM': obs['NBM'],  # unchanged
+                    'NNS': obs['NNS']  # unchanged
                 }
                 
                 success = observer_db.update_one(kk, obs['seit'], updated_record)

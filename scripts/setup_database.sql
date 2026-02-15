@@ -345,7 +345,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 -- CSV: KK,VName,NName,seit,aktiv,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
 -- DB:  "KK","VName","NName","seit","aktiv","HbOrt","GH","HLG","HLM","HOW","HBG","HBM","HNS","NbOrt","GN","NLG","NLM","NOW","NBG","NBM","NNS"
 -- NO MAPPING NEEDED - Python names == DB names!
-\COPY observers("KK","VName","NName","seit","aktiv","HbOrt","GH","HLG","HLM","HOW","HBG","HBM","HNS","NbOrt","GN","NLG","NLM","NOW","NBG","NBM","NNS") FROM '/home/ubuntu/halopy/halobeo.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', NULL '');
+\COPY observers("KK","VName","NName","seit","aktiv","HbOrt","GH","HLG","HLM","HOW","HBG","HBM","HNS","NbOrt","GN","NLG","NLM","NOW","NBG","NBM","NNS") FROM '/home/ubuntu/halopy/resources/halobeo.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', NULL '');
 
 -- Import observations - CSV columns map 1:1 to DB columns (exact names)
 -- CSV: KK,O,JJ,MM,TT,g,ZS,ZM,d,DD,N,C,c,EE,H,F,V,f,zz,GG,8HHHH,sectors,remarks

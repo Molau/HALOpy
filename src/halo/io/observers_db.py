@@ -296,7 +296,7 @@ def save_one(record: Dict[str, Any]) -> bool:
         False if duplicate key (kk, since)
         
     Example:
-        >>> record = {'kk': '44', 'first_name': 'Max', 'last_name': 'Mustermann', ...}
+        >>> record = {'KK': '44', 'VName': 'Max', 'NName': 'Mustermann', ...}
         >>> if save_one(record):
         ...     print("Observer record saved")
         ... else:

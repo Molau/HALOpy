@@ -875,14 +875,14 @@ def execute_single_param_analysis(params: dict) -> dict:
                             SELECT 
                                 calculate_solar_altitude(
                                     o."JJ", o."MM", o."TT", o."ZS", o."ZM", o."d",
-                                    obs.primary_lon_deg, obs.primary_lon_min, obs.primary_lon_dir,
-                                    obs.primary_lat_deg, obs.primary_lat_min, obs.primary_lat_dir,
+                                    obs."HLG", obs."HLM", obs."HOW",
+                                    obs."HBG", obs."HBM", obs."HNS",
                                     %s
                                 ) as altitude
                             FROM observations o
-                            JOIN observers obs ON obs.kk = o."KK"
-                                AND CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
-                                AND obs.since = (
+                            JOIN observers obs ON obs."KK" = o."KK"
+                                AND CAST(SUBSTRING(obs."seit" FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                                AND obs."seit" = (
                                     SELECT MAX(obs2.since) 
                                     FROM observers obs2 
                                     WHERE obs2.kk = o."KK"
@@ -901,19 +901,19 @@ def execute_single_param_analysis(params: dict) -> dict:
                         SELECT 
                             calculate_solar_altitude(
                                 o."JJ", o."MM", o."TT", o."ZS", o."ZM", o."d",
-                                obs.primary_lon_deg, obs.primary_lon_min, obs.primary_lon_dir,
-                                obs.primary_lat_deg, obs.primary_lat_min, obs.primary_lat_dir,
+                                obs."HLG", obs."HLM", obs."HOW",
+                                obs."HBG", obs."HBM", obs."HNS",
                                 %s
                             ) as altitude,
                             COUNT(*) as count
                         FROM observations o
-                        JOIN observers obs ON obs.kk = o."KK"
-                            AND CAST(SUBSTRING(obs.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
-                            AND obs.since = (
-                                SELECT MAX(obs2.since) 
+                        JOIN observers obs ON obs."KK" = o."KK"
+                            AND CAST(SUBSTRING(obs."seit" FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                            AND obs."seit" = (
+                                SELECT MAX(obs2."seit") 
                                 FROM observers obs2 
-                                WHERE obs2.kk = o."KK"
-                                    AND CAST(SUBSTRING(obs2.since FROM 4 FOR 2) AS INTEGER) <= o."JJ"
+                                WHERE obs2."KK" = o."KK"
+                                    AND CAST(SUBSTRING(obs2."seit" FROM 4 FOR 2) AS INTEGER) <= o."JJ"
                             )
                         {where_clause_inner}
                         GROUP BY altitude
