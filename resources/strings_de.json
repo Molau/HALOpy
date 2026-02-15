@@ -2,8 +2,8 @@
   "app": {
     "title": "Haloerfassungsprogramm",
     "window_title": "HALO 3.0",
-    "version": "3.0.9",
-    "version_date": "2026-02-02",
+    "version": "3.0.10",
+    "version_date": "2026-02-15",
     "copyright_years": "1992-2026",
     "welcome_title": "Willkommen beim HALO Auswerteprogramm",
     "description": "Programm zur Erfassung und Auswertung von Halobeobachtungen",
