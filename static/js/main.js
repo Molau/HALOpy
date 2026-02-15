@@ -672,7 +672,7 @@ async function showAddObservationDialogNumeric() {
     const config = await configResponse.json();
     
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
-    if (!config.cloud_mode && !window.haloData.isLoaded) {
+    if (!isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -1545,7 +1545,7 @@ async function showAddObservationDialogMenu() {
     const config = await configResponse.json();
     
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
-    if (!config.cloud_mode && !window.haloData.isLoaded) {
+    if (!isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -3401,7 +3401,7 @@ async function showDisplayObservationsDialog() {
         
         // Only check for loaded data in Local Mode
         // In Cloud Mode, data is always in database
-        if (!config.cloud_mode) {
+        if (!isCloudMode) {
             try {
                 const response = await fetch('/api/observations?limit=1');
                 if (!response.ok) {
@@ -3947,7 +3947,7 @@ async function showSelectDialog() {
     const config = await configResponse.json();
     
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
-    if (!config.cloud_mode && !window.haloData.fileName) {
+    if (!isCloudMode && !window.haloData.fileName) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -5178,7 +5178,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                             <label class="form-label">${i18nStrings.file.load}:</label>
                             ${startupFilePath ? `
                                 <input type="text" class="form-control" value="${startupFilePath}" readonly style="background-color: #f8f9fa;">
-                                <small class="text-muted">Startup-Datei wird verwendet</small>
+                                <small class="text-muted">${i18nStrings.settings.startup_file_in_use}</small>
                             ` : `
                                 <input type="file" class="form-control" id="upload-file-input" accept=".csv">
                             `}
@@ -5228,7 +5228,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             // Preselect: savedObserverKK > fixedObserver > none
             const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
             option.selected = selected === 'selected';
-            option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
+            option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName} ${obs.NName}`.trim();
             observerSelect.appendChild(option);
         });
         
@@ -6263,7 +6263,7 @@ async function showObserverDownloadDialog() {
         setTimeout(() => modalEl.remove(), 300);
         
         // Trigger download
-        if (config.cloud_mode) {
+        if (isCloudMode) {
             await downloadObserversCloudMode(cloudServerUrl, downloadAll);
         } else {
             await downloadObserversLocalMode(cloudServerUrl, observerKK, password, downloadAll);
@@ -6298,20 +6298,13 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
         console.log("🔍 DEBUG: Cloud Mode observer download - result:", result);
         
         if (response.ok && result.success) {
-            // Close spinner on success
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-            }
-            
-            // Trigger file save dialog
+            // Trigger file save dialog - pass spinner so it can close it after save/cancel
             const csvContent = result.csv_content;
             const defaultFilename = 'halobeo.csv';
             console.log("🔍 DEBUG: Cloud Mode observer download - triggering file save dialog, content length:", csvContent.length);
-            triggerFileSaveDialog(csvContent, defaultFilename);
+            triggerFileSaveDialog(csvContent, defaultFilename, spinner);
             
-            // Success notification
-            showNotification(i18nStrings.upload_download.download_success_observer, 'success');
+            // Note: Success notification shown immediately, but spinner stays until file dialog closes
         } else {
             // Close spinner on error
             if (spinner) {
@@ -6432,7 +6425,7 @@ async function triggerAutosave() {
     const config = await configResponse.json();
     
     // Skip autosave in Cloud Mode - database saves immediately
-    if (config.cloud_mode) {
+    if (isCloudMode) {
         return;
     }
     
@@ -6457,7 +6450,7 @@ async function checkAutosaveRecovery() {
     const config = await configResponse.json();
     
     // Skip autosave recovery in Cloud Mode - database is the source of truth
-    if (config.cloud_mode) {
+    if (isCloudMode) {
         return;
     }
     
@@ -6820,7 +6813,7 @@ async function showMergeFileDialog() {
     const config = await configResponse.json();
     
     // Check if a file is loaded (Local Mode only - Cloud Mode doesn't support file merge)
-    if (!config.cloud_mode && !window.haloData.fileName) {
+    if (!isCloudMode && !window.haloData.fileName) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
     }
@@ -7603,8 +7596,8 @@ async function showChangePasswordDialog() {
                 try {
                     const configResponse = await fetch('/api/config');
                     const config = await configResponse.json();
-                    const apiBase = config.cloud_mode ? '' : config.cloud_server_url;
-                    if (!config.cloud_mode && !apiBase) {
+                    const apiBase = isCloudMode ? '' : config.cloud_server_url;
+                    if (!isCloudMode && !apiBase) {
                         showError(i18nStrings.messages.error_loading);
                         return;
                     }
@@ -7850,8 +7843,8 @@ window.handleLogout = async function() {
         try {
             const configResponse = await fetch('/api/config');
             const config = await configResponse.json();
-            const apiBase = config.cloud_mode ? '' : config.cloud_server_url;
-            if (!config.cloud_mode && !apiBase) {
+            const apiBase = isCloudMode ? '' : config.cloud_server_url;
+            if (!isCloudMode && !apiBase) {
                 showErrorDialog(i18nStrings.messages.error_loading);
                 return;
             }
