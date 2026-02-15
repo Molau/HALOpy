@@ -6011,65 +6011,88 @@ def analyze_observations() -> Dict[str, Any]:
         # Get request parameters
         params = request.get_json()
         
-        # TODO: CLOUD MODE - CRITICAL REFACTORING REQUIRED
-        # This function uses complex filtering with param1/param2 ranges and filter1/filter2
-        # ALL filters must be converted to SQL WHERE clauses to avoid loading 100K+ records
-        # Required changes:
-        # 1. Create obs_db.load_filtered_analysis() with all filter parameters
-        # 2. Convert _apply_filter() logic to SQL WHERE conditions
-        # 3. Convert _apply_param_range_filter() logic to SQL WHERE conditions
-        # 4. Keep _group_by_parameter() in Python (aggregation after filtering)
-        # 5. Test with large datasets (100K+ observations) to verify performance
-        
-        # Load observations from current session or default file
-        observations = current_app.config.get('OBSERVATIONS', [])
-        if not observations:
-            csv_handler = ObservationCSV()
-            data_path = obs_file.get_data_path('ALLE.CSV')
-            observations, needs_conversion = csv_handler.read_observations(str(data_path))
-            # Auto-convert legacy format
-            if needs_conversion:
-                csv_handler.write_observations(data_path, observations)
-        
-        # Apply filters first
-        filtered_obs = observations
-        
-        # Apply filter1 if specified
-        if params.get('filter1'):
-            filter1 = params['filter1']
-            filter1_value = params.get('filter1_value', '')
-            filtered_obs = _apply_filter(filtered_obs, filter1, filter1_value, params, 'filter1')
-        
-        # Apply filter2 if specified
-        if params.get('filter2'):
-            filter2 = params['filter2']
-            filter2_value = params.get('filter2_value', '')
-            filtered_obs = _apply_filter(filtered_obs, filter2, filter2_value, params, 'filter2')
-        
-        # Apply param1 range filter if needed
-        param1 = params.get('param1')
-        filtered_obs = _apply_param_range_filter(filtered_obs, param1, params, 'param1')
-        
-        # Apply param2 range filter if specified
-        param2 = params.get('param2')
-        if param2:
-            filtered_obs = _apply_param_range_filter(filtered_obs, param2, params, 'param2')
-        
-        # Group by parameter(s)
-        if not param2:
-            # Single parameter analysis
-            data = _group_by_parameter(filtered_obs, param1, params, 'param1')
+        # Cloud Mode: Use database analysis functions (SQL-based)
+        # Local Mode: Use Python filtering on loaded observations
+        if is_cloud_mode():
+            # Apply fixed observer filter for non-admin users
+            fixed_observer = session.get('observer_kk')
+            if fixed_observer:
+                params['kk'] = int(fixed_observer)
+            
+            # Use database analysis functions
+            param1 = params.get('param1')
+            param2 = params.get('param2')
+            
+            if not param2:
+                # Single parameter analysis
+                data = obs_db.execute_single_param_analysis(params)
+            else:
+                # Two parameter analysis (cross-tabulation)
+                data = obs_db.execute_two_param_analysis(params)
+            
+            # Calculate total from data (sum of all counts)
+            if isinstance(data, dict):
+                if not param2:
+                    total = sum(data.values())
+                else:
+                    total = sum(sum(inner.values()) for inner in data.values())
+            else:
+                total = 0
+            
+            debug_info = None  # DB analysis doesn't provide debug info yet
+            
         else:
-            # Two parameter analysis (cross-tabulation)
-            data, debug_info = _group_by_two_parameters(filtered_obs, param1, param2, params)
+            # Local Mode: Load observations and use Python filtering
+            observations = current_app.config.get('OBSERVATIONS', [])
+            if not observations:
+                csv_handler = ObservationCSV()
+                data_path = obs_file.get_data_path('ALLE.CSV')
+                observations, needs_conversion = csv_handler.read_observations(str(data_path))
+                # Auto-convert legacy format
+                if needs_conversion:
+                    csv_handler.write_observations(data_path, observations)
+            
+            # Apply filters first
+            filtered_obs = observations
+            
+            # Apply filter1 if specified
+            if params.get('filter1'):
+                filter1 = params['filter1']
+                filter1_value = params.get('filter1_value', '')
+                filtered_obs = _apply_filter(filtered_obs, filter1, filter1_value, params, 'filter1')
+            
+            # Apply filter2 if specified
+            if params.get('filter2'):
+                filter2 = params['filter2']
+                filter2_value = params.get('filter2_value', '')
+                filtered_obs = _apply_filter(filtered_obs, filter2, filter2_value, params, 'filter2')
+            
+            # Apply param1 range filter if needed
+            param1 = params.get('param1')
+            filtered_obs = _apply_param_range_filter(filtered_obs, param1, params, 'param1')
+            
+            # Apply param2 range filter if specified
+            param2 = params.get('param2')
+            if param2:
+                filtered_obs = _apply_param_range_filter(filtered_obs, param2, params, 'param2')
+            
+            # Group by parameter(s)
+            if not param2:
+                # Single parameter analysis
+                data = _group_by_parameter(filtered_obs, param1, params, 'param1')
+            else:
+                # Two parameter analysis (cross-tabulation)
+                data, debug_info = _group_by_two_parameters(filtered_obs, param1, param2, params)
+            
+            total = len(filtered_obs)
         
         response_payload = {
             'success': True,
             'data': data,
-            'total': len(filtered_obs)
+            'total': total
         }
-        # Include SH debug info when present
-        if param2 and param1 and (param1 == 'SH' or param2 == 'SH'):
+        # Include SH debug info when present (Local Mode only)
+        if not is_cloud_mode() and param2 and param1 and (param1 == 'SH' or param2 == 'SH'):
             response_payload['debug'] = debug_info
 
         return jsonify(response_payload)
