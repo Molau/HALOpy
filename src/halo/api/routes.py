@@ -32,6 +32,7 @@ from flask import Blueprint, jsonify, request, current_app, Response, session, g
 from halo.config import is_cloud_mode, get_cloud_server_url
 from halo.io.csv_handler import ObservationCSV
 from halo.models.constants import (
+    CIRCULAR_HALOS,
     COMBINED_TO_INDIVIDUAL_HALOS,
     DEFAULT_OBSERVATION_LIMIT,
     YEAR_CUTOFF,
