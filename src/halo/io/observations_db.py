@@ -57,6 +57,7 @@ def _tuple_to_observation(row: Tuple) -> Observation:
     
     Mappings:
     - PostgreSQL lowercase columns → Python uppercase fields
+    - PostgreSQL NULL → Python -1 (not observed)
     - pillar column → HO/HU fields (parse "8HHHH")
     - cc column → C field
     - ff column → f field
@@ -67,24 +68,47 @@ def _tuple_to_observation(row: Tuple) -> Observation:
     Returns:
         Observation object
     """
+    # Helper to convert NULL to -1
+    def null_to_minus1(value):
+        return value if value is not None else -1
+    
     # Parse pillar field: "8HHHH" → HO, HU
-    # Special values: "//" = not observed (stored as -2 in Python)
+    # Special values: "//" or NULL = not observed (stored as -1 in Python)
     pillar = row[20] or ""
-    if pillar == "//":
-        HO = -2
-        HU = -2
+    if not pillar or pillar == "//":
+        HO = -1
+        HU = -1
     elif len(pillar) >= 3 and pillar[1:3].isdigit():
         HO = int(pillar[1:3])
         HU = int(pillar[3:5]) if len(pillar) >= 5 and pillar[3:5].isdigit() else 0
     else:
-        HO = 0
-        HU = 0
+        HO = -1
+        HU = -1
     
     return Observation(
-        KK=row[0], O=row[1], JJ=row[2], MM=row[3], TT=row[4], g=row[5],
-        ZS=row[6], ZM=row[7], d=row[8], DD=row[9], N=row[10], C=row[11], c=row[12],
-        EE=row[13], H=row[14], F=row[15], V=row[16], f=row[17], zz=row[18], GG=row[19],
-        HO=HO, HU=HU, sectors=row[21] or "", remarks=row[22] or ""
+        KK=null_to_minus1(row[0]), 
+        O=null_to_minus1(row[1]), 
+        JJ=null_to_minus1(row[2]), 
+        MM=null_to_minus1(row[3]), 
+        TT=null_to_minus1(row[4]), 
+        g=null_to_minus1(row[5]),
+        ZS=null_to_minus1(row[6]), 
+        ZM=null_to_minus1(row[7]), 
+        d=null_to_minus1(row[8]), 
+        DD=null_to_minus1(row[9]), 
+        N=null_to_minus1(row[10]), 
+        C=null_to_minus1(row[11]), 
+        c=null_to_minus1(row[12]),
+        EE=null_to_minus1(row[13]), 
+        H=null_to_minus1(row[14]), 
+        F=null_to_minus1(row[15]), 
+        V=null_to_minus1(row[16]), 
+        f=null_to_minus1(row[17]), 
+        zz=null_to_minus1(row[18]), 
+        GG=null_to_minus1(row[19]),
+        HO=HO, HU=HU, 
+        sectors=row[21] or "", 
+        remarks=row[22] or ""
     )
 
 
