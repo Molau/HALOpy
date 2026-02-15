@@ -930,15 +930,71 @@ def execute_single_param_analysis(params: dict) -> dict:
     
     # Special handling for HO_HU (pillar height)
     if param1 == 'HO_HU':
-        # Need to parse pillar field and extract HO/HU values
-        # Complex query - for now, return empty dict
-        return {}
+        # Parse pillar field "8HHHH" and extract HO/HU values
+        # Use UNION to get both HO and HU values separately
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                query = f"""
+                    SELECT height, COUNT(*) as count FROM (
+                        SELECT NULLIF(SUBSTRING(pillar, 2, 2), '')::INTEGER as height
+                        FROM observations
+                        WHERE {where_sql} AND pillar IS NOT NULL AND pillar != ''
+                        UNION ALL
+                        SELECT NULLIF(SUBSTRING(pillar, 4, 2), '')::INTEGER as height
+                        FROM observations
+                        WHERE {where_sql} AND pillar IS NOT NULL AND pillar != ''
+                    ) AS heights
+                    WHERE height IS NOT NULL AND height > 0
+                    GROUP BY height
+                    ORDER BY height
+                """
+                
+                cursor.execute(query, sql_params + sql_params)
+                rows = cursor.fetchall()
+                
+                result = {}
+                for row in rows:
+                    height = row[0]
+                    count = row[1]
+                    if height is not None:
+                        result[height] = count
+                
+                return result
     
     # Special handling for SE (sectors) - extract octant letters
     if param1 == 'SE':
-        # Need to parse sectors string and count by octant
-        # Complex query - for now, return empty dict
-        return {}
+        # Parse sectors string and count each octant letter (a-h)
+        # Sectors format: "a-b-c" or "e-f-g-h" etc.
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Use UNION ALL to count each octant letter separately
+                # This counts each occurrence of each letter a-h in the sectors field
+                octants = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+                union_queries = []
+                all_params = []
+                
+                for octant in octants:
+                    union_queries.append(f"""
+                        SELECT '{octant}' as octant, COUNT(*) as count
+                        FROM observations
+                        WHERE {where_sql} 
+                            AND LOWER(sectors) LIKE %s
+                    """)
+                    all_params.extend(sql_params + [f'%{octant}%'])
+                
+                query = " UNION ALL ".join(union_queries)
+                
+                cursor.execute(query, all_params)
+                rows = cursor.fetchall()
+                
+                result = {}
+                for row in rows:
+                    octant = row[0]
+                    count = row[1]
+                    if count > 0:  # Only include octants that actually appear
+                        result[octant] = count
+                
+                return result
     
     # Standard query with GROUP BY
     with get_connection() as conn:
