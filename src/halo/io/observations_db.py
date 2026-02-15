@@ -980,6 +980,9 @@ def execute_single_param_analysis(params: dict) -> dict:
                     ORDER BY octant
                 """
                 
+                print(f"🔍 DEBUG: SE Query SQL:\n{query}")
+                print(f"🔍 DEBUG: SE Query Params: {sql_params}")
+                
                 cursor.execute(query, sql_params)
                 rows = cursor.fetchall()
                 
