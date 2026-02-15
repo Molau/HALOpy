@@ -838,6 +838,9 @@ def execute_single_param_analysis(params: dict) -> dict:
     # Special case: ZZ uses ZS field
     if param1 == 'ZZ':
         db_field = '"ZS"'
+    elif param1 == 'JJ':
+        # Year: convert 2-digit to 4-digit (JJ < 50 = 20xx, JJ >= 50 = 19xx)
+        db_field = f'CASE WHEN "JJ" >= {YEAR_CUTOFF} THEN "JJ" + 1900 ELSE "JJ" + 2000 END'
     else:
         db_field = f'"{param1}"'
     
@@ -863,11 +866,11 @@ def execute_single_param_analysis(params: dict) -> dict:
     with get_connection() as conn:
         with conn.cursor() as cursor:
             query = f"""
-                SELECT {db_field}, COUNT(*) as count
+                SELECT {db_field} as value, COUNT(*) as count
                 FROM observations
                 WHERE {where_sql}
-                GROUP BY {db_field}
-                ORDER BY {db_field}
+                GROUP BY value
+                ORDER BY value
             """
             
             cursor.execute(query, sql_params)
