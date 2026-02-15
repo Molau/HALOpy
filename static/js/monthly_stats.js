@@ -150,9 +150,30 @@ document.addEventListener('DOMContentLoaded', async function() {
             const response = await fetch(url);
             
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                console.error('API error:', errorData);
-                throw new Error(errorData.error);
+                // Handle different error response types gracefully
+                let errorMessage = `Server Error ${response.status}: ${response.statusText}`;
+                
+                try {
+                    // Try to parse JSON error response
+                    const errorData = await response.json();
+                    if (errorData.error) {
+                        errorMessage = errorData.error;
+                    }
+                } catch (jsonError) {
+                    // If JSON parsing fails, try to get text content
+                    try {
+                        const textContent = await response.text();
+                        if (textContent && textContent.length < 200) {
+                            errorMessage = textContent;
+                        }
+                    } catch (textError) {
+                        // If everything fails, use status info
+                        console.warn('Failed to parse error response:', jsonError);
+                    }
+                }
+                
+                console.error('API error:', { status: response.status, statusText: response.statusText, message: errorMessage });
+                throw new Error(errorMessage);
             }
             
             const data = await response.json();

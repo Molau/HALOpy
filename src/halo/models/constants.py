@@ -190,10 +190,18 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
         
         # Calculate relative activity with daylight factor
         # Determine latitude from observer data
-        # observers is dict {kk: observer_record_list} where record is CSV row
+        # observers is dict {kk: observer_record} where record is CSV row (list) or DB dict
         if kk in observers:
             observer_found_count += 1
             observer_record = observers[kk]
+            
+            # Helper function to access observer record fields (supports both dict and list format)
+            def get_observer_field(obs_rec, key, index):
+                """Get field from observer record (dict from DB or list from file)."""
+                if isinstance(obs_rec, dict):
+                    return obs_rec.get(key, '')
+                else:
+                    return obs_rec[index] if len(obs_rec) > index else ''
             
             # CORRECTED COLUMN INDICES FOR LATITUDE
             # Format: KK, VName, NName, seit, active, Ort, lonDeg, lonMin, lonSec, lonDir, latDeg, latMin, latDir, ...
@@ -203,13 +211,19 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
             # Primary site (g=0): columns 10, 11, 12 = lat_deg, lat_min, lat_dir
             # Secondary site (g=2): columns 18, 19, 20 = lat_deg, lat_min, lat_dir
             if obs.g == 0:  # Primary site
-                lat_deg = int(observer_record[10]) if len(observer_record) > 10 and observer_record[10] else 50
-                lat_min = int(observer_record[11]) if len(observer_record) > 11 and observer_record[11] else 0
-                lat_ns = observer_record[12] if len(observer_record) > 12 else 'N'
+                lat_deg_str = get_observer_field(observer_record, 'primary_lat_deg', 10)
+                lat_min_str = get_observer_field(observer_record, 'primary_lat_min', 11)
+                lat_ns = get_observer_field(observer_record, 'primary_lat_dir', 12)
+                lat_deg = int(lat_deg_str) if lat_deg_str and lat_deg_str != '' else 50
+                lat_min = int(lat_min_str) if lat_min_str and lat_min_str != '' else 0
+                lat_ns = lat_ns if lat_ns else 'N'
             else:  # Secondary site (g=2)
-                lat_deg = int(observer_record[18]) if len(observer_record) > 18 and observer_record[18] else 50
-                lat_min = int(observer_record[19]) if len(observer_record) > 19 and observer_record[19] else 0
-                lat_ns = observer_record[20] if len(observer_record) > 20 else 'N'
+                lat_deg_str = get_observer_field(observer_record, 'secondary_lat_deg', 18)
+                lat_min_str = get_observer_field(observer_record, 'secondary_lat_min', 19)
+                lat_ns = get_observer_field(observer_record, 'secondary_lat_dir', 20)
+                lat_deg = int(lat_deg_str) if lat_deg_str and lat_deg_str != '' else 50
+                lat_min = int(lat_min_str) if lat_min_str and lat_min_str != '' else 0
+                lat_ns = lat_ns if lat_ns else 'N'
             
             latitude = lat_deg + lat_min / 60.0
             if lat_ns == 'S':
