@@ -32,6 +32,7 @@ def _db_to_csv_format(db_record: Dict[str, Any]) -> Dict[str, Any]:
     - Convert boolean True/False to int 0/1
     - Use same field names as CSV
     - Convert None to empty string or 0
+    - Normalize seit to MM/JJ format (2-digit year)
     
     Args:
         db_record: Record from database (RealDictRow converted to dict)
@@ -39,11 +40,23 @@ def _db_to_csv_format(db_record: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Record in CSV-compatible format
     """
+    # Normalize seit to MM/JJ format (ensure 2-digit year)
+    seit = db_record['since']
+    if seit and '/' in seit:
+        parts = seit.split('/')
+        if len(parts) == 2:
+            month = parts[0].zfill(2)  # Ensure 2-digit month
+            year = parts[1]
+            # If year is 4 digits, extract last 2 digits
+            if len(year) == 4:
+                year = year[-2:]
+            seit = f"{month}/{year.zfill(2)}"  # Ensure 2-digit year
+    
     return {
         'KK': str(db_record['kk']).zfill(2),
         'VName': db_record['first_name'] or '',
         'NName': db_record['last_name'] or '',
-        'seit': db_record['since'],
+        'seit': seit,
         'aktiv': 1 if db_record['active'] else 0,  # Convert bool to 0/1
         'HbOrt': db_record['primary_site'] or '',
         'GH': db_record['primary_region'],
