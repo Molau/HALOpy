@@ -844,11 +844,46 @@ def execute_single_param_analysis(params: dict) -> dict:
     else:
         db_field = f'"{param1}"'
     
-    # Special handling for SH (solar altitude) - requires calculation
+    # Special handling for SH (solar altitude) - requires calculation with JOIN
     if param1 == 'SH':
-        # TODO: Implement with JOIN to observers table
-        # For now, return empty dict
-        return {}
+        # Get altitude type (min, mean, max)
+        sh_type = params.get('sh_type', 'mean')
+        
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                query = f"""
+                    SELECT 
+                        calculate_solar_altitude(
+                            o."JJ", o."MM", o."TT", o."ZS", o."ZM", o."d",
+                            obs.primary_lon_deg, obs.primary_lon_min, obs.primary_lon_dir,
+                            obs.primary_lat_deg, obs.primary_lat_min, obs.primary_lat_dir,
+                            %s
+                        ) as altitude,
+                        COUNT(*) as count
+                    FROM observations o
+                    JOIN observers obs ON o."KK" = obs.kk
+                        AND o."JJ" >= EXTRACT(YEAR FROM obs.since) - 
+                            CASE WHEN EXTRACT(YEAR FROM obs.since) >= 2000 THEN 2000 ELSE 1900 END
+                        AND (obs.until IS NULL OR o."JJ" <= EXTRACT(YEAR FROM obs.until) - 
+                            CASE WHEN EXTRACT(YEAR FROM obs.until) >= 2000 THEN 2000 ELSE 1900 END)
+                    WHERE {where_sql}
+                        AND o."O" = 1  -- Sun observations only
+                        AND o."g" != 1  -- Not generalized observations
+                    GROUP BY altitude
+                    ORDER BY altitude
+                """
+                
+                cursor.execute(query, [sh_type] + sql_params)
+                rows = cursor.fetchall()
+                
+                result = {}
+                for row in rows:
+                    altitude = row[0]
+                    count = row[1]
+                    if altitude is not None:
+                        result[altitude] = count
+                
+                return result
     
     # Special handling for HO_HU (pillar height)
     if param1 == 'HO_HU':

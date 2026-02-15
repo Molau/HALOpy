@@ -6023,7 +6023,49 @@ def analyze_observations() -> Dict[str, Any]:
             param1 = params.get('param1')
             param2 = params.get('param2')
             
-            if not param2:
+            # Special parameters that require Python calculation (not yet implemented in SQL)
+            # SH is now implemented in SQL with calculate_solar_altitude() function
+            needs_python_fallback = (param1 in ['HO_HU', 'SE']) or (param2 and param2 in ['HO_HU', 'SE'])
+            
+            if needs_python_fallback:
+                # Fall back to Python filtering for complex parameters
+                # Load filtered observations from database
+                if fixed_observer:
+                    observations = obs_db.load_filtered(kk=int(fixed_observer))
+                else:
+                    observations = obs_db.load_all()
+                
+                # Apply filters and grouping in Python (same as Local Mode)
+                filtered_obs = observations
+                
+                # Apply filter1 if specified
+                if params.get('filter1'):
+                    filter1 = params['filter1']
+                    filter1_value = params.get('filter1_value', '')
+                    filtered_obs = _apply_filter(filtered_obs, filter1, filter1_value, params, 'filter1')
+                
+                # Apply filter2 if specified
+                if params.get('filter2'):
+                    filter2 = params['filter2']
+                    filter2_value = params.get('filter2_value', '')
+                    filtered_obs = _apply_filter(filtered_obs, filter2, filter2_value, params, 'filter2')
+                
+                # Apply param1 range filter if needed
+                filtered_obs = _apply_param_range_filter(filtered_obs, param1, params, 'param1')
+                
+                # Apply param2 range filter if specified
+                if param2:
+                    filtered_obs = _apply_param_range_filter(filtered_obs, param2, params, 'param2')
+                
+                # Group by parameter(s)
+                if not param2:
+                    data = _group_by_parameter(filtered_obs, param1, params, 'param1')
+                else:
+                    data, debug_info = _group_by_two_parameters(filtered_obs, param1, param2, params)
+                
+                total = len(filtered_obs)
+                
+            elif not param2:
                 # Single parameter analysis
                 data_dict = obs_db.execute_single_param_analysis(params)
                 
