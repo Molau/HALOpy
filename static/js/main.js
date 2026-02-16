@@ -321,46 +321,8 @@ async function loadObserverCodes() {
 }
 
 // Show Bootstrap confirmation dialog instead of browser confirm()
-function showConfirmDialog(title, message, onConfirm, onCancel, buttonLabels = null) {
-    const modalId = 'confirm-modal-' + Math.random().toString(36).substr(2, 9);
-    const modalHtml = `
-        <div class="modal fade" id="${modalId}" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${title}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        ${message}
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="confirm-yes-${modalId}">${i18nStrings.common.ok}</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById(modalId);
-    const modal = new bootstrap.Modal(modalEl);
-    
-    document.getElementById('confirm-yes-' + modalId).addEventListener('click', () => {
-        modal.hide();
-        if (onConfirm) onConfirm();
-    });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        if (!modal._isShown) {
-            modalEl.remove();
-            if (onCancel) onCancel();
-        }
-    });
-    
-    modal.show();
-}
+// Backward compatibility wrapper - actual implementation in modal-manager.js
+// function showConfirmDialog(title, message, onConfirm, onCancel) - defined in modal-manager.js
 
 // Helper function to get default month and year based on date default setting
 async function getDateDefault() {
@@ -3459,7 +3421,13 @@ async function showDisplayObservationsDialog() {
         },
         () => {
             // onCancel callback - user cancelled
-
+            // Hide spinner if still visible
+            if (spinnerInfo.modal && spinnerInfo.modalEl) {
+                spinnerInfo.modal.hide();
+                if (spinnerInfo.modalEl.parentNode) {
+                    spinnerInfo.modalEl.remove();
+                }
+            }
         }
     );
     } catch (error) {
@@ -6543,120 +6511,15 @@ async function checkAutosaveRecovery() {
 }
 
 // Show error dialog
-function showErrorDialog(message, onClose = null) {
-    // Generate unique modal ID to avoid conflicts
-    const modalId = 'error-modal-' + Date.now();
-    
-    const modalHtml = `
-        <div class="modal fade" id="${modalId}" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${i18nStrings.common.error}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>${message}</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="${modalId}-ok">${i18nStrings.common.ok}</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById(modalId);
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    
-    // Track if OK button was clicked
-    let okClicked = false;
-    
-    // OK button handler
-    const okButton = document.getElementById(`${modalId}-ok`);
-    okButton.addEventListener('click', () => {
-        okClicked = true;
-        modal.hide();
-    });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        // Clean up modal element
-        modalEl.remove();
-        
-        // Force cleanup of any remaining Bootstrap modal backdrops
-        setTimeout(() => {
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            backdrops.forEach(backdrop => {
-                backdrop.remove();
-            });
-            
-            // Reset body styles if needed
-            if (document.querySelectorAll('.modal.show').length === 0) {
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('overflow');
-                document.body.style.removeProperty('padding-right');
-            }
-        }, 100);
-        
-        // Only call onClose if OK button was clicked, not on ESC/Close
-        if (onClose && okClicked) {
-            onClose();
-        }
-    });
-}
+// Backward compatibility wrapper - actual implementation in modal-manager.js
+// function showErrorDialog(message) - defined in modal-manager.js
 
 // Show info/success modal (simple non-dismissable spinner or message)
-function showInfoModal(title, message) {
-    const modalHtml = `
-        <div class="modal fade" id="info-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${title}</h5>
-                    </div>
-                    <div class="modal-body text-center py-4">
-                        <div class="spinner-border text-primary mb-3" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mb-0">${message}</p>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('info-modal');
-    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
-    modal.show();
-    return { modal, modalEl };
-}
+// Backward compatibility wrapper - actual implementation in modal-manager.js
+// function showInfoModal(title, message) - defined in modal-manager.js
 
-function showSuccessModal(title, message) {
-    const modalHtml = `
-        <div class="modal fade" id="success-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">${title}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="mb-0">${message}</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">OK</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('success-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    return { modal, modalEl };
-}
+// Backward compatibility wrapper - actual implementation in modal-manager.js
+// function showSuccessModal(title, message) - defined in modal-manager.js
 
 
 // Load file dialog
@@ -6994,45 +6857,8 @@ async function showSaveFileDialog() {
 }
 
 // Show warning modal with custom message
-function showWarningModal(message) {
-    return new Promise((resolve) => {
-        // Block any navigation while modal is open
-        window.__warningModalOpen = true;
-        
-        // Add a small delay to ensure any previous modal backdrop is fully removed
-        setTimeout(() => {
-            // Generate unique ID to avoid conflicts with other modals
-            const modalId = 'warning-modal-' + Date.now();
-            const modalHtml = `
-            <div class="modal fade" id="${modalId}" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">${i18nStrings.common.warning}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>${message}</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        const modalEl = document.getElementById(modalId);
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            window.__warningModalOpen = false;
-            modalEl.remove();
-            resolve();
-        });
-        }, 300); // 300ms delay to let previous modal backdrop fully disappear
-    });
-}
+// Backward compatibility wrapper - actual implementation in modal-manager.js
+// function showWarningModal(message) - defined in modal-manager.js
 
 // Show notification with custom message and type
 // - Auto-dismisses after 3 seconds

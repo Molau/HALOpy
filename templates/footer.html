@@ -9,3 +9,8 @@
   // Expose update repo to frontend
   window.UPDATE_REPO = "{{ update_repo }}";
 </script>
+
+<!-- Bootstrap JS -->
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<!-- Modal Manager - Must be loaded before main.js -->
+<script src="{{ url_for('static', filename='js/modal-manager.js') }}"></script>
