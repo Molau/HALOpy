@@ -694,6 +694,7 @@ async function showAddObservationDialogNumeric() {
     const modalEl = document.getElementById('add-observation-modal');
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
+    setupModalKeyboard(modalEl, document.getElementById('btn-add-obs-ok'));
 
     const input = document.getElementById('obs-code-input');
     const errEl = document.getElementById('obs-code-error');
