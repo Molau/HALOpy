@@ -227,17 +227,29 @@ class ObservationForm {
                             <div class="alert alert-danger mt-2" id="obs-form-error" style="display:none;"></div>
                         </div>
                         <div class="modal-footer py-1">
-                            ${(this.mode === 'edit' || this.mode === 'delete') ? `<button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>` : ''}
-                            ${this.mode === 'view' ? `<button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>` : ''}
-                            ${(this.mode === 'edit' || this.mode === 'delete') ? `<button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>` : ''}
-                            ${this.mode === 'view' ? `<button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>` : ''}
-                            ${this.mode === 'view' ? `<button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>` : ''}
-                            ${this.mode === 'delete' ? `<button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>` : ''}
-                            ${this.mode === 'edit' || this.mode === 'add' ? `<button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>` : ''}
-                            ${this.mode === 'add' ? `<button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" disabled>${i18nStrings.common.ok}</button>` : ''}
-                            ${this.mode === 'edit' ? `<button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>` : ''}
-                            ${this.mode === 'delete' ? `<button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>` : ''}
-                            ${(this.mode === 'edit' || this.mode === 'delete') ? `<button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" style="display:none;" disabled>${i18nStrings.common.ok}</button>` : ''}
+                            ${this.mode === 'view' ? `
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
+                            ` : ''}
+                            ${this.mode === 'edit' ? `
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" style="display:none;" disabled>${i18nStrings.common.ok}</button>
+                            ` : ''}
+                            ${this.mode === 'delete' ? `
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" style="display:none;" disabled>${i18nStrings.common.ok}</button>
+                            ` : ''}
+                            ${this.mode === 'add' ? `
+                                <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" disabled>${i18nStrings.common.ok}</button>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
