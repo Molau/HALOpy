@@ -1521,10 +1521,16 @@ def file_status() -> Dict[str, Any]:
     if auto_loaded:
         current_app.config['AUTO_LOADED'] = False
     
+    # Cloud Mode: get count from database, Local Mode: from memory
+    if is_cloud_mode():
+        obs_count = obs_db.count()
+    else:
+        obs_count = len(current_app.config.get('OBSERVATIONS', []))
+    
     return jsonify({
         'filename': current_app.config.get('LOADED_FILE'),
         'dirty': current_app.config.get('DIRTY', False),
-        'count': len(current_app.config.get('OBSERVATIONS', [])),
+        'count': obs_count,
         'auto_loaded': auto_loaded
     })
 

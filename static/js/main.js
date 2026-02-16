@@ -199,8 +199,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 50);
     }
     
-    // Clear file info on startup - but only if sessionStorage didn't restore data
-    if (!window.haloData.isLoaded) {
+    // Cloud Mode: always show database count (database is always available)
+    if (isCloudMode) {
+        try {
+            const statusResp = await fetch('/api/file/status');
+            if (statusResp.ok) {
+                const status = await statusResp.json();
+                window.haloData.isLoaded = true;
+                updateFileInfoDisplay(null, status.count);
+            }
+        } catch (e) {
+            console.error('Failed to load database count:', e);
+        }
+    } else if (!window.haloData.isLoaded) {
+        // Local Mode: clear file info if no file loaded
         clearFileInfoDisplay();
     }
     
@@ -3049,25 +3061,16 @@ async function showDeleteConfirmDialog(obs, currentNum, totalNum, callback) {
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
 
-    // Default focus on No, Enter triggers No
+    // Default focus on No (safe default for destructive action)
     const btnNo = document.getElementById('btn-delete-no');
     const btnYes = document.getElementById('btn-delete-yes');
     const btnCancel = document.getElementById('btn-delete-cancel');
     if (btnNo) btnNo.focus();
 
+    // Enter triggers No (safe default), ESC handled by Bootstrap
+    setupModalKeyboard(modalEl, btnNo);
+
     let answered = false;
-    const keyHandler = (e) => {
-        if (e.key === 'Enter' && !answered) {
-            answered = true;
-            modal.hide();
-            callback(false);
-        } else if (e.key === 'Escape' && !answered) {
-            answered = true;
-            modal.hide();
-            callback(null);
-        }
-    };
-    document.addEventListener('keydown', keyHandler);
 
     btnYes.addEventListener('click', () => { answered = true; modal.hide(); callback(true); });
     btnNo.addEventListener('click', () => { answered = true; modal.hide(); callback(false); });
@@ -3075,7 +3078,6 @@ async function showDeleteConfirmDialog(obs, currentNum, totalNum, callback) {
 
     modalEl.addEventListener('hidden.bs.modal', () => {
         modalEl.remove();
-        document.removeEventListener('keydown', keyHandler);
         if (!answered) {
             callback(null);
         }
