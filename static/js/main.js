@@ -3548,26 +3548,14 @@ async function showDisplayCompactList(filterState) {
     // Close button
     const btnClose = modalEl.querySelector('[data-bs-dismiss="modal"]');
     
-    // Enter/ESC key support when modal is visible
-    const keyHandler = (e) => {
-        if ((e.key === 'Enter' || e.key === 'Escape') && modalEl.classList.contains('show')) {
-            e.preventDefault();
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
-            window.navigateInternal('/');
-        }
-    };
+    // Decision #033: Use setupModalKeyboard for Enter key → OK button (closes modal)
+    setupModalKeyboard(modalEl, btnClose);
     
-    // Remove any existing handler first to avoid duplicates
-    document.removeEventListener('keydown', keyHandler);
-    document.addEventListener('keydown', keyHandler);
-    
-    // Cleanup on close
+    // Decision #033: Use setupModalCleanup for DOM cleanup + navigate home
+    setupModalCleanup(modalEl);
     modalEl.addEventListener('hidden.bs.modal', () => {
-        document.removeEventListener('keydown', keyHandler);
-        modalEl.remove();
         window.navigateInternal('/');
-    });
+    }, { once: true });
     
     // Show modal and display first page
     modal.show();

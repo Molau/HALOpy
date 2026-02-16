@@ -146,6 +146,19 @@ class ObservationForm {
         
         this.modal = new bootstrap.Modal(this.modalElement);
         this.modal.show();
+        
+        // Decision #033: consistent Enter key handling via setupModalKeyboard()
+        // Determine which button Enter should trigger based on mode
+        let confirmBtn = null;
+        if (this.mode === 'view') {
+            confirmBtn = document.getElementById('btn-obs-form-next');
+        } else if (this.mode === 'edit' || this.mode === 'delete') {
+            // Before editing starts, Enter triggers Next (skip to next observation)
+            confirmBtn = document.getElementById('btn-obs-form-next');
+        } else if (this.mode === 'add') {
+            confirmBtn = document.getElementById('btn-obs-form-ok');
+        }
+        setupModalKeyboard(this.modalElement, confirmBtn);
     }
     
     /**
@@ -1286,13 +1299,7 @@ class ObservationForm {
                 }
             });
             
-            // Bind Enter key to No button when in view mode (default action)
-            this.modalElement.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !this.isEditingMode) {
-                    e.preventDefault();
-                    noBtn.click();
-                }
-            });
+            // Enter key handling moved to show() via setupModalKeyboard() (Decision #033)
         }
         
         // View mode navigation buttons
@@ -1312,15 +1319,7 @@ class ObservationForm {
                 }
             });
             
-            // Bind Enter key to Next button in view mode
-            if (this.mode === 'view') {
-                this.modalElement.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        nextBtn.click();
-                    }
-                });
-            }
+            // Enter key handled by setupModalKeyboard() in show() (Decision #033)
         }
         
         // OK button in view mode should close and return to main (like ESC/Cancel)
