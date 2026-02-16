@@ -288,12 +288,8 @@ class ModalManager {
 // Create global instance
 window.modalManager = new ModalManager();
 
-// Debug: Log that modal manager is loaded
-console.log('🔍 DEBUG: ModalManager loaded successfully', window.modalManager);
-
 // Backward compatibility functions
 window.showConfirmDialog = (title, message, onConfirm, onCancel) => {
-    console.log('🔍 DEBUG: showConfirmDialog called via modalManager');
     modalManager.showConfirm(title, message).then(confirmed => {
         if (confirmed && onConfirm) {
             onConfirm();
@@ -304,18 +300,14 @@ window.showConfirmDialog = (title, message, onConfirm, onCancel) => {
 };
 
 window.showWarningModal = (message) => {
-    console.log('🔍 DEBUG: showWarningModal called via modalManager');
     return modalManager.showWarning(message);
 };
 window.showErrorDialog = (message) => {
-    console.log('🔍 DEBUG: showErrorDialog called via modalManager');
     return modalManager.showError(message);
 };
 window.showInfoModal = (title, message) => {
-    console.log('🔍 DEBUG: showInfoModal called via modalManager');
     return modalManager.showLoading(title, message);
 };
 window.showSuccessModal = (title, message) => {
-    console.log('🔍 DEBUG: showSuccessModal called via modalManager');
     return modalManager.showSuccess(message, title);
 };
