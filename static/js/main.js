@@ -2480,12 +2480,14 @@ async function showModifySingleObservations(filterState) {
                 await triggerAutosave();
                 
                 const successMsg = i18nStrings.messages.observation_modified;
-                showMessage(successMsg, 'success');
+                sessionStorage.setItem('pendingNotification', JSON.stringify({
+                    message: '<strong>✓</strong> ' + successMsg,
+                    type: 'success',
+                    duration: 3000
+                }));
                 
-                // After modification, return to main menu
-                setTimeout(() => {
-                    window.navigateInternal('/');
-                }, 1500);
+                // Return to main menu
+                window.navigateInternal('/');
             } catch (e) {showErrorDialog(i18nStrings.common.error + ': ' + e.message);
             }
         }, () => {
@@ -2896,12 +2898,14 @@ async function processBulkUpdate(filteredObs, updates) {
         } else {}
         
 
-        showMessage(`${filteredObs.length} ${i18nStrings.observations.bulk_modify_success}`, 'success');
+        sessionStorage.setItem('pendingNotification', JSON.stringify({
+            message: `<strong>✓</strong> ${filteredObs.length} ${i18nStrings.observations.bulk_modify_success}`,
+            type: 'success',
+            duration: 3000
+        }));
         
         // Reload the page to refresh all displays
-        setTimeout(() => {
-            window.location.reload();
-        }, 1500);
+        window.location.reload();
         
     } catch (error) {showErrorDialog(`${i18nStrings.messages.bulk_update_failed}: ${error.message}`);
     }
@@ -2994,9 +2998,13 @@ async function showDeleteSingleObservations(filterState) {
                 
                 await triggerAutosave();
 
-                // Show brief success notification
+                // Store notification for display after navigation (toast must survive page change)
                 const msg = `${i18nStrings.common.observation} ${i18nStrings.common.deleted}`;
-                showNotification(`<strong>✓</strong> ${msg}`, 'success', 1500);
+                sessionStorage.setItem('pendingNotification', JSON.stringify({
+                    message: `<strong>✓</strong> ${msg}`,
+                    type: 'success',
+                    duration: 3000
+                }));
                 
                 // Return to main after deletion (critical operation - don't continue iterating)
                 window.navigateInternal('/');
@@ -3375,12 +3383,13 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
             await triggerAutosave();
             
             const successMsg = i18nStrings.messages.observation_modified;
-            showMessage(successMsg, 'success');
+            sessionStorage.setItem('pendingNotification', JSON.stringify({
+                message: '<strong>✓</strong> ' + successMsg,
+                type: 'success',
+                duration: 3000
+            }));
             
-            // Delay before calling onModified (which redirects)
-            setTimeout(() => {
-                if (onModified) onModified();
-            }, 1500);
+            if (onModified) onModified();
         } catch (e) {showErrorDialog(i18nStrings.common.error + ': ' + e.message);
         }
     }, () => {

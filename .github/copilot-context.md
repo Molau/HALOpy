@@ -1490,6 +1490,26 @@ spinner.hide();
 7. ✗ **NEVER** use `|| 'OK'` or `|| 'Cancel'` fallbacks for button text
 8. ✗ **NEVER** implement custom backdrop/z-index management (Bootstrap handles this)
 
+### Toast/Notification after Modal Actions
+
+Toasts (via `showNotification()`) are often the result of a modal action (e.g., "Observation deleted"). They must NOT be coupled to the modal lifecycle:
+
+1. ✓ **If the page stays** (no navigation): Use `showNotification()` directly — toast lives in `document.body`, independent of the modal
+2. ✓ **If the page navigates** (e.g., `window.navigateInternal('/')`): Use `sessionStorage.setItem('pendingNotification', ...)` — the toast will be displayed after the page loads
+3. ✗ **NEVER** call `showNotification()` immediately before `navigateInternal()` or `window.location.reload()` — the toast will be destroyed by the navigation
+
+**Pattern for navigation-safe notifications**:
+```javascript
+sessionStorage.setItem('pendingNotification', JSON.stringify({
+    message: '<strong>✓</strong> ' + msg,
+    type: 'success',
+    duration: 3000
+}));
+window.navigateInternal('/');
+```
+
+**Pending notifications** are picked up on page load in `main.js` initialization and displayed via `showNotification()`.
+
 ### Migration Plan
 
 - Replace `ModalManager` class with utility functions (`setupModalKeyboard`, `createModalButton`, `createStandardFooter`)
