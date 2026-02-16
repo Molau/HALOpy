@@ -4,32 +4,11 @@
  * Thin utility layer on top of standard Bootstrap modals.
  * Provides consistent keyboard handling, button creation, and simple modal helpers.
  * Does NOT wrap or replace Bootstrap - works WITH it.
+ * 
+ * Backdrop Policy: ALL modals use { backdrop: 'static' } to prevent
+ * accidental closing when clicking outside. This is enforced at each
+ * new bootstrap.Modal() call site, not via global patching.
  */
-
-// ========== Global Bootstrap Modal Default ==========
-// Disable backdrop click closing for ALL modals application-wide.
-// Users must use ESC, X button, or Cancel/OK to close modals.
-// This prevents accidental data loss from misclicks.
-(function() {
-    const OriginalModal = bootstrap.Modal;
-    const OriginalModalGetOrCreateInstance = OriginalModal.getOrCreateInstance;
-    const OriginalModalGetInstance = OriginalModal.getInstance;
-
-    function PatchedModal(element, config = {}) {
-        // Force backdrop: 'static' unless explicitly set to something else
-        if (config.backdrop === undefined) {
-            config.backdrop = 'static';
-        }
-        return new OriginalModal(element, config);
-    }
-
-    // Preserve static methods
-    PatchedModal.getOrCreateInstance = OriginalModalGetOrCreateInstance;
-    PatchedModal.getInstance = OriginalModalGetInstance;
-    PatchedModal.prototype = OriginalModal.prototype;
-
-    bootstrap.Modal = PatchedModal;
-})();
 
 /**
  * Setup consistent keyboard handling for any Bootstrap modal.
@@ -162,7 +141,10 @@ function showSimpleModal(config) {
 
     document.body.insertAdjacentHTML('beforeend', html);
     const modalEl = document.getElementById(id);
-    const modal = new bootstrap.Modal(modalEl);
+    const modalOptions = isLoading
+        ? { backdrop: 'static', keyboard: false }
+        : { backdrop: 'static' };
+    const modal = new bootstrap.Modal(modalEl, modalOptions);
 
     setupModalCleanup(modalEl);
 

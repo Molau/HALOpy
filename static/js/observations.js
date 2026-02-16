@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     };
     
     function showFilterDialog() {
-        const modal = new bootstrap.Modal(filterDialog);
+        const modal = new bootstrap.Modal(filterDialog, { backdrop: 'static' });
         modal.show();
         // Decision #033: consistent Enter key handling
         setupModalKeyboard(filterDialog, btnApplyFilter);

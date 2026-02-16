@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('warning-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         
         // Wait for modal to be fully shown before allowing focus
         modalEl.addEventListener('shown.bs.modal', () => {
@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Show modal
         const modal = new bootstrap.Modal(resultsModal, {
-            backdrop: true,
+            backdrop: 'static',
             keyboard: false
         });
         modal.show();
@@ -799,7 +799,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                     // Show filter dialog with explicit backdrop configuration
                     const modal = new bootstrap.Modal(filterDialog, {
-                        backdrop: true,
+                        backdrop: 'static',
                         keyboard: false
                     });
                     modal.show();

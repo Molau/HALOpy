@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('warning-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         
         // Wait for modal to be fully shown before allowing focus
         modalEl.addEventListener('shown.bs.modal', () => {
@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Show results modal
         const resultsModal = new bootstrap.Modal(document.getElementById('results-modal'), {
-            backdrop: true,
+            backdrop: 'static',
             keyboard: false
         });
         resultsModal.show();
@@ -842,7 +842,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         chartModalElement.addEventListener('shown.bs.modal', () => {
             chartModalElement.focus({ preventScroll: true });
         }, { once: true });
-        const chartModal = new bootstrap.Modal(chartModalElement);
+        const chartModal = new bootstrap.Modal(chartModalElement, { backdrop: 'static' });
         
         // Store data for print/save buttons
         window.chartData = data;
@@ -962,7 +962,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         chartModalElement.addEventListener('shown.bs.modal', () => {
             chartModalElement.focus({ preventScroll: true });
         }, { once: true });
-        const chartModal = new bootstrap.Modal(chartModalElement);
+        const chartModal = new bootstrap.Modal(chartModalElement, { backdrop: 'static' });
         
         // Store data for print/save buttons
         window.chartData = data;
@@ -1320,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Show filter dialog automatically with explicit backdrop configuration
             const modal = new bootstrap.Modal(filterDialog, {
-                backdrop: true,
+                backdrop: 'static',
                 keyboard: false
             });
             modal.show();

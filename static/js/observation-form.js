@@ -145,7 +145,7 @@ class ObservationForm {
             }, 0);
         }
         
-        this.modal = new bootstrap.Modal(this.modalElement);
+        this.modal = new bootstrap.Modal(this.modalElement, { backdrop: 'static' });
         this.modal.show();
         
         // Decision #033: consistent Enter key handling via setupModalKeyboard()

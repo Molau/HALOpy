@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('warning-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         
         // Wait for modal to be fully shown before allowing focus
         modalEl.addEventListener('shown.bs.modal', () => {
@@ -1679,7 +1679,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('resultModalBody').innerHTML = html;
         
         // Show modal
-        const modalInstance = new bootstrap.Modal(modal);
+        const modalInstance = new bootstrap.Modal(modal, { backdrop: 'static' });
         modalInstance.show();
         
         // Focus OK button
@@ -1985,7 +1985,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.body.appendChild(chartModal);
         
         // Show modal
-        const modalInstance = new bootstrap.Modal(chartModal);
+        const modalInstance = new bootstrap.Modal(chartModal, { backdrop: 'static' });
         modalInstance.show();
         
         // Prevent ESC key from propagating to parent modal
@@ -2060,7 +2060,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.body.appendChild(chartModal);
         
         // Show modal
-        const modalInstance = new bootstrap.Modal(chartModal);
+        const modalInstance = new bootstrap.Modal(chartModal, { backdrop: 'static' });
         modalInstance.show();
         
         // Prevent ESC key from propagating to parent modal
@@ -3197,6 +3197,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     btnApplyParam.disabled = true;
     
     // Show parameter dialog on load
-    const modal = new bootstrap.Modal(paramDialog);
+    const modal = new bootstrap.Modal(paramDialog, { backdrop: 'static' });
     modal.show();
 });

@@ -184,7 +184,7 @@ async function showAddSiteDialog(observer) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('add-site-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     const errEl = document.getElementById('site-error');
@@ -324,7 +324,7 @@ function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('confirm-edit-site-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     document.getElementById('btn-confirm-edit-site').addEventListener('click', () => {
@@ -397,7 +397,7 @@ function showDeleteSiteConfirmDialog(observer, sites, currentIndex) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('confirm-delete-site-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     // Handle delete

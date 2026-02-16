@@ -1,4 +1,4 @@
-﻿// HALO Web Application JavaScript
+// HALO Web Application JavaScript
 
 // ============================================================================
 // GLOBAL CONSTANTS
@@ -581,7 +581,7 @@ function showAddAnotherObservationDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('add-another-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         
         let resolved = false;
         
@@ -705,7 +705,7 @@ async function showAddObservationDialogNumeric() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('add-observation-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     setupModalKeyboard(modalEl, document.getElementById('btn-add-obs-ok'));
 
@@ -903,8 +903,8 @@ async function showAddObservationDialogNumeric() {
                         return;
                     } else {
                         // Complete halo or non-circular: Sectors (15 chars) + 8//// (5 chars) were auto-filled
-                        // If g=1: Delete last char of GG (manually entered) → position 29
-                        // If g != 1: GG was also auto-filled, delete it and last char of zz → position 27
+                        // If g=1: Delete last char of GG (manually entered) ? position 29
+                        // If g != 1: GG was also auto-filled, delete it and last char of zz ? position 27
                         if (g === 1) {
                             // g=1: GG was manually entered, delete last digit
                             eing = eing.slice(0, 29);
@@ -928,8 +928,8 @@ async function showAddObservationDialogNumeric() {
                     
                     if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                         // Incomplete circular halo: Sectors were manually entered and now all deleted
-                        // If g=1: Delete last char of GG → position 29
-                        // If g != 1: Delete GG completely and last char of zz → position 27
+                        // If g=1: Delete last char of GG ? position 29
+                        // If g != 1: Delete GG completely and last char of zz ? position 27
                         if (g === 1) {
                             eing = eing.slice(0, 29);
                         } else {
@@ -951,8 +951,8 @@ async function showAddObservationDialogNumeric() {
                     const g = parseInt(eing.slice(9,10),10);
                     if (ee === 9) {
                         // EE 09 only: 8// was auto-filled
-                        // If g=1: Delete last char of GG → position 29
-                        // If g != 1: Delete GG and last char of zz → position 27
+                        // If g=1: Delete last char of GG ? position 29
+                        // If g != 1: Delete GG and last char of zz ? position 27
                         if (g === 1) {
                             eing = eing.slice(0, 29);
                         } else {
@@ -974,8 +974,8 @@ async function showAddObservationDialogNumeric() {
                     const g = parseInt(eing.slice(9,10),10);
                     if (ee === 8 || ee === 10) {
                         // EE 08/10: 8 was auto-filled
-                        // If g=1: Delete last char of GG → position 29
-                        // If g != 1: Delete GG and last char of zz → position 27
+                        // If g=1: Delete last char of GG ? position 29
+                        // If g != 1: Delete GG and last char of zz ? position 27
                         if (g === 1) {
                             eing = eing.slice(0, 29);
                         } else {
@@ -1480,7 +1480,7 @@ async function showAddObservationDialogNumeric() {
             modal.hide();
             
             // Show success notification
-            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Wait for modal to close, then ask if user wants to add another
             modalEl.addEventListener('hidden.bs.modal', async () => {
@@ -1557,7 +1557,7 @@ async function showAddObservationDialogMenu() {
             await triggerAutosave();
             
             // Show success notification
-            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Close the form modal first
             form.hideModal();
@@ -2363,7 +2363,7 @@ async function showModifyObservationsDialog() {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('modify-type-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     const btnOk = document.getElementById('btn-modify-ok');
     
@@ -2490,7 +2490,7 @@ async function showModifySingleObservations(filterState) {
                 
                 const successMsg = i18nStrings.messages.observation_modified;
                 sessionStorage.setItem('pendingNotification', JSON.stringify({
-                    message: '<strong>✓</strong> ' + successMsg,
+                    message: '<strong>?</strong> ' + successMsg,
                     type: 'success',
                     duration: 3000
                 }));
@@ -2800,7 +2800,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('modify-group-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     const okBtn = document.getElementById('btn-modify-group-ok');
@@ -2910,7 +2910,7 @@ async function processBulkUpdate(filteredObs, updates) {
         
 
         sessionStorage.setItem('pendingNotification', JSON.stringify({
-            message: `<strong>✓</strong> ${filteredObs.length} ${i18nStrings.observations.bulk_modify_success}`,
+            message: `<strong>?</strong> ${filteredObs.length} ${i18nStrings.observations.bulk_modify_success}`,
             type: 'success',
             duration: 3000
         }));
@@ -3012,7 +3012,7 @@ async function showDeleteSingleObservations(filterState) {
                 // Store notification for display after navigation (toast must survive page change)
                 const msg = `${i18nStrings.common.observation} ${i18nStrings.common.deleted}`;
                 sessionStorage.setItem('pendingNotification', JSON.stringify({
-                    message: `<strong>✓</strong> ${msg}`,
+                    message: `<strong>?</strong> ${msg}`,
                     type: 'success',
                     duration: 3000
                 }));
@@ -3259,7 +3259,7 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
             
             const successMsg = i18nStrings.messages.observation_modified;
             sessionStorage.setItem('pendingNotification', JSON.stringify({
-                message: '<strong>✓</strong> ' + successMsg,
+                message: '<strong>?</strong> ' + successMsg,
                 type: 'success',
                 duration: 3000
             }));
@@ -3456,7 +3456,7 @@ async function showDisplayCompactList(filterState) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('compact-list-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     // Display function
     const displayPage = () => {
@@ -3490,7 +3490,7 @@ async function showDisplayCompactList(filterState) {
     // Close button
     const btnClose = modalEl.querySelector('[data-bs-dismiss="modal"]');
     
-    // Decision #033: Use setupModalKeyboard for Enter key → OK button (closes modal)
+    // Decision #033: Use setupModalKeyboard for Enter key ? OK button (closes modal)
     setupModalKeyboard(modalEl, btnClose);
     
     // Decision #033: Use setupModalCleanup for DOM cleanup + navigate home
@@ -3748,7 +3748,7 @@ async function showActiveObserversDialog() {
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('active-observers-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
 
         document.getElementById('btn-active-ok').addEventListener('click', async () => {
@@ -3817,7 +3817,7 @@ async function showStartupFileDialog() {
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('startup-file-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
 
         // Handle Enter key to submit
@@ -3841,9 +3841,9 @@ async function showStartupFileDialog() {
             
             // Show success message
             if (selectedFile) {
-                showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_changed}`);
+                showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_changed}`);
             } else {
-                showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_disabled}`);
+                showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_disabled}`);
             }
         });
 
@@ -4076,7 +4076,7 @@ async function showSelectDialog() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('select-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
 
     const selectFilter = document.getElementById('select-filter');
@@ -4651,7 +4651,7 @@ async function showSelectDialog() {
                 .replace('{kept}', keptCount)
                 .replace('{deleted}', deletedCount);
             sessionStorage.setItem('pendingNotification', JSON.stringify({
-                message: `<strong>✓</strong> ${message}`,
+                message: `<strong>?</strong> ${message}`,
                 type: 'success',
                 duration: 5000
             }));
@@ -4710,7 +4710,7 @@ async function showNewFileDialog() {
         // Update file info in header
         updateFileInfoDisplay(filename, 0);
         
-        showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', filename)}`, 'success');
+        showNotification(`<strong>?</strong> ${i18nStrings.messages.new_file_created.replace('{0}', filename)}`, 'success');
     } catch (err) {
         if (err.name === 'AbortError') {
             // User cancelled the file picker
@@ -4765,7 +4765,7 @@ async function saveFile() {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 
-                showNotification(`<strong>✓</strong> ${newFilename} gespeichert`, 'success');
+                showNotification(`<strong>?</strong> ${newFilename} gespeichert`, 'success');
             } else {
                 const result = await response.json();
                 showErrorDialog(i18nStrings.common.error + ': ' + result.error);
@@ -4849,7 +4849,7 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
     modalEl.innerHTML = modalHtml;
     document.body.appendChild(modalEl.firstElementChild);
     
-    const modal = new bootstrap.Modal(document.getElementById('auth-modal'));
+    const modal = new bootstrap.Modal(document.getElementById('auth-modal'), { backdrop: 'static' });
     const observerSelect = document.getElementById('auth-observer');
     const passwordInput = document.getElementById('auth-password');
     const togglePasswordBtn = document.getElementById('toggle-password');
@@ -5119,7 +5119,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('upload-file-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     const fileInput = document.getElementById('upload-file-input');
     
     // Setup auth fields (Local Mode only)
@@ -5301,7 +5301,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 const result = await response.json();
                 
                 // Build success message with details
-                let message = `✓ ${result.count || 0} ${i18nStrings.common.observations} `;
+                let message = `? ${result.count || 0} ${i18nStrings.common.observations} `;
                 message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;
                 if (result.duplicates && result.duplicates > 0) {
                     message += ` (${result.duplicates} ${i18nStrings.upload_download.duplicates_skipped})`;
@@ -5439,7 +5439,7 @@ async function showDownloadDialog() {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('download-file-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     // Setup auth fields (Local Mode only)
     let observerKK = null;
@@ -6109,7 +6109,7 @@ async function showObserverDownloadDialog() {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('download-observer-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     // Setup auth fields (Local Mode only)
     let observerKK = null;
@@ -6404,7 +6404,7 @@ async function checkAutosaveRecovery() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('autosave-recovery-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         
         // Handle "No" - delete the autosave file
         document.getElementById('btn-dismiss-autosave').addEventListener('click', async () => {
@@ -6443,7 +6443,7 @@ async function checkAutosaveRecovery() {
                 
                 // Show success notification
                 const message = `${result.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${result.filename}" ${i18nStrings.messages.loaded}`;
-                showNotification(`<strong>✓</strong> ${message}`, 'success', 5000);
+                showNotification(`<strong>?</strong> ${message}`, 'success', 5000);
             } catch (error) {
                 showErrorDialog(i18nStrings.messages.autosave_recovery_error + ': ' + error.message);
             }
@@ -6598,13 +6598,13 @@ async function continueLoadFile() {
             }
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
+            showNotification(`<strong>?</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
         } catch (error) {
             bsModal.hide();
             setTimeout(() => {
                 loadingModal.remove();
             }, 300);
-            showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>?</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
         }
     });
     
@@ -6719,11 +6719,11 @@ async function continueMergeFile() {
             
             // Show success message with count of added observations
             // (addedCount already computed above)
-            showNotification(`<strong>✓</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
+            showNotification(`<strong>?</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
         } catch (error) {
             bsModal.hide();
             setTimeout(() => loadingModal.remove(), 300);
-            showNotification(`<strong>✗</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>?</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
             document.body.appendChild(errorMsg);
             setTimeout(() => errorMsg.remove(), 5000);
         }
@@ -6794,7 +6794,7 @@ async function checkAndDisplayFileInfo() {
                 
                 // Show notification if file was auto-loaded
                 if (status.auto_loaded) {
-                    showNotification(`<strong>✓</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
+                    showNotification(`<strong>?</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
                 }
             } else {
                 // No data loaded
@@ -6889,7 +6889,7 @@ async function showFixedObserverDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('fixed-observer-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
         document.getElementById('btn-fixed-observer-ok').addEventListener('click', async () => {
@@ -7001,7 +7001,7 @@ async function showDatumDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('datum-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
         // Show/hide constant month inputs based on selection
@@ -7074,7 +7074,7 @@ async function showEingabeartDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('eingabeart-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
         document.getElementById('btn-eingabeart-ok').addEventListener('click', async () => {
@@ -7142,7 +7142,7 @@ async function showAusgabeartDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('ausgabeart-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
         document.getElementById('btn-ausgabeart-ok').addEventListener('click', async () => {
@@ -7262,7 +7262,7 @@ async function showChangePasswordDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('change-password-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
         const showError = (message) => {
@@ -7458,7 +7458,7 @@ function showVersionDialog() {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('version-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     modalEl.addEventListener('hidden.bs.modal', () => {
         clearMenuHighlights();
@@ -7514,7 +7514,7 @@ async function showWhatsNewDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('whatsnew-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         modalEl.addEventListener('hidden.bs.modal', () => {
             clearMenuHighlights();
@@ -7578,7 +7578,7 @@ async function showHelpDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('help-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         modalEl.addEventListener('hidden.bs.modal', () => {
             clearMenuHighlights();
@@ -7615,7 +7615,7 @@ window.handleLogout = async function() {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('logout-confirm-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     // Handle Yes button
     document.getElementById('logout-confirm-yes').addEventListener('click', async () => {
@@ -7874,7 +7874,7 @@ async function showAddObserverDialog(formData = null) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('add-observer-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     const errEl = document.getElementById('observer-error');
@@ -7920,13 +7920,8 @@ async function showAddObserverDialog(formData = null) {
         }
     });
     
-    // Handle Enter key to submit
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            document.getElementById('btn-add-observer-ok').click();
-        }
-    });
+    // Decision #033: Enter key triggers OK, excludes TEXTAREA and SELECT
+    setupModalKeyboard(modalEl, document.getElementById('btn-add-observer-ok'));
     
     // Handle save button
     document.getElementById('btn-add-observer-ok').addEventListener('click', async () => {
@@ -8025,7 +8020,7 @@ async function showAddObserverDialog(formData = null) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_added}`);
             
         } catch (e) {
             const formData = observerData;
@@ -8039,7 +8034,7 @@ async function showAddObserverDialog(formData = null) {
         }
     });
     
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+    setupModalCleanup(modalEl);
 }
 
 // Delete Observer Dialog Functions
@@ -8110,7 +8105,7 @@ async function showDeleteObserverDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('select-delete-observer-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
         // Handle OK button
@@ -8167,10 +8162,10 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                 <td>${aktivDisplay}</td>
                 <td>${site.HbOrt}</td>
                 <td>${String(site.GH).padStart(2, '0')}</td>
-                <td>${site.HLG}° ${site.HLM}' ${site.HOW} / ${site.HBG}° ${site.HBM}' ${site.HNS}</td>
+                <td>${site.HLG}� ${site.HLM}' ${site.HOW} / ${site.HBG}� ${site.HBM}' ${site.HNS}</td>
                 <td>${site.NbOrt}</td>
                 <td>${String(site.GN).padStart(2, '0')}</td>
-                <td>${site.NLG}° ${site.NLM}' ${site.NOW} / ${site.NBG}° ${site.NBM}' ${site.NNS}</td>
+                <td>${site.NLG}� ${site.NLM}' ${site.NOW} / ${site.NBG}� ${site.NBM}' ${site.NNS}</td>
             </tr>`;
     }).join('');
     
@@ -8215,7 +8210,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('delete-observer-confirm-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     // Handle Enter key - same as "No" button
@@ -8252,7 +8247,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_deleted}`);
             
             // Return to main page after 2 seconds
             setTimeout(() => {
@@ -8327,7 +8322,7 @@ async function showEditObserverDialog() {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('select-observer-modal');
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
         // Handle OK button
@@ -8401,7 +8396,7 @@ function showEditTypeDialog(observer) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('edit-type-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     // Handle OK button
@@ -8464,7 +8459,7 @@ function showEditBaseDataDialog(observer) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('edit-base-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     const errEl = document.getElementById('edit-base-error');
@@ -8507,7 +8502,7 @@ function showEditBaseDataDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_updated}`);
             
             // Reload the page if we're on the observers page
             setTimeout(() => {
@@ -8711,7 +8706,7 @@ async function showAddSiteDialog(observer) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('add-site-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     const errEl = document.getElementById('site-error');
@@ -8782,7 +8777,7 @@ async function showAddSiteDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_added}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_site_added}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -9003,7 +8998,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('edit-site-confirm-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     // Convert 2-digit year to 4-digit year
     const yearNum = parseInt(site.seit_year);
@@ -9245,7 +9240,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('edit-site-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     // Convert 2-digit year to 4-digit year
     const yearNum = parseInt(site.seit_year);
@@ -9350,7 +9345,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_updated}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_site_updated}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -9574,7 +9569,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('delete-site-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     // Convert 2-digit year to 4-digit for display
     const yearNum = parseInt(site.seit_year);
@@ -9644,7 +9639,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_deleted}`);
+            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_site_deleted}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {

@@ -119,7 +119,7 @@ async function showFilterDialog() {
     }
     
     const filterDialogEl = document.getElementById('filter-dialog');
-    const modal = new bootstrap.Modal(filterDialogEl);
+    const modal = new bootstrap.Modal(filterDialogEl, { backdrop: 'static' });
     modal.show();
     
     // Decision #033: Enter key triggers OK button
@@ -335,7 +335,7 @@ function displayObservers() {
     
     // Show modal
     const modalEl = document.getElementById('observers-modal');
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
     // Decision #033: Enter key triggers OK (direct handler - no input elements in this modal)

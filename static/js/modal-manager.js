@@ -73,7 +73,7 @@ class ModalManager {
         
         // Create Bootstrap modal
         const modal = new bootstrap.Modal(modalEl, {
-            backdrop: options.backdrop !== false ? (options.backdrop || true) : false,
+            backdrop: options.backdrop !== false ? (options.backdrop || 'static') : false,
             keyboard: options.keyboard !== false
         });
 

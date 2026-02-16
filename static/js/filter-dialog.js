@@ -85,7 +85,7 @@ class FilterDialog {
             filter1Select.disabled = true;
         }
         
-        this.modal = new bootstrap.Modal(this.modalElement);
+        this.modal = new bootstrap.Modal(this.modalElement, { backdrop: 'static' });
         this.modal.show();
         
         // Decision #033: Use standard keyboard handling

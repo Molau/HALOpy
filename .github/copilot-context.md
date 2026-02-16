@@ -1494,16 +1494,17 @@ spinner.hide();
 8. ✗ **NEVER** use `|| 'OK'` or `|| 'Cancel'` fallbacks for button text
 9. ✗ **NEVER** implement custom backdrop/z-index management (Bootstrap handles this)
 
-### Backdrop Policy (Global Enforcement)
+### Backdrop Policy (Direct Enforcement)
 
 **All modals use `backdrop: 'static'`** — clicking outside does NOT close the modal.
 
-**Enforcement mechanism** (in `modal-utils.js`):
-- Global Bootstrap `Modal` constructor is patched at load time
-- If no `backdrop` option is explicitly passed, it defaults to `'static'`
-- This affects ALL `new bootstrap.Modal()` calls application-wide
-- HTML template modals additionally use `data-bs-backdrop="static"` as safety net
+**Enforcement mechanism** (direct at each call site):
+- Every `new bootstrap.Modal(element)` call MUST include `{ backdrop: 'static' }` as second argument
+- HTML template modals use `data-bs-backdrop="static"` attribute
+- `showSimpleModal()` in `modal-utils.js` defaults to `backdrop: 'static'`
+- `modal-manager.js` defaults to `backdrop: 'static'` when no option is passed
 - Loading/spinner modals use `backdrop: 'static'` + `keyboard: false`
+- **No global patching** — each call site is explicit and auditable
 
 ### Toast/Notification after Modal Actions
 
