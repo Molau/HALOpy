@@ -572,16 +572,10 @@ function showAddAnotherObservationDialog() {
         
         let resolved = false;
         
-        // ESC key handler
-        const handleEsc = (e) => {
-            if (e.key === 'Escape') {
-                modal.hide();
-            }
-        };
-        document.addEventListener('keydown', handleEsc);
+        const btnYes = modalEl.querySelector('#btn-yes');
         
         // Yes button - add another
-        modalEl.querySelector('#btn-yes').addEventListener('click', () => {
+        btnYes.addEventListener('click', () => {
             if (!resolved) {
                 resolved = true;
                 modal.hide();
@@ -600,7 +594,6 @@ function showAddAnotherObservationDialog() {
         
         // Cleanup on modal hidden
         modalEl.addEventListener('hidden.bs.modal', () => {
-            document.removeEventListener('keydown', handleEsc);
             if (!resolved) {
                 // ESC or backdrop click - treat as No
                 resolved = true;
@@ -610,6 +603,7 @@ function showAddAnotherObservationDialog() {
         });
         
         modal.show();
+        setupModalKeyboard(modalEl, btnYes);
         }, 300); // 300ms delay to let previous modal backdrop fully disappear
     });
 }
