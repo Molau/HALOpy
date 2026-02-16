@@ -154,8 +154,8 @@ class ModalManager {
      */
     showConfirm(title, message, options = {}) {
         const {
-            confirmText = i18nStrings.common.ok,
-            cancelText = i18nStrings.common.cancel,
+            confirmText = options.confirmText || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok),
+            cancelText = options.cancelText || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.cancel),
             confirmType = 'primary'
         } = options;
 
@@ -193,10 +193,11 @@ class ModalManager {
      */
     showWarning(message, title = null) {
         return new Promise((resolve) => {
-            const modalTitle = title || i18nStrings.common.warning;
+            const modalTitle = title || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.warning) || 'Warning';
             const id = this.generateId();
             
-            const footer = this.createButton(i18nStrings.common.ok, 'primary', null, true);
+            const okText = (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok) || 'OK';
+            const footer = this.createButton(okText, 'primary', null, true);
             const html = this.createBaseModal(id, modalTitle, `<p>${message}</p>`, footer);
             
             const { modalEl } = this.showModal(id, html);
@@ -209,10 +210,11 @@ class ModalManager {
      */
     showError(message, title = null) {
         return new Promise((resolve) => {
-            const modalTitle = title || i18nStrings.common.error;
+            const modalTitle = title || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.error) || 'Error';
             const id = this.generateId();
             
-            const footer = this.createButton(i18nStrings.common.ok, 'danger', null, true);
+            const okText = (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok) || 'OK';
+            const footer = this.createButton(okText, 'danger', null, true);
             const html = this.createBaseModal(id, modalTitle, `<p>${message}</p>`, footer);
             
             const { modalEl } = this.showModal(id, html);
@@ -253,10 +255,11 @@ class ModalManager {
      */
     showSuccess(message, title = null) {
         return new Promise((resolve) => {
-            const modalTitle = title || i18nStrings.common.success;
+            const modalTitle = title || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.success) || 'Success';
             const id = this.generateId();
             
-            const footer = this.createButton(i18nStrings.common.ok, 'success', null, true);
+            const okText = (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok) || 'OK';
+            const footer = this.createButton(okText, 'success', null, true);
             const html = this.createBaseModal(id, modalTitle, `<p>${message}</p>`, footer);
             
             const { modalEl } = this.showModal(id, html);
@@ -285,8 +288,12 @@ class ModalManager {
 // Create global instance
 window.modalManager = new ModalManager();
 
+// Debug: Log that modal manager is loaded
+console.log('🔍 DEBUG: ModalManager loaded successfully', window.modalManager);
+
 // Backward compatibility functions
 window.showConfirmDialog = (title, message, onConfirm, onCancel) => {
+    console.log('🔍 DEBUG: showConfirmDialog called via modalManager');
     modalManager.showConfirm(title, message).then(confirmed => {
         if (confirmed && onConfirm) {
             onConfirm();
@@ -296,7 +303,19 @@ window.showConfirmDialog = (title, message, onConfirm, onCancel) => {
     });
 };
 
-window.showWarningModal = (message) => modalManager.showWarning(message);
-window.showErrorDialog = (message) => modalManager.showError(message);
-window.showInfoModal = (title, message) => modalManager.showLoading(title, message);
-window.showSuccessModal = (title, message) => modalManager.showSuccess(message, title);
+window.showWarningModal = (message) => {
+    console.log('🔍 DEBUG: showWarningModal called via modalManager');
+    return modalManager.showWarning(message);
+};
+window.showErrorDialog = (message) => {
+    console.log('🔍 DEBUG: showErrorDialog called via modalManager');
+    return modalManager.showError(message);
+};
+window.showInfoModal = (title, message) => {
+    console.log('🔍 DEBUG: showInfoModal called via modalManager');
+    return modalManager.showLoading(title, message);
+};
+window.showSuccessModal = (title, message) => {
+    console.log('🔍 DEBUG: showSuccessModal called via modalManager');
+    return modalManager.showSuccess(message, title);
+};
