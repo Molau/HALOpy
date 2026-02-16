@@ -2801,6 +2801,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
     modal.show();
     
     const okBtn = document.getElementById('btn-modify-group-ok');
+    setupModalKeyboard(modalEl, okBtn);
     
     // Handle OK button
     okBtn.addEventListener('click', async () => {
@@ -3072,79 +3073,6 @@ async function applyFilterToObservations(filterState) {
         }
         
         return true;
-    });
-}
-
-// Show confirmation dialog asking if user wants to modify this observation
-async function showModifyConfirmDialog(obs, currentNum, totalNum, callback) {
-    
-    // Format observation display
-    const obsDisplay = formatObservationForDisplay(obs);
-    
-    const modalHtml = `
-        <div class="modal fade" id="modify-confirm-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header py-2">
-                        <h6 class="modal-title">${i18nStrings.observations.modify_question} (${currentNum}/${totalNum})</h6>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body py-2">
-                        <div style="font-size: 14px; line-height: 1.6; background-color: #f8f9fa; padding: 10px; border-radius: 4px;">${obsDisplay}</div>
-                    </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-modify-cancel">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-modify-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-danger btn-sm px-3" id="btn-modify-yes">${i18nStrings.common.yes}</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('modify-confirm-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    
-    let answered = false;
-    
-    document.getElementById('btn-modify-yes').addEventListener('click', () => {
-        answered = true;
-        modal.hide();
-        callback(true);
-    });
-    
-    document.getElementById('btn-modify-no').addEventListener('click', () => {
-        answered = true;
-        modal.hide();
-        callback(false);
-    });
-    
-    document.getElementById('btn-modify-cancel').addEventListener('click', () => {
-        answered = true;
-        modal.hide();
-        callback(null); // null indicates cancel entire operation
-    });
-    
-    // Handle ESC key to return to main menu
-    const escHandler = (e) => {
-        if (e.key === 'Escape' && !answered) {
-            answered = true;
-            modal.hide();
-            callback(null);
-            window.navigateInternal('/');
-        }
-    };
-    document.addEventListener('keydown', escHandler);
-    
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        modalEl.remove();
-        document.removeEventListener('keydown', escHandler);
-        if (!answered) {
-            callback(null);
-            window.navigateInternal('/');
-        }
     });
 }
 
