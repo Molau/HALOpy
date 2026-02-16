@@ -2355,17 +2355,22 @@ async function showModifyObservationsDialog() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('modify-type-modal');
     const modal = new bootstrap.Modal(modalEl);
+    
+    const btnOk = document.getElementById('btn-modify-ok');
+    
+    // Decision #033: consistent keyboard + cleanup
+    setupModalKeyboard(modalEl, btnOk);
+    setupModalCleanup(modalEl);
+    
     modal.show();
     
     // Handle OK button
-    document.getElementById('btn-modify-ok').addEventListener('click', async () => {
+    btnOk.addEventListener('click', async () => {
         const selected = document.querySelector('input[name="modify_type"]:checked');
         const modifyType = selected ? selected.value : 'single';
         modal.hide();
         await showModifyFilterDialog(modifyType);
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 // Show filter dialog for modify observations
