@@ -1326,8 +1326,10 @@ class ObservationForm {
                 this.hideModal();
                 if (this.mode === 'view' && this.onYes) {
                     this.onYes(); // Next in view mode
-                } else if ((this.mode === 'edit' || this.mode === 'delete') && this.onYes) {
-                    this.onYes(); // Next in edit/delete mode
+                } else if (this.mode === 'delete' && this.onNo) {
+                    this.onNo(); // Next in delete mode = skip (NOT delete!)
+                } else if (this.mode === 'edit' && this.onYes) {
+                    this.onYes(); // Next in edit mode = skip to next
                 }
             });
             
