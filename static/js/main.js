@@ -2556,9 +2556,10 @@ async function showGroupModifyDialogMenu(filteredObs) {
         return;
     }
     
-    // Build observer options - NO pre-selection
+    // Build observer options - pre-select fixed observer if set
     const observerOptions = observers.map(obs => {
-        return `<option value="${obs.KK}">${obs.KK} - ${obs.VName} ${obs.NName}</option>`;
+        const selected = (fixedObserver && String(obs.KK) === String(fixedObserver)) ? ' selected' : '';
+        return `<option value="${obs.KK}"${selected}>${obs.KK} - ${obs.VName} ${obs.NName}</option>`;
     }).join('');
     
     // Build year options (0-99: 80-99=1980-1999, 0-79=2000-2079)
