@@ -175,6 +175,10 @@ class FilterDialog {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 btnApply.click();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.modal.hide();
+                if (this.onCancel) this.onCancel();
             }
         });
         
