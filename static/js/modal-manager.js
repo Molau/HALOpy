@@ -43,7 +43,7 @@ class ModalManager {
                         ${title ? `
                             <div class="modal-header">
                                 <h5 class="modal-title">${title}</h5>
-                                ${backdrop !== 'static' ? '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' : ''}
+                                ${backdrop !== 'static' ? '<button type="button" class="btn-close"></button>' : ''}
                             </div>
                         ` : ''}
                         <div class="modal-body">
@@ -87,6 +87,15 @@ class ModalManager {
         modalEl.addEventListener('hidden.bs.modal', () => {
             this.cleanup(id);
         });
+
+        // Intercept close button clicks to ensure proper cleanup
+        const closeButton = modalEl.querySelector('.btn-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                modal.hide();
+            });
+        }
 
         modal.show();
         return { modal, modalEl };
