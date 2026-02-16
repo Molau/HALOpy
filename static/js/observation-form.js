@@ -157,8 +157,8 @@ class ObservationForm {
             // Delete mode: Enter triggers Cancel (the primary/default button)
             confirmBtn = document.getElementById('btn-obs-form-cancel');
         } else if (this.mode === 'edit') {
-            // Edit mode: Enter triggers Next (skip to next observation)
-            confirmBtn = document.getElementById('btn-obs-form-next');
+            // Edit mode: Enter triggers Yes (confirm modification)
+            confirmBtn = document.getElementById('btn-obs-form-yes');
         } else if (this.mode === 'add') {
             confirmBtn = document.getElementById('btn-obs-form-ok');
         }
