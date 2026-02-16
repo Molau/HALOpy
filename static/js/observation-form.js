@@ -186,7 +186,7 @@ class ObservationForm {
         if (this.customTitle) {
             title = this.customTitle;
         } else if (this.mode === 'edit') {
-            title = i18nStrings.observations.modify_observation;
+            title = i18nStrings.observations.modify_question;
         } else if (this.mode === 'delete') {
             title = i18nStrings.observations.delete_question;
         } else if (this.mode === 'view') {
@@ -234,8 +234,8 @@ class ObservationForm {
                             ` : ''}
                             ${this.mode === 'edit' ? `
                                 <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
-                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" style="display:none;" disabled>${i18nStrings.common.ok}</button>
                             ` : ''}
