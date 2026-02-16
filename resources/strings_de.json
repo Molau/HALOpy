@@ -88,7 +88,8 @@
     "pagination_first": "Erste Seite",
     "pagination_prev": "Vorherige Seite",
     "pagination_next": "Nächste Seite",
-    "pagination_last": "Letzte Seite"
+    "pagination_last": "Letzte Seite",
+    "database": "Datenbank"
   },
   "messages": {
     "loading": "Daten werden geladen...",

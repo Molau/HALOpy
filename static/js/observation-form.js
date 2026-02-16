@@ -100,9 +100,10 @@ class ObservationForm {
         this.onCancelBtn = onCancelBtn;
         this.isEditingMode = false; // Track if user has entered editing mode
         this.navigating = false; // Track if user is navigating (Next/Prev in view mode)
-        this.noButtonPressed = false; // Track if No button was pressed (prevents cancel callback)
-        this.noButtonPressed = false; // Track if No button was pressed (prevents cancel callback)
         this.noButtonPressed = false; // Track if No button was pressed (delete mode)
+        this.saved = false; // Reset for reuse
+        this.skipped = false; // Reset for reuse
+        this.destroyed = false; // Reset for reuse (may have been set by previous hidden.bs.modal)
         
         this.createModalHTML();
         this.setupEventListeners();
@@ -1382,7 +1383,14 @@ class ObservationForm {
         }
         
         // Clean up on modal hidden
+        const currentModalElement = this.modalElement; // Capture reference for closure
         this.modalElement.addEventListener('hidden.bs.modal', () => {
+            // If show() was called again, this.modalElement points to the NEW modal.
+            // In that case, skip cleanup to avoid interfering with the new modal.
+            if (this.modalElement !== currentModalElement) {
+                currentModalElement.remove();
+                return;
+            }
             if (!this.saved && !this.skipped && !this.navigating && !this.noButtonPressed) {
                 // User cancelled (ESC or Cancel button)
                 if (this.mode === 'delete' && this.onCancelBtn) {
@@ -1403,7 +1411,7 @@ class ObservationForm {
                 }
             }
             this.destroyed = true; // Mark as destroyed to prevent async operations
-            this.modalElement.remove();
+            currentModalElement.remove();
         });
         
         // Initial check of required fields (important for pre-filled forms in add mode)

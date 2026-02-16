@@ -2408,6 +2408,10 @@ async function showModifySingleObservations(filterState) {
         return;
     }
     
+    // Create ObservationForm ONCE and reuse for all navigation steps
+    const form = new ObservationForm();
+    await form.initialize('edit');
+    
     // Show observations one by one in edit form
     let currentIndex = 0;
     
@@ -2427,21 +2431,78 @@ async function showModifySingleObservations(filterState) {
         // Find the index of this observation in the full observations array
         const obsIndex = window.haloData.observations ? window.haloData.observations.indexOf(obs) : -1;
         
-        // Show observation form directly with populated fields
-        showObservationFormForEdit(obs, currentIndex + 1, filteredObs.length, () => {
-            // After modification, return to main menu
-            window.navigateInternal('/');
+        // Show observation form directly with populated fields (reuse form instance)
+        // Store the original observation index for deletion
+        let originalIndex = obsIndex;
+        
+        form.show('edit', obs, async (modifiedObs) => {
+            // Delete the old observation and insert the modified one
+            try {
+                // Remove old observation from array using the stored index
+                if (originalIndex >= 0 && originalIndex < window.haloData.observations.length) {
+                    window.haloData.observations.splice(originalIndex, 1);
+                }
+                
+                // First, delete the old observation from server
+                const deleteResp = await fetch('/api/observations/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(obs)
+                });
+                
+                // Now POST the modified observation
+                const resp = await fetch('/api/observations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(modifiedObs)
+                });
+                
+                if (resp.status === 409) {
+                    throw new Error(i18nStrings.observations.error_observation_exists);
+                }
+                
+                if (!resp.ok) throw new Error('Failed to save modified observation');
+                
+                const addedObs = await resp.json();
+                
+                // Reload observations from server to get correct sorted order
+                const obsResponse = await fetch('/api/observations?limit=200000');
+                if (obsResponse.ok) {
+                    const data = await obsResponse.json();
+                    window.haloData.observations = data.observations;
+                }
+                
+                // Set dirty flag (Local Mode only)
+                if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
+                updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+                
+                // Trigger autosave
+                await triggerAutosave();
+                
+                const successMsg = i18nStrings.messages.observation_modified;
+                showMessage(successMsg, 'success');
+                
+                // After modification, return to main menu
+                setTimeout(() => {
+                    window.navigateInternal('/');
+                }, 1500);
+            } catch (e) {showErrorDialog(i18nStrings.common.error + ': ' + e.message);
+            }
         }, () => {
-            // User chose to skip this observation - show next
-            showObservationAt(currentIndex + 1);
-        }, obsIndex,
+            // Cancel - return to main
+            window.navigateInternal('/');
+        }, currentIndex + 1, filteredObs.length, null, 
         () => {
-            // Next button pressed
+            // Next button pressed - skip to next observation
             showObservationAt(currentIndex + 1);
         },
         () => {
-            // Previous button pressed
+            // Previous button pressed - go to previous observation
             showObservationAt(currentIndex - 1);
+        },
+        () => {
+            // Cancel button - return to main
+            window.navigateInternal('/');
         });
     };
     
@@ -2889,6 +2950,10 @@ async function showDeleteSingleObservations(filterState) {
         return;
     }
 
+    // Create ObservationForm ONCE and reuse for all navigation steps
+    const form = new ObservationForm();
+    await form.initialize('delete');
+
     let currentIndex = 0;
 
     const showNextObservation = async () => {
@@ -2900,7 +2965,7 @@ async function showDeleteSingleObservations(filterState) {
         const obs = filteredObs[currentIndex];
         const obsIndex = window.haloData.observations ? window.haloData.observations.indexOf(obs) : -1;
 
-        showObservationFormForDelete(obs, currentIndex + 1, filteredObs.length, async () => {
+        form.show('delete', obs, null, null, currentIndex + 1, filteredObs.length, i18nStrings.observations.delete_question, async () => {
             // Yes -> delete
             try {
                 // Remove from client array first if present
@@ -2919,15 +2984,8 @@ async function showDeleteSingleObservations(filterState) {
                     throw new Error('Delete endpoint responded ' + resp.status);
                 }
 
-                // Optionally reload from server to ensure order/count
-                const reload = await fetch('/api/observations?limit=200000');
-                if (reload.ok) {
-                    const data = await reload.json();
-                    window.haloData.observations = data.observations;
-                }
-
                 if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-                updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+                updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations ? window.haloData.observations.length : 0);
                 
                 // Save to sessionStorage to persist dirty flag
                 if (window.saveHaloDataToSession) {
@@ -2936,17 +2994,13 @@ async function showDeleteSingleObservations(filterState) {
                 
                 await triggerAutosave();
 
-                // Store notification in sessionStorage for display on main page
+                // Show brief success notification
                 const msg = `${i18nStrings.common.observation} ${i18nStrings.common.deleted}`;
-                sessionStorage.setItem('pendingNotification', JSON.stringify({
-                    message: `<strong>✓</strong> ${msg}`,
-                    type: 'success',
-                    duration: 3000
-                }));
+                showNotification(`<strong>✓</strong> ${msg}`, 'success', 1500);
                 
-                // Continue to next observation (longer delay to let message show)
+                // Continue to next observation immediately
                 currentIndex += 1;
-                setTimeout(() => showNextObservation(), 2500);
+                showNextObservation();
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
                 window.navigateInternal('/');
             }
@@ -3734,6 +3788,10 @@ async function showDisplaySingleObservations(filterState) {
         return;
     }
     
+    // Create ObservationForm ONCE and reuse for all navigation steps
+    const form = new ObservationForm();
+    await form.initialize('view');
+    
     let currentIndex = 0;
     
     const showNext = () => {
@@ -3743,7 +3801,7 @@ async function showDisplaySingleObservations(filterState) {
         }
         
         const obs = filteredObs[currentIndex];
-        showObservationFormForView(obs, currentIndex + 1, filteredObs.length, () => {
+        form.show('view', obs, null, null, currentIndex + 1, filteredObs.length, null, () => {
             // Next button
             currentIndex++;
             showNext();
@@ -6800,8 +6858,13 @@ function updateFileInfoDisplay(fileName, count) {
     const obsCountElem = document.getElementById('obs-count');
     
     if (fileInfo && fileNameElem && obsCountElem) {
-        const dirtyMarker = window.haloData.isDirty ? '*' : '';
-        fileNameElem.textContent = dirtyMarker + fileName;
+        if (window.haloConfig && window.haloConfig.cloud_mode) {
+            // Cloud Mode: no files, show database indicator
+            fileNameElem.textContent = i18nStrings.common.database;
+        } else {
+            const dirtyMarker = window.haloData.isDirty ? '*' : '';
+            fileNameElem.textContent = dirtyMarker + (fileName || '');
+        }
         obsCountElem.textContent = `${count} ${i18nStrings.common.observations}`;
         fileInfo.style.display = 'flex';
     }
