@@ -675,7 +675,7 @@ async function showAddObservationDialogNumeric() {
                     </div>
                     <div class="modal-body py-2">
                         <div class="border rounded mb-2" style="font-family: var(--bs-font-monospace, monospace); white-space: pre; background: #f8f9fa; padding: 4px 6px; font-size: 14px; color: #000;"><div id="obs-guide-header" style="margin: 0; padding: 0; line-height: 1.4;">${i18nStrings.observations.input_pattern}</div><div id="obs-guide-entered" style="margin: 0; padding: 0; line-height: 1.4;"></div><div id="obs-guide-remarks" style="margin: 0; padding: 0; line-height: 1.4; display: none;"></div><div id="obs-guide-caret" style="color:#0d6efd; margin: 0; padding: 0; line-height: 1.4;"></div></div>
-                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" spellcheck="false" style="position: absolute; left: -9999px; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
+                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" spellcheck="false" style="opacity: 0; height: 0; padding: 0; margin: 0; border: none; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
                         <div id="obs-code-error" class="text-danger mt-1" style="display:none; font-size: 12px;"></div>
                     </div>
                     <div class="modal-footer py-1">
