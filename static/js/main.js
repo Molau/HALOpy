@@ -11,6 +11,7 @@ const YEAR_MAX = 2079;
 let currentLanguage = 'de';
 window.currentLanguage = currentLanguage;
 let i18nStrings = {};
+window.i18nStrings = i18nStrings;
 let observerData = null; // cache of observer data with regions
 
 // Application constants loaded from backend
@@ -2061,6 +2062,7 @@ async function loadI18n(lang) {
     try {
         const response = await fetch(`/api/i18n/${lang}?v=${Date.now()}`);
         i18nStrings = await response.json();
+        window.i18nStrings = i18nStrings;
         updatePageText();
     } catch (error) {}
 }

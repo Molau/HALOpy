@@ -116,7 +116,7 @@ function showSimpleModal(config) {
         if (config.footer) {
             footer = config.footer;
         } else {
-            const okText = config.okText || window.i18nStrings.common.ok;
+            const okText = config.okText || i18nStrings.common.ok;
             footer = createModalButton(okText, config.okType || 'primary', { dismiss: true });
         }
     }
@@ -163,7 +163,7 @@ function showSimpleModal(config) {
 window.showWarningModal = function(message) {
     return new Promise(resolve => {
         const { modalEl } = showSimpleModal({
-            title: window.i18nStrings.common.warning,
+            title: i18nStrings.common.warning,
             body: `<p>${message}</p>`
         });
         modalEl.addEventListener('hidden.bs.modal', () => resolve(), { once: true });
@@ -173,7 +173,7 @@ window.showWarningModal = function(message) {
 window.showErrorDialog = function(message) {
     return new Promise(resolve => {
         const { modalEl } = showSimpleModal({
-            title: window.i18nStrings.common.error,
+            title: i18nStrings.common.error,
             body: `<p>${message}</p>`,
             okType: 'danger'
         });
@@ -207,8 +207,8 @@ window.showConfirmDialog = function(title, message, onConfirm, onCancel) {
     const id = 'confirm-' + Date.now();
     const okId = id + '-ok';
 
-    const footer = createModalButton(window.i18nStrings.common.cancel, 'secondary', { dismiss: true }) +
-                   createModalButton(window.i18nStrings.common.ok, 'primary', { id: okId });
+    const footer = createModalButton(i18nStrings.common.cancel, 'secondary', { dismiss: true }) +
+                   createModalButton(i18nStrings.common.ok, 'primary', { id: okId });
 
     const { modal, modalEl } = showSimpleModal({
         title,

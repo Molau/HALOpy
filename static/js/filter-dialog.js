@@ -87,6 +87,10 @@ class FilterDialog {
         
         this.modal = new bootstrap.Modal(this.modalElement);
         this.modal.show();
+        
+        // Decision #033: Use standard keyboard handling
+        const btnApply = document.getElementById('btn-apply-filter');
+        setupModalKeyboard(this.modalElement, btnApply);
     }
     
     createModalHTML() {
@@ -161,36 +165,16 @@ class FilterDialog {
         filterCriterion1Select.addEventListener('change', () => this.handleFilter1Change());
         filterCriterion2Select.addEventListener('change', () => this.handleFilter2Change());
         
-        if (filter2Value) {
-            filter2Value.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.applyFilters();
-                }
-            });
-        }
-        
-        // Bind Enter key to Apply button for entire modal
-        this.modalElement.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                btnApply.click();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                this.modal.hide();
-                if (this.onCancel) this.onCancel();
-            }
-        });
+        // Enter/ESC key handling via setupModalKeyboard() in show() (Decision #033)
         
         btnApply.addEventListener('click', () => this.applyFilters());
         btnCancel.addEventListener('click', () => {
             this.modal.hide();
-            if (this.onCancel) this.onCancel();
         });
         
-        // Clean up on modal hidden
+        // Clean up on modal hidden (ESC, X button, Cancel button, or after Apply)
         this.modalElement.addEventListener('hidden.bs.modal', () => {
-            // Call pending callback if exists
+            // Call pending callback if exists (Apply was clicked)
             if (this.pendingCallback && this.onApply) {
                 const callbackPromise = this.onApply(this.pendingCallback);
                 this.pendingCallback = null;
@@ -199,6 +183,9 @@ class FilterDialog {
                 if (callbackPromise && typeof callbackPromise.then === 'function') {
                     callbackPromise.catch(err => console.error('Filter callback error:', err));
                 }
+            } else if (this.onCancel) {
+                // No pending callback = dialog was cancelled (ESC, X, Cancel button)
+                this.onCancel();
             }
             
             this.modalElement.remove();

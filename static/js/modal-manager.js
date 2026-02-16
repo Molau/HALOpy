@@ -163,8 +163,8 @@ class ModalManager {
      */
     showConfirm(title, message, options = {}) {
         const {
-            confirmText = options.confirmText || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok),
-            cancelText = options.cancelText || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.cancel),
+            confirmText = options.confirmText || i18nStrings.common.ok,
+            cancelText = options.cancelText || i18nStrings.common.cancel,
             confirmType = 'primary'
         } = options;
 
@@ -202,10 +202,10 @@ class ModalManager {
      */
     showWarning(message, title = null) {
         return new Promise((resolve) => {
-            const modalTitle = title || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.warning) || 'Warning';
+            const modalTitle = title || i18nStrings.common.warning;
             const id = this.generateId();
             
-            const okText = (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok) || 'OK';
+            const okText = i18nStrings.common.ok;
             const footer = this.createButton(okText, 'primary', null, true);
             const html = this.createBaseModal(id, modalTitle, `<p>${message}</p>`, footer);
             
@@ -219,10 +219,10 @@ class ModalManager {
      */
     showError(message, title = null) {
         return new Promise((resolve) => {
-            const modalTitle = title || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.error) || 'Error';
+            const modalTitle = title || i18nStrings.common.error;
             const id = this.generateId();
             
-            const okText = (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok) || 'OK';
+            const okText = i18nStrings.common.ok;
             const footer = this.createButton(okText, 'danger', null, true);
             const html = this.createBaseModal(id, modalTitle, `<p>${message}</p>`, footer);
             
@@ -264,10 +264,10 @@ class ModalManager {
      */
     showSuccess(message, title = null) {
         return new Promise((resolve) => {
-            const modalTitle = title || (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.success) || 'Success';
+            const modalTitle = title || i18nStrings.common.success;
             const id = this.generateId();
             
-            const okText = (window.i18nStrings && window.i18nStrings.common && window.i18nStrings.common.ok) || 'OK';
+            const okText = i18nStrings.common.ok;
             const footer = this.createButton(okText, 'success', null, true);
             const html = this.createBaseModal(id, modalTitle, `<p>${message}</p>`, footer);
             
