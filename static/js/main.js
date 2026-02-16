@@ -334,8 +334,7 @@ async function loadObserverCodes() {
 }
 
 // Show Bootstrap confirmation dialog instead of browser confirm()
-// Backward compatibility wrapper - actual implementation in modal-manager.js
-// function showConfirmDialog(title, message, onConfirm, onCancel) - defined in modal-manager.js
+// function showConfirmDialog(title, message, onConfirm, onCancel) - defined in modal-utils.js
 
 // Helper function to get default month and year based on date default setting
 async function getDateDefault() {
@@ -903,8 +902,8 @@ async function showAddObservationDialogNumeric() {
                         return;
                     } else {
                         // Complete halo or non-circular: Sectors (15 chars) + 8//// (5 chars) were auto-filled
-                        // If g=1: Delete last char of GG (manually entered) ? position 29
-                        // If g != 1: GG was also auto-filled, delete it and last char of zz ? position 27
+                        // If g=1: Delete last char of GG (manually entered) → position 29
+                        // If g != 1: GG was also auto-filled, delete it and last char of zz → position 27
                         if (g === 1) {
                             // g=1: GG was manually entered, delete last digit
                             eing = eing.slice(0, 29);
@@ -928,8 +927,8 @@ async function showAddObservationDialogNumeric() {
                     
                     if (v === 1 && CIRCULAR_HALOS.has(ee)) {
                         // Incomplete circular halo: Sectors were manually entered and now all deleted
-                        // If g=1: Delete last char of GG ? position 29
-                        // If g != 1: Delete GG completely and last char of zz ? position 27
+                        // If g=1: Delete last char of GG → position 29
+                        // If g != 1: Delete GG completely and last char of zz → position 27
                         if (g === 1) {
                             eing = eing.slice(0, 29);
                         } else {
@@ -951,8 +950,8 @@ async function showAddObservationDialogNumeric() {
                     const g = parseInt(eing.slice(9,10),10);
                     if (ee === 9) {
                         // EE 09 only: 8// was auto-filled
-                        // If g=1: Delete last char of GG ? position 29
-                        // If g != 1: Delete GG and last char of zz ? position 27
+                        // If g=1: Delete last char of GG → position 29
+                        // If g != 1: Delete GG and last char of zz → position 27
                         if (g === 1) {
                             eing = eing.slice(0, 29);
                         } else {
@@ -974,8 +973,8 @@ async function showAddObservationDialogNumeric() {
                     const g = parseInt(eing.slice(9,10),10);
                     if (ee === 8 || ee === 10) {
                         // EE 08/10: 8 was auto-filled
-                        // If g=1: Delete last char of GG ? position 29
-                        // If g != 1: Delete GG and last char of zz ? position 27
+                        // If g=1: Delete last char of GG → position 29
+                        // If g != 1: Delete GG and last char of zz → position 27
                         if (g === 1) {
                             eing = eing.slice(0, 29);
                         } else {
@@ -1480,7 +1479,7 @@ async function showAddObservationDialogNumeric() {
             modal.hide();
             
             // Show success notification
-            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Wait for modal to close, then ask if user wants to add another
             modalEl.addEventListener('hidden.bs.modal', async () => {
@@ -1557,7 +1556,7 @@ async function showAddObservationDialogMenu() {
             await triggerAutosave();
             
             // Show success notification
-            showNotification(`<strong>?</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
+            showNotification(`<strong>✓</strong> 1 ${i18nStrings.common.observation} ${i18nStrings.common.added}`);
             
             // Close the form modal first
             form.hideModal();
@@ -2490,7 +2489,7 @@ async function showModifySingleObservations(filterState) {
                 
                 const successMsg = i18nStrings.messages.observation_modified;
                 sessionStorage.setItem('pendingNotification', JSON.stringify({
-                    message: '<strong>?</strong> ' + successMsg,
+                    message: '<strong>✓</strong> ' + successMsg,
                     type: 'success',
                     duration: 3000
                 }));
@@ -2910,7 +2909,7 @@ async function processBulkUpdate(filteredObs, updates) {
         
 
         sessionStorage.setItem('pendingNotification', JSON.stringify({
-            message: `<strong>?</strong> ${filteredObs.length} ${i18nStrings.observations.bulk_modify_success}`,
+            message: `<strong>✓</strong> ${filteredObs.length} ${i18nStrings.observations.bulk_modify_success}`,
             type: 'success',
             duration: 3000
         }));
@@ -3012,13 +3011,14 @@ async function showDeleteSingleObservations(filterState) {
                 // Store notification for display after navigation (toast must survive page change)
                 const msg = `${i18nStrings.common.observation} ${i18nStrings.common.deleted}`;
                 sessionStorage.setItem('pendingNotification', JSON.stringify({
-                    message: `<strong>?</strong> ${msg}`,
+                    message: `<strong>✓</strong> ${msg}`,
                     type: 'success',
                     duration: 3000
                 }));
                 
-                // Return to main after deletion (critical operation - don't continue iterating)
-                window.navigateInternal('/');
+                // Continue to next observation (longer delay to let message show)
+                currentIndex += 1;
+                setTimeout(() => showNextObservation(), 2500);
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
                 window.navigateInternal('/');
             }
@@ -3841,9 +3841,9 @@ async function showStartupFileDialog() {
             
             // Show success message
             if (selectedFile) {
-                showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_changed}`);
+                showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_changed}`);
             } else {
-                showNotification(`<strong>?</strong> ${i18nStrings.settings.startup_file_disabled}`);
+                showNotification(`<strong>✓</strong> ${i18nStrings.settings.startup_file_disabled}`);
             }
         });
 
@@ -4651,7 +4651,7 @@ async function showSelectDialog() {
                 .replace('{kept}', keptCount)
                 .replace('{deleted}', deletedCount);
             sessionStorage.setItem('pendingNotification', JSON.stringify({
-                message: `<strong>?</strong> ${message}`,
+                message: `<strong>✓</strong> ${message}`,
                 type: 'success',
                 duration: 5000
             }));
@@ -4710,7 +4710,7 @@ async function showNewFileDialog() {
         // Update file info in header
         updateFileInfoDisplay(filename, 0);
         
-        showNotification(`<strong>?</strong> ${i18nStrings.messages.new_file_created.replace('{0}', filename)}`, 'success');
+        showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', filename)}`, 'success');
     } catch (err) {
         if (err.name === 'AbortError') {
             // User cancelled the file picker
@@ -4765,7 +4765,7 @@ async function saveFile() {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 
-                showNotification(`<strong>?</strong> ${newFilename} gespeichert`, 'success');
+                showNotification(`<strong>✓</strong> ${newFilename} gespeichert`, 'success');
             } else {
                 const result = await response.json();
                 showErrorDialog(i18nStrings.common.error + ': ' + result.error);
@@ -5301,7 +5301,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 const result = await response.json();
                 
                 // Build success message with details
-                let message = `? ${result.count || 0} ${i18nStrings.common.observations} `;
+                let message = `✓ ${result.count || 0} ${i18nStrings.common.observations} `;
                 message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;
                 if (result.duplicates && result.duplicates > 0) {
                     message += ` (${result.duplicates} ${i18nStrings.upload_download.duplicates_skipped})`;
@@ -6443,7 +6443,7 @@ async function checkAutosaveRecovery() {
                 
                 // Show success notification
                 const message = `${result.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${result.filename}" ${i18nStrings.messages.loaded}`;
-                showNotification(`<strong>?</strong> ${message}`, 'success', 5000);
+                showNotification(`<strong>✓</strong> ${message}`, 'success', 5000);
             } catch (error) {
                 showErrorDialog(i18nStrings.messages.autosave_recovery_error + ': ' + error.message);
             }
@@ -6457,16 +6457,9 @@ async function checkAutosaveRecovery() {
     }
 }
 
-// Show error dialog
-// Backward compatibility wrapper - actual implementation in modal-manager.js
-// function showErrorDialog(message) - defined in modal-manager.js
-
-// Show info/success modal (simple non-dismissable spinner or message)
-// Backward compatibility wrapper - actual implementation in modal-manager.js
-// function showInfoModal(title, message) - defined in modal-manager.js
-
-// Backward compatibility wrapper - actual implementation in modal-manager.js
-// function showSuccessModal(title, message) - defined in modal-manager.js
+// Show error dialog - defined in modal-utils.js
+// Show info/loading modal - defined in modal-utils.js
+// Show success modal - defined in modal-utils.js
 
 
 // Load file dialog
@@ -6598,13 +6591,13 @@ async function continueLoadFile() {
             }
             
             // Show success message
-            showNotification(`<strong>?</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
+            showNotification(`<strong>✓</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
         } catch (error) {
             bsModal.hide();
             setTimeout(() => {
                 loadingModal.remove();
             }, 300);
-            showNotification(`<strong>?</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
         }
     });
     
@@ -6719,11 +6712,11 @@ async function continueMergeFile() {
             
             // Show success message with count of added observations
             // (addedCount already computed above)
-            showNotification(`<strong>?</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
+            showNotification(`<strong>✓</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
         } catch (error) {
             bsModal.hide();
             setTimeout(() => loadingModal.remove(), 300);
-            showNotification(`<strong>?</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>✗</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
             document.body.appendChild(errorMsg);
             setTimeout(() => errorMsg.remove(), 5000);
         }
@@ -6794,7 +6787,7 @@ async function checkAndDisplayFileInfo() {
                 
                 // Show notification if file was auto-loaded
                 if (status.auto_loaded) {
-                    showNotification(`<strong>?</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
+                    showNotification(`<strong>✓</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
                 }
             } else {
                 // No data loaded
@@ -6812,9 +6805,7 @@ async function showSaveFileDialog() {
     await saveFile();
 }
 
-// Show warning modal with custom message
-// Backward compatibility wrapper - actual implementation in modal-manager.js
-// function showWarningModal(message) - defined in modal-manager.js
+// Show warning modal with custom message - defined in modal-utils.js
 
 // Show notification with custom message and type
 // - Auto-dismisses after 3 seconds
@@ -8020,7 +8011,7 @@ async function showAddObserverDialog(formData = null) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_added}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
             
         } catch (e) {
             const formData = observerData;
@@ -8162,10 +8153,10 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                 <td>${aktivDisplay}</td>
                 <td>${site.HbOrt}</td>
                 <td>${String(site.GH).padStart(2, '0')}</td>
-                <td>${site.HLG}� ${site.HLM}' ${site.HOW} / ${site.HBG}� ${site.HBM}' ${site.HNS}</td>
+                <td>${site.HLG}° ${site.HLM}' ${site.HOW} / ${site.HBG}° ${site.HBM}' ${site.HNS}</td>
                 <td>${site.NbOrt}</td>
                 <td>${String(site.GN).padStart(2, '0')}</td>
-                <td>${site.NLG}� ${site.NLM}' ${site.NOW} / ${site.NBG}� ${site.NBM}' ${site.NNS}</td>
+                <td>${site.NLG}° ${site.NLM}' ${site.NOW} / ${site.NBG}° ${site.NBM}' ${site.NNS}</td>
             </tr>`;
     }).join('');
     
@@ -8247,7 +8238,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_deleted}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
             
             // Return to main page after 2 seconds
             setTimeout(() => {
@@ -8502,7 +8493,7 @@ function showEditBaseDataDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_updated}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
             
             // Reload the page if we're on the observers page
             setTimeout(() => {
@@ -8777,7 +8768,7 @@ async function showAddSiteDialog(observer) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_site_added}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_added}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -9345,7 +9336,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_site_updated}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_updated}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -9639,7 +9630,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
-            showNotification(`<strong>?</strong> ${i18nStrings.observers.success_site_deleted}`);
+            showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_deleted}`);
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {

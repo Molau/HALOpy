@@ -1502,7 +1502,6 @@ spinner.hide();
 - Every `new bootstrap.Modal(element)` call MUST include `{ backdrop: 'static' }` as second argument
 - HTML template modals use `data-bs-backdrop="static"` attribute
 - `showSimpleModal()` in `modal-utils.js` defaults to `backdrop: 'static'`
-- `modal-manager.js` defaults to `backdrop: 'static'` when no option is passed
 - Loading/spinner modals use `backdrop: 'static'` + `keyboard: false`
 - **No global patching** — each call site is explicit and auditable
 
@@ -1528,10 +1527,8 @@ window.navigateInternal('/');
 
 ### Migration Plan
 
-- Replace `ModalManager` class with utility functions (`setupModalKeyboard`, `createModalButton`, `createStandardFooter`)
-- Keep backward-compatible global functions (`showWarningModal`, `showErrorDialog`, etc.) but reimplement using utilities
+- ✓ `modal-manager.js` removed — all global functions (`showWarningModal`, `showErrorDialog`, etc.) are in `modal-utils.js`
 - Migrate complex modals one by one: add `setupModalKeyboard()` call to each
-- Remove `modal-manager.js` when all modals are migrated
 
 ### Related Decisions
 - Decision #018: Button sizing (`btn-sm px-3`), colors, text standards → unchanged
