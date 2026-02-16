@@ -3428,6 +3428,19 @@ async function showDisplayObservationsDialog() {
                     spinnerInfo.modalEl.remove();
                 }
             }
+            
+            // Force cleanup of any remaining modal backdrops
+            setTimeout(() => {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+                
+                // Reset body styles if needed
+                if (document.querySelectorAll('.modal.show').length === 0) {
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                }
+            }, 200);
         }
     );
     } catch (error) {
