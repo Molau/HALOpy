@@ -28,6 +28,36 @@ main {
 }
 
 /* Language switcher focus state - prevent white on white */
+
+/* Fix for mobile touch devices - disable hover states on touch */
+@media (hover: none) {
+    .dropdown:hover > .dropdown-menu,
+    .dropdown-hover:hover > .dropdown-menu {
+        display: none !important;
+    }
+    
+    /* Ensure dropdowns work properly on touch devices */
+    .dropdown-menu {
+        display: none;
+    }
+    
+    .dropdown.show > .dropdown-menu {
+        display: block !important;
+    }
+}
+
+/* Remove hover effects on touch devices to prevent double-tap requirement */
+@media (pointer: coarse) {
+    .nav-link:hover {
+        color: inherit !important;
+        background-color: inherit !important;
+    }
+    
+    .dropdown-item:hover {
+        background-color: inherit !important;
+        color: inherit !important;
+    }
+}
 #lang-de.btn-light:focus,
 #lang-en.btn-light:focus {
     background-color: #e9ecef;
