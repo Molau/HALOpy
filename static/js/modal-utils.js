@@ -6,6 +6,31 @@
  * Does NOT wrap or replace Bootstrap - works WITH it.
  */
 
+// ========== Global Bootstrap Modal Default ==========
+// Disable backdrop click closing for ALL modals application-wide.
+// Users must use ESC, X button, or Cancel/OK to close modals.
+// This prevents accidental data loss from misclicks.
+(function() {
+    const OriginalModal = bootstrap.Modal;
+    const OriginalModalGetOrCreateInstance = OriginalModal.getOrCreateInstance;
+    const OriginalModalGetInstance = OriginalModal.getInstance;
+
+    function PatchedModal(element, config = {}) {
+        // Force backdrop: 'static' unless explicitly set to something else
+        if (config.backdrop === undefined) {
+            config.backdrop = 'static';
+        }
+        return new OriginalModal(element, config);
+    }
+
+    // Preserve static methods
+    PatchedModal.getOrCreateInstance = OriginalModalGetOrCreateInstance;
+    PatchedModal.getInstance = OriginalModalGetInstance;
+    PatchedModal.prototype = OriginalModal.prototype;
+
+    bootstrap.Modal = PatchedModal;
+})();
+
 /**
  * Setup consistent keyboard handling for any Bootstrap modal.
  * Call this ONCE after modal.show().

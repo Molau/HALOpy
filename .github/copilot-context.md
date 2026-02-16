@@ -1424,8 +1424,11 @@ Whenever the i18n resources are modified, both language files MUST be updated in
 2. **ESC key** → closes modal (equivalent to Cancel/X button)
    - Exception: Loading/spinner modals (`backdrop: 'static'`, `keyboard: false`) block ESC
 3. **X button** (close) → same as ESC, closes without action
-4. **Backdrop click** → closes modal (same as ESC)
-   - Exception: Loading/spinner modals use `backdrop: 'static'`
+4. **Backdrop click** → DISABLED (`backdrop: 'static'` for ALL modals)
+   - Clicking outside a modal does NOT close it — prevents accidental data loss
+   - Enforced globally via Bootstrap Modal constructor patch in `modal-utils.js`
+   - HTML template modals use `data-bs-backdrop="static"` attribute
+   - Loading/spinner modals additionally use `keyboard: false` to block ESC
 5. **Cleanup** → Modal element removed from DOM after `hidden.bs.modal` event
 
 ### Utility Functions (replacing ModalManager class)
@@ -1486,9 +1489,21 @@ spinner.hide();
 3. ✓ **ALL dynamically created modals** must be removed from DOM on `hidden.bs.modal`
 4. ✓ **Button text** must come from `i18nStrings` – no fallback values (Decision #015)
 5. ✓ **Complex modals** in templates: use standard Bootstrap markup, add `setupModalKeyboard()` in JS
-6. ✗ **NEVER** wrap Bootstrap modals in a custom class/framework
-7. ✗ **NEVER** use `|| 'OK'` or `|| 'Cancel'` fallbacks for button text
-8. ✗ **NEVER** implement custom backdrop/z-index management (Bootstrap handles this)
+6. ✓ **ALL HTML template modals** must have `data-bs-backdrop="static"` attribute
+7. ✗ **NEVER** wrap Bootstrap modals in a custom class/framework
+8. ✗ **NEVER** use `|| 'OK'` or `|| 'Cancel'` fallbacks for button text
+9. ✗ **NEVER** implement custom backdrop/z-index management (Bootstrap handles this)
+
+### Backdrop Policy (Global Enforcement)
+
+**All modals use `backdrop: 'static'`** — clicking outside does NOT close the modal.
+
+**Enforcement mechanism** (in `modal-utils.js`):
+- Global Bootstrap `Modal` constructor is patched at load time
+- If no `backdrop` option is explicitly passed, it defaults to `'static'`
+- This affects ALL `new bootstrap.Modal()` calls application-wide
+- HTML template modals additionally use `data-bs-backdrop="static"` as safety net
+- Loading/spinner modals use `backdrop: 'static'` + `keyboard: false`
 
 ### Toast/Notification after Modal Actions
 
