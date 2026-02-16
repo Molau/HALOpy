@@ -2998,9 +2998,8 @@ async function showDeleteSingleObservations(filterState) {
                 const msg = `${i18nStrings.common.observation} ${i18nStrings.common.deleted}`;
                 showNotification(`<strong>✓</strong> ${msg}`, 'success', 1500);
                 
-                // Continue to next observation immediately
-                currentIndex += 1;
-                showNextObservation();
+                // Return to main after deletion (critical operation - don't continue iterating)
+                window.navigateInternal('/');
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
                 window.navigateInternal('/');
             }
