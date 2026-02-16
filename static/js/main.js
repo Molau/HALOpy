@@ -3031,59 +3031,6 @@ async function showDeleteSingleObservations(filterState) {
     showNextObservation();
 }
 
-// Confirmation dialog for deletion with default focus on No
-async function showDeleteConfirmDialog(obs, currentNum, totalNum, callback) {
-
-    const obsDisplay = formatObservationForDisplay(obs);
-
-    const html = `
-        <div class="modal fade" id="delete-confirm-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header py-2">
-                        <h6 class="modal-title">${i18nStrings.observations.delete_question} (${currentNum}/${totalNum})</h6>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body py-2">
-                        <div style="font-size: 14px; line-height: 1.6; background-color: #f8f9fa; padding: 10px; border-radius: 4px;">${obsDisplay}</div>
-                    </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-cancel">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-danger btn-sm px-3" id="btn-delete-yes">${i18nStrings.common.yes}</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-
-    document.body.insertAdjacentHTML('beforeend', html);
-    const modalEl = document.getElementById('delete-confirm-modal');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-
-    // Default focus on No (safe default for destructive action)
-    const btnNo = document.getElementById('btn-delete-no');
-    const btnYes = document.getElementById('btn-delete-yes');
-    const btnCancel = document.getElementById('btn-delete-cancel');
-    if (btnNo) btnNo.focus();
-
-    // Enter triggers No (safe default), ESC handled by Bootstrap
-    setupModalKeyboard(modalEl, btnNo);
-
-    let answered = false;
-
-    btnYes.addEventListener('click', () => { answered = true; modal.hide(); callback(true); });
-    btnNo.addEventListener('click', () => { answered = true; modal.hide(); callback(false); });
-    btnCancel.addEventListener('click', () => { answered = true; modal.hide(); callback(null); });
-
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        modalEl.remove();
-        if (!answered) {
-            callback(null);
-        }
-    });
-}
-
 // Apply filter criteria to observations
 async function applyFilterToObservations(filterState) {
     // Fetch all observations from server (supports auto-loaded files)
@@ -6900,8 +6847,12 @@ async function checkAndDisplayFileInfo() {
         if (statusResponse.ok) {
             const status = await statusResponse.json();
             
-            if (status.count > 0 && status.filename) {
-                // Data is loaded, update display and global state
+            if (window.haloConfig && window.haloConfig.cloud_mode) {
+                // Cloud Mode: always show database count (no filename needed)
+                window.haloData.isLoaded = true;
+                updateFileInfoDisplay(null, status.count);
+            } else if (status.count > 0 && status.filename) {
+                // Local Mode: data is loaded, update display and global state
                 if (window.haloData.observations.length === 0) {
                     window.haloData.isLoaded = true;
                     window.haloData.fileName = status.filename;
