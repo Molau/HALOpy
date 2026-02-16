@@ -3751,6 +3751,13 @@ async function showActiveObserversDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
 
+        // Decision #033: Keyboard handling + cleanup
+        setupModalKeyboard(modalEl, document.getElementById('btn-active-ok'));
+        setupModalCleanup(modalEl);
+
+        // clearMenuHighlights on close (settings menu)
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights());
+
         document.getElementById('btn-active-ok').addEventListener('click', async () => {
             const selected = document.querySelector('input[name="active_observers"]:checked');
             const newEnabled = selected ? selected.value === '1' : enabled;
@@ -3763,10 +3770,6 @@ async function showActiveObserversDialog() {
             });
         });
 
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
     } catch (error) {}
 }
 
@@ -6883,6 +6886,10 @@ async function showFixedObserverDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
+        // Decision #033: Keyboard handling + cleanup
+        setupModalKeyboard(modalEl, document.getElementById('btn-fixed-observer-ok'));
+        setupModalCleanup(modalEl);
+        
         document.getElementById('btn-fixed-observer-ok').addEventListener('click', async () => {
             const select = document.getElementById('fixed-observer-select');
             const newObserver = select.value;
@@ -6896,10 +6903,8 @@ async function showFixedObserverDialog() {
             });
         });
         
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        // clearMenuHighlights on close (settings menu)
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights());
         
     } catch (error) {}
 }
@@ -8099,6 +8104,10 @@ async function showDeleteObserverDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
+        // Decision #033: Keyboard handling + cleanup
+        setupModalKeyboard(modalEl, document.getElementById('btn-select-delete-observer-ok'));
+        setupModalCleanup(modalEl);
+        
         // Handle OK button
         document.getElementById('btn-select-delete-observer-ok').addEventListener('click', async () => {
             const selectedKK = document.getElementById('delete-observer-select').value;
@@ -8127,8 +8136,6 @@ async function showDeleteObserverDialog() {
                 }, { once: true });
             }
         });
-        
-        modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
         
     } catch (e) {
         showErrorDialog(e.message);
@@ -8192,8 +8199,8 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                         </div>
                     </div>
                     <div class="modal-footer py-1">
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-observer-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-observer-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-observer-no">${i18nStrings.common.no}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-observer-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>
@@ -8204,13 +8211,9 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
-    // Handle Enter key - same as "No" button
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('btn-delete-observer-no').click();
-        }
-    });
+    // Decision #033: Keyboard handling + cleanup (Enter → No = safe, destructive dialog)
+    setupModalKeyboard(modalEl, document.getElementById('btn-delete-observer-no'));
+    setupModalCleanup(modalEl);
     
     // Handle "No" button - close dialog
     document.getElementById('btn-delete-observer-no').addEventListener('click', () => {
@@ -8249,8 +8252,6 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             showErrorDialog(e.message);
         }
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 // Edit Observer Dialog Functions
@@ -8316,6 +8317,10 @@ async function showEditObserverDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
+        // Decision #033: Keyboard handling + cleanup
+        setupModalKeyboard(modalEl, document.getElementById('btn-select-observer-ok'));
+        setupModalCleanup(modalEl);
+        
         // Handle OK button
         document.getElementById('btn-select-observer-ok').addEventListener('click', () => {
             const selectedKK = document.getElementById('observer-select').value;
@@ -8330,8 +8335,6 @@ async function showEditObserverDialog() {
                 showEditTypeDialog(selectedObserver);
             });
         });
-        
-        modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
         
     } catch (e) {
         showErrorDialog(e.message);
@@ -8390,6 +8393,10 @@ function showEditTypeDialog(observer) {
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
+    // Decision #033: Keyboard handling + cleanup
+    setupModalKeyboard(modalEl, document.getElementById('btn-edit-type-ok'));
+    setupModalCleanup(modalEl);
+    
     // Handle OK button
     document.getElementById('btn-edit-type-ok').addEventListener('click', () => {
         const selectedType = document.querySelector('input[name="editType"]:checked').value;
@@ -8407,8 +8414,6 @@ function showEditTypeDialog(observer) {
             }
         });
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 function showEditBaseDataDialog(observer) {
@@ -8452,6 +8457,10 @@ function showEditBaseDataDialog(observer) {
     const modalEl = document.getElementById('edit-base-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
+    
+    // Decision #033: Keyboard handling + cleanup
+    setupModalKeyboard(modalEl, document.getElementById('btn-edit-base-ok'));
+    setupModalCleanup(modalEl);
     
     const errEl = document.getElementById('edit-base-error');
     
@@ -8507,8 +8516,6 @@ function showEditBaseDataDialog(observer) {
             errEl.style.display = 'block';
         }
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 /**
@@ -8702,13 +8709,9 @@ async function showAddSiteDialog(observer) {
     
     const errEl = document.getElementById('site-error');
     
-    // Handle Enter key
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            document.getElementById('btn-add-site-ok').click();
-        }
-    });
+    // Decision #033: Keyboard handling + cleanup
+    setupModalKeyboard(modalEl, document.getElementById('btn-add-site-ok'));
+    setupModalCleanup(modalEl);
     
     // Handle save
     document.getElementById('btn-add-site-ok').addEventListener('click', async () => {
@@ -8781,8 +8784,6 @@ async function showAddSiteDialog(observer) {
             errEl.style.display = 'block';
         }
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 // Edit existing observation site
@@ -8980,8 +8981,8 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-edit-site-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-edit-site-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-edit-site-no">${i18nStrings.common.no}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-edit-site-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>
@@ -9018,13 +9019,9 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     
     modal.show();
     
-    // Handle Enter key - same as "No" button
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('btn-edit-site-no').click();
-        }
-    });
+    // Decision #033: Keyboard handling + cleanup (Enter → Yes = edit this site)
+    setupModalKeyboard(modalEl, document.getElementById('btn-edit-site-yes'));
+    setupModalCleanup(modalEl);
     
     // Handle "No" button - show next site or close
     document.getElementById('btn-edit-site-no').addEventListener('click', () => {
@@ -9046,8 +9043,6 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
             showEditSiteFormDialog(observer, sites, currentIndex);
         });
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 async function showEditSiteFormDialog(observer, sites, currentIndex) {
@@ -9266,13 +9261,9 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
     
     const errEl = document.getElementById('edit-site-error');
     
-    // Handle Enter key
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            document.getElementById('btn-edit-site-ok').click();
-        }
-    });
+    // Decision #033: Keyboard handling + cleanup
+    setupModalKeyboard(modalEl, document.getElementById('btn-edit-site-ok'));
+    setupModalCleanup(modalEl);
     
     // Store original seit for identifying the record
     const originalSeit = site.seit;
@@ -9349,8 +9340,6 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             errEl.style.display = 'block';
         }
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 // Delete observation site
@@ -9551,8 +9540,8 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-site-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-site-no">${i18nStrings.common.no}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>
@@ -9589,13 +9578,9 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     
     modal.show();
     
-    // Handle Enter key - same as "No" button
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('btn-delete-site-no').click();
-        }
-    });
+    // Decision #033: Keyboard handling + cleanup (Enter → No = safe, destructive dialog)
+    setupModalKeyboard(modalEl, document.getElementById('btn-delete-site-no'));
+    setupModalCleanup(modalEl);
     
     // Handle "No" button - show next site or close
     document.getElementById('btn-delete-site-no').addEventListener('click', () => {
@@ -9642,7 +9627,5 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             showErrorDialog(e.message);
         }
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 

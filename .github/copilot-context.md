@@ -1161,7 +1161,7 @@ These are NOT decisions - they are fixed requirements from the HALO key observat
 |------------|-----------|-------|-------------------|
 | Cancel | `btn btn-secondary btn-sm px-3` | Close dialog without action | No |
 | OK | `btn btn-primary btn-sm px-3` | Confirm/apply action | **Yes** |
-| Yes (destructive) | `btn btn-danger btn-sm px-3` | Confirm delete/destructive action | **Yes** |
+| Yes (destructive) | `btn btn-primary btn-sm px-3` | Confirm delete/destructive action | **Yes** |
 | No (destructive) | `btn btn-secondary btn-sm px-3` | Reject destructive action | No |
 | Secondary action | `btn btn-secondary btn-sm px-3` | Print, Save, etc. (secondary to main action) | No |
 
