@@ -1390,6 +1390,120 @@ Whenever the i18n resources are modified, both language files MUST be updated in
 
 ---
 
+## Modal Architecture Standard - Decision #033
+
+- **Date**: 2026-02-16
+- **Status**: ✓ Approved
+- **Scope**: All modal dialogs in HALOpy (simple and complex)
+- **Supersedes**: Decision #011 (Standard Modal Dialog Layout) - which is now part of this decision
+- **Complements**: Decision #018 (UI/Dialog Button Standards) - button sizing/colors remain unchanged
+
+### Core Principle
+
+**Use standard Bootstrap modals. No custom modal framework needed.** Bootstrap provides modal show/hide, backdrop, ESC-close, and centering out of the box. HALOpy adds a thin utility layer for consistent keyboard handling and button creation – NOT a class that wraps Bootstrap.
+
+### Modal Categories
+
+**Category A: Simple Modals** (Warning, Error, Success, Confirm, Loading)
+- Created dynamically in JavaScript
+- Use global utility functions: `showWarningModal()`, `showErrorDialog()`, `showConfirmDialog()`, `showSuccessModal()`, `showInfoModal()`
+- Automatically cleaned up after closing
+- Standard button layout per Decision #018
+
+**Category B: Complex Modals** (Observation form, Observer form, Analysis dialogs, Filter)
+- HTML defined in Jinja2 templates OR constructed in dedicated JS modules
+- Use `setupModalKeyboard(modalEl, confirmBtnEl)` for consistent keyboard behavior
+- May have multiple buttons with custom labels
+- Managed by their own JS module (e.g., `FilterDialog`, `observation-form.js`)
+
+### Required Behavior for ALL Modals
+
+1. **Enter key** → triggers primary action button (the rightmost/confirm button)
+   - Exception: When focus is in a `<textarea>`, `<select>`, or multi-line input, Enter does NOT trigger the button
+   - Exception: Loading/spinner modals have no action button
+2. **ESC key** → closes modal (equivalent to Cancel/X button)
+   - Exception: Loading/spinner modals (`backdrop: 'static'`, `keyboard: false`) block ESC
+3. **X button** (close) → same as ESC, closes without action
+4. **Backdrop click** → closes modal (same as ESC)
+   - Exception: Loading/spinner modals use `backdrop: 'static'`
+5. **Cleanup** → Modal element removed from DOM after `hidden.bs.modal` event
+
+### Utility Functions (replacing ModalManager class)
+
+```javascript
+/**
+ * Setup consistent keyboard handling for any Bootstrap modal.
+ * Call this ONCE after showing a modal.
+ * @param {HTMLElement} modalEl - The .modal element
+ * @param {HTMLElement|null} confirmBtn - The primary action button (Enter triggers this)
+ */
+function setupModalKeyboard(modalEl, confirmBtn) {
+    modalEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && confirmBtn) {
+            const tag = document.activeElement?.tagName;
+            if (tag !== 'TEXTAREA' && tag !== 'SELECT') {
+                e.preventDefault();
+                confirmBtn.click();
+            }
+        }
+    });
+}
+
+/**
+ * Create standard button HTML (enforces Decision #018 sizing).
+ * @param {string} text - Button label (from i18n)
+ * @param {string} type - Bootstrap type: 'primary', 'secondary', 'danger', 'success'
+ * @param {object} options - { id, dismiss, classes }
+ */
+function createModalButton(text, type = 'primary', options = {}) { ... }
+
+/**
+ * Create standard footer with Cancel + OK buttons.
+ */
+function createStandardFooter(cancelText, okText, okType = 'primary', okId = null) { ... }
+```
+
+### Spinner/Loading Pattern
+
+```javascript
+// Show spinner - returns handle for later hide
+const spinner = showInfoModal(title, message);
+
+// ... async operation ...
+
+// Hide spinner
+spinner.hide();
+```
+
+- Loading modals: `backdrop: 'static'`, `keyboard: false` (not dismissable)
+- Centered spinner with message text below
+- No footer/buttons
+
+### Implementation Rules
+
+1. ✓ **ALL modals** must call `setupModalKeyboard()` after `modal.show()` for Enter key support
+2. ✓ **ALL buttons** must use `btn-sm px-3` (enforced by `createModalButton()` or manually)
+3. ✓ **ALL dynamically created modals** must be removed from DOM on `hidden.bs.modal`
+4. ✓ **Button text** must come from `i18nStrings` – no fallback values (Decision #015)
+5. ✓ **Complex modals** in templates: use standard Bootstrap markup, add `setupModalKeyboard()` in JS
+6. ✗ **NEVER** wrap Bootstrap modals in a custom class/framework
+7. ✗ **NEVER** use `|| 'OK'` or `|| 'Cancel'` fallbacks for button text
+8. ✗ **NEVER** implement custom backdrop/z-index management (Bootstrap handles this)
+
+### Migration Plan
+
+- Replace `ModalManager` class with utility functions (`setupModalKeyboard`, `createModalButton`, `createStandardFooter`)
+- Keep backward-compatible global functions (`showWarningModal`, `showErrorDialog`, etc.) but reimplement using utilities
+- Migrate complex modals one by one: add `setupModalKeyboard()` call to each
+- Remove `modal-manager.js` when all modals are migrated
+
+### Related Decisions
+- Decision #018: Button sizing (`btn-sm px-3`), colors, text standards → unchanged
+- Decision #019: Notification/toast messages (NOT modals) → unchanged
+- Decision #015: No fallback values → applies to all modal button text
+
+---
+
 ## Deferred Features
 
 ### Features NOT Yet Approved for Modification

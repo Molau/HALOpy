@@ -129,15 +129,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         window.navigateInternal('/');
     });
     
-    // Enter key support for filter inputs (only if they exist)
-    if (filter2Value) {
-        filter2Value.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                applyFilters();
-            }
-        });
-    }
+    // Enter key is now handled by setupModalKeyboard() in showFilterDialog() (Decision #033)
     
     btnExitObservations.addEventListener('click', () => {
         window.navigateInternal('/');
@@ -320,6 +312,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     function showFilterDialog() {
         const modal = new bootstrap.Modal(filterDialog);
         modal.show();
+        // Decision #033: consistent Enter key handling
+        setupModalKeyboard(filterDialog, btnApplyFilter);
     }
     
     function handleFilter1Change() {
