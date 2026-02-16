@@ -118,8 +118,12 @@ async function showFilterDialog() {
         console.error('Error loading fixed observer:', e);
     }
     
-    const modal = new bootstrap.Modal(document.getElementById('filter-dialog'));
+    const filterDialogEl = document.getElementById('filter-dialog');
+    const modal = new bootstrap.Modal(filterDialogEl);
     modal.show();
+    
+    // Decision #033: Enter key triggers OK button
+    setupModalKeyboard(filterDialogEl, document.getElementById('apply-filter'));
     
     const filterTypeSelect = document.getElementById('filter-type');
     const kkSelect = document.getElementById('filter-select-kk');
@@ -323,10 +327,10 @@ function displayObservers() {
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
     
-    // Clean up after modal is hidden
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        modalEl.remove();
-    });
+    // Decision #033: Enter key triggers OK, auto-cleanup on close
+    const okBtn = modalEl.querySelector('.btn-primary');
+    setupModalKeyboard(modalEl, okBtn);
+    setupModalCleanup(modalEl);
 }
 
 /**
