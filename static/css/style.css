@@ -75,6 +75,12 @@ main {
         background-color: inherit !important;
         color: inherit !important;
     }
+    
+    /* Disable border-hover on menu items (causes sticky hover / double-tap) */
+    .navbar-nav .nav-link.menu-title:hover,
+    .navbar-nav .dropdown-toggle.menu-title:hover {
+        border: 2px solid transparent !important;
+    }
 }
 #lang-de.btn-light:focus,
 #lang-en.btn-light:focus {
