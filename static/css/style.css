@@ -29,23 +29,6 @@ main {
 
 /* Language switcher focus state - prevent white on white */
 
-/* Fix for mobile touch devices - disable hover states on touch */
-@media (hover: none) {
-    .dropdown:hover > .dropdown-menu,
-    .dropdown-hover:hover > .dropdown-menu {
-        display: none !important;
-    }
-    
-    /* Ensure dropdowns work properly on touch devices */
-    .dropdown-menu {
-        display: none;
-    }
-    
-    .dropdown.show > .dropdown-menu {
-        display: block !important;
-    }
-}
-
 /* Make numeric observation input visible on touch devices so virtual keyboard appears */
 @media (pointer: coarse) {
     #obs-code-input {
@@ -64,24 +47,6 @@ main {
     }
 }
 
-/* Remove hover effects on touch devices to prevent double-tap requirement */
-@media (pointer: coarse) {
-    .nav-link:hover {
-        color: inherit !important;
-        background-color: inherit !important;
-    }
-    
-    .dropdown-item:hover {
-        background-color: inherit !important;
-        color: inherit !important;
-    }
-    
-    /* Disable border-hover on menu items (causes sticky hover / double-tap) */
-    .navbar-nav .nav-link.menu-title:hover,
-    .navbar-nav .dropdown-toggle.menu-title:hover {
-        border: 2px solid transparent !important;
-    }
-}
 #lang-de.btn-light:focus,
 #lang-en.btn-light:focus {
     background-color: #e9ecef;
@@ -113,28 +78,6 @@ select option:disabled {
 .navbar-nav .nav-item {
     margin-left: 1rem;
     margin-right: 1rem;
-}
-
-/* Blue border on hover for all menu items */
-.navbar-nav .nav-link.menu-title:hover,
-.navbar-nav .dropdown-toggle.menu-title:hover {
-    border: 2px solid #0d6efd;
-    border-radius: 0.25rem;
-}
-
-/* Remove Bootstrap default dropdown and nav-link styling */
-.navbar-nav .nav-link.menu-title,
-.navbar-nav .dropdown-toggle.menu-title {
-    background-color: transparent !important;
-}
-
-.navbar-nav .nav-link.menu-title:hover,
-.navbar-nav .nav-link.menu-title:focus,
-.navbar-nav .dropdown-toggle.menu-title:hover,
-.navbar-nav .dropdown-toggle.menu-title:focus,
-.navbar-nav .dropdown-toggle.menu-title.show {
-    background-color: transparent !important;
-    color: inherit !important;
 }
 
 /* Stat cards hover effect */
