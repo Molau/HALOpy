@@ -21,40 +21,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     const btnApply = document.getElementById('btn-apply-filter');
     const applySpinner = document.getElementById('apply-spinner');
     
-    // Show warning modal (same style as main.js)
-    function showWarningModal(message) {
-        const modalHtml = `
-            <div class="modal fade" id="warning-modal" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">${i18nStrings.common.warning}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>${message}</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        const modalEl = document.getElementById('warning-modal');
-        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
-        
-        // Wait for modal to be fully shown before allowing focus
-        modalEl.addEventListener('shown.bs.modal', () => {
-            modalEl.removeAttribute('aria-hidden');
-        }, { once: true });
-        
-        modal.show();
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            modalEl.remove();
-            window.navigateInternal('/');
-        });
+    // Show warning modal and navigate to main on close
+    function showWarningAndGoHome(message) {
+        const modalEl = showWarningModal(message);
+        if (modalEl) {
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                window.navigateInternal('/');
+            });
+        }
     }
 
     // Populate year dropdown (YEAR_MIN-YEAR_MAX)
@@ -101,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // No data loaded - show warning only in Local Mode
         if (!window.isCloudMode) {
-            showWarningModal(i18nStrings.messages.no_data);
+            showWarningAndGoHome(i18nStrings.messages.no_data);
         }
         return false;
     }
@@ -258,6 +232,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             keyboard: false
         });
         resultsModal.show();
+        
+        // Decision #033: setupModalKeyboard for Enter key → OK button
+        const resultsModalEl = document.getElementById('results-modal');
+        const statsOkBtn = document.getElementById('btn-stats-ok');
+        setupModalKeyboard(resultsModalEl, statsOkBtn);
         
         // Wire up action buttons
         setupActionButtons();
@@ -643,21 +622,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 saveStatistics();
             };
         }
-        
-        // Add keyboard handler for Enter and ESC keys on results modal
-        const resultsModal = document.getElementById('results-modal');
-        const keyHandler = (e) => {
-            if (e.key === 'Enter' || e.key === 'Escape') {
-                e.preventDefault();
-                if (btnOk) btnOk.click();
-            }
-        };
-        
-        // Add listener to modal element
-        resultsModal.addEventListener('keydown', keyHandler);
-        
-        // Store handler reference for cleanup
-        resultsModal._keyHandler = keyHandler;
     }
     
     // Show chart - render with Chart.js for interactive display
@@ -783,10 +747,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
         
+        // Decision #033: setupModalKeyboard for Enter key → OK button
+        setupModalKeyboard(chartModalElement, document.getElementById('btn-chart-close-line'));
+        
         chartModal.show();
-    }
-    
-    function showBarChart() {
         if (!currentStatsData) return;
         
         const year = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
@@ -901,6 +865,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 e.stopPropagation();
             }
         });
+        
+        // Decision #033: setupModalKeyboard for Enter key → OK button
+        setupModalKeyboard(chartModalElement, document.getElementById('btn-chart-close-bar'));
         
         chartModal.show();
     }
@@ -1236,6 +1203,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         keyboard: false
     });
     modal.show();
+    
+    // Decision #033: setupModalKeyboard for Enter key → Apply button
+    setupModalKeyboard(filterDialog, btnApply);
     
     // Focus year select when modal is shown
     filterDialog.addEventListener('shown.bs.modal', () => {

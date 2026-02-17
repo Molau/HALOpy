@@ -187,15 +187,10 @@ async function showAddSiteDialog(observer) {
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
-    const errEl = document.getElementById('site-error');
+    // Decision #033: setupModalKeyboard for Enter key → OK button
+    setupModalKeyboard(modalEl, document.getElementById('btn-add-site-ok'));
     
-    // Handle Enter key
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            document.getElementById('btn-add-site-ok').click();
-        }
-    });
+    const errEl = document.getElementById('site-error');
     
     // Handle save
     document.getElementById('btn-add-site-ok').addEventListener('click', async () => {
@@ -327,6 +322,9 @@ function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
+    // Decision #033: setupModalKeyboard for Enter key → Yes button
+    setupModalKeyboard(modalEl, document.getElementById('btn-confirm-edit-site'));
+    
     document.getElementById('btn-confirm-edit-site').addEventListener('click', () => {
         modal.hide();
         modalEl.addEventListener('hidden.bs.modal', () => {
@@ -399,6 +397,9 @@ function showDeleteSiteConfirmDialog(observer, sites, currentIndex) {
     const modalEl = document.getElementById('confirm-delete-site-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
+    
+    // Decision #033: setupModalKeyboard for Enter key → Delete button
+    setupModalKeyboard(modalEl, document.getElementById('btn-delete-site'));
     
     // Handle delete
     document.getElementById('btn-delete-site').addEventListener('click', async () => {
