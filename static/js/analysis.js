@@ -2757,7 +2757,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             let colPercentage;
             if (percentageMode === 'param2') {
                 // Spaltensumme mode: each column = 100%
-                colPercentage = '100.0%';
+                colPercentage = 'Σ=100.0%';
             } else if (percentageMode === 'param1') {
                 // Zeilensumme mode: column header shows average of percentages in this column
                 let sum = 0;
@@ -2771,10 +2771,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 colPercentage = count > 0 ? 'Ø=' + (sum / count).toFixed(1) + '%' : 'Ø=0.0%';
             } else {
                 // Global mode: show actual percentage
-                colPercentage = total > 0 ? ((colTotal / total) * 100).toFixed(1) + '%' : '0.0%';
+                colPercentage = total > 0 ? (colTotal / total * 100).toFixed(1) + '%' : '0.0%';
             }
             const colLabel = formatParamValue(param2Code, col);
-            html += `<th><strong>${colLabel}</strong><br/>Σ=${colTotal} (Σ=${colPercentage})</th>`;
+            html += `<th><strong>${colLabel}</strong><br/>Σ=${colTotal} (${colPercentage})</th>`;
         });
         
         html += `
@@ -2788,7 +2788,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             let rowPercentage;
             if (percentageMode === 'param1') {
                 // Zeilensumme mode: each row = 100%
-                rowPercentage = '(Σ=100.0%)';
+                rowPercentage = 'Σ=100.0%';
             } else if (percentageMode === 'param2') {
                 // Spaltensumme mode: row header shows average of percentages in this row
                 let sum = 0;
@@ -2799,16 +2799,16 @@ document.addEventListener('DOMContentLoaded', async function() {
                         count++;
                     }
                 });
-                rowPercentage = count > 0 ? '(Ø=' + (sum / count).toFixed(1) + '%)' : '(Ø=0.0%)';
+                rowPercentage = count > 0 ? 'Ø=' + (sum / count).toFixed(1) + '%' : 'Ø=0.0%';
             } else {
                 // Global mode: show actual percentage
-                rowPercentage = total > 0 ? ((rowTotal / total) * 100).toFixed(1) + '%' : '0.0%';
+                rowPercentage = total > 0 ? (rowTotal / total * 100).toFixed(1) + '%' : '0.0%';
             }
             const rowLabel = formatParamValue(param1Code, param1Val);
             
             html += `
                 <tr>
-                    <th scope="row" class="bg-primary text-white"><strong>${rowLabel}</strong><br/>Σ=${rowTotal} (Σ=${rowPercentage})</th>
+                    <th scope="row" class="bg-primary text-white"><strong>${rowLabel}</strong><br/>Σ=${rowTotal} (${rowPercentage})</th>
             `;
             
             // Add data cells with percentages
@@ -3037,7 +3037,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 rowPercentageStr = count > 0 ? '(Ø=' + (sum / count).toFixed(1) + '%)' : '(Ø=0.0%)';
             } else {
                 // Global mode: show actual percentage
-                rowPercentageStr = total > 0 ? ((rowTotal / total) * 100).toFixed(1) + '%' : '0.0%';
+                rowPercentageStr = '(' + (total > 0 ? (rowTotal / total * 100).toFixed(1) : '0.0') + '%)';
             }
             totalCountWidthFirst = Math.max(totalCountWidthFirst, String(rowTotal).length);
             totalPercWidthFirst = Math.max(totalPercWidthFirst, rowPercentageStr.length);
@@ -3131,7 +3131,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             let colPercentageStr;
             if (percentageMode === 'param2') {
                 // Spaltensumme mode: each column = 100%
-                colPercentageStr = '100.0%';
+                colPercentageStr = 'Σ=100.0%';
             } else if (percentageMode === 'param1') {
                 // Zeilensumme mode: column header shows average of percentages in this column
                 let sum = 0;
@@ -3145,7 +3145,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 colPercentageStr = count > 0 ? 'Ø=' + (sum / count).toFixed(1) + '%' : 'Ø=0.0%';
             } else {
                 // Global mode: show actual percentage
-                colPercentageStr = total > 0 ? ((colTotal / total) * 100).toFixed(1) + '%' : '0.0%';
+                colPercentageStr = total > 0 ? (colTotal / total * 100).toFixed(1) + '%' : '0.0%';
             }
             const headerText = 'Σ=' + colTotal + ' (' + colPercentageStr + ')';
             const leftPad = Math.max(0, Math.floor((cellWidths[idx] - headerText.length) / 2));
@@ -3181,7 +3181,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 rowPercentageStr = count > 0 ? '(Ø=' + (sum / count).toFixed(1) + '%)' : '(Ø=0.0%)';
             } else {
                 // Global mode: show actual percentage
-                rowPercentageStr = total > 0 ? ((rowTotal / total) * 100).toFixed(1) + '%' : '0.0%';
+                rowPercentageStr = '(' + (total > 0 ? (rowTotal / total * 100).toFixed(1) : '0.0') + '%)';
             }
             const rowLabel = formatParamValue(param1Code, param1Val);
             const totalText = 'Σ=' + rowTotal + ' ' + rowPercentageStr;
