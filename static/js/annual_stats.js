@@ -722,70 +722,70 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
         
         // Show chart modal
-        const chartModalElement = document.getElementById('chart-modal-line');
-        chartModalElement.setAttribute('tabindex', '-1');
-        chartModalElement.addEventListener('shown.bs.modal', () => {
-            chartModalElement.focus({ preventScroll: true });
+        const chartModalElementLine = document.getElementById('chart-modal-line');
+        chartModalElementLine.setAttribute('tabindex', '-1');
+        chartModalElementLine.addEventListener('shown.bs.modal', () => {
+            chartModalElementLine.focus({ preventScroll: true });
         }, { once: true });
-        const chartModal = new bootstrap.Modal(chartModalElement, { backdrop: 'static' });
+        const chartModalLine = new bootstrap.Modal(chartModalElementLine, { backdrop: 'static' });
         
         // Store data for print/save buttons
         window.chartData = currentStatsData;
         
         // Prevent ESC key from closing parent modal
-        chartModalElement.addEventListener('keydown', (e) => {
+        chartModalElementLine.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 e.stopPropagation();
             }
         });
         
         // Decision #033: setupModalKeyboard for Enter key → OK button
-        setupModalKeyboard(chartModalElement, document.getElementById('btn-chart-close-line'));
+        setupModalKeyboard(chartModalElementLine, document.getElementById('btn-chart-close-line'));
         
-        chartModal.show();
+        chartModalLine.show();
         if (!currentStatsData) return;
         
-        const year = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
-                 `20${currentStatsData.jj.toString().padStart(2, '0')}`;
+        const year2 = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
+               `20${currentStatsData.jj.toString().padStart(2, '0')}`;
         
         // Set chart title
-        const chartTitle = document.getElementById('chart-printable-title-bar');
-        if (chartTitle) {
-            chartTitle.textContent = i18nStrings.annual_stats.chart_title.replace('{year}', year);
-            chartTitle.style.display = 'block';
+        const chartTitle2 = document.getElementById('chart-printable-title-bar');
+        if (chartTitle2) {
+            chartTitle2.textContent = i18nStrings.annual_stats.chart_title.replace('{year}', year2);
+            chartTitle2.style.display = 'block';
         }
         
         // Set chart subtitle
-        const chartSubtitle = document.getElementById('chart-subtitle-bar');
-        if (chartSubtitle) {
+        const chartSubtitle2 = document.getElementById('chart-subtitle-bar');
+        if (chartSubtitle2) {
             const totalEE = currentStatsData.totals.total_ee || 0;
-            chartSubtitle.textContent = i18nStrings.annual_stats.chart_subtitle.replace('{count}', totalEE);
+            chartSubtitle2.textContent = i18nStrings.annual_stats.chart_subtitle.replace('{count}', totalEE);
         }
         
         // Prepare chart data - months 1-12
-        const monthLabels = Object.values(i18nStrings.months_short);
-        const months = Array.from({length: 12}, (_, i) => i + 1);
+        const monthLabels2 = Object.values(i18nStrings.months_short);
+        const months2 = Array.from({length: 12}, (_, i) => i + 1);
         
-        const realData = months.map(mm => currentStatsData.monthly_stats[mm.toString()].real || 0);
-        const relativeData = months.map(mm => currentStatsData.monthly_stats[mm.toString()].relative || 0);
+        const realData2 = months2.map(mm => currentStatsData.monthly_stats[mm.toString()].real || 0);
+        const relativeData2 = months2.map(mm => currentStatsData.monthly_stats[mm.toString()].relative || 0);
         
         // Create chart
-        const canvas = document.getElementById('activity-chart-bar');
-        const ctx = canvas.getContext('2d');
+        const canvas2 = document.getElementById('activity-chart-bar');
+        const ctx2 = canvas2.getContext('2d');
         
         // Destroy existing chart if it exists
         if (window.activityChart) {
             window.activityChart.destroy();
         }
         
-        window.activityChart = new Chart(ctx, {
+        window.activityChart = new Chart(ctx2, {
             type: 'bar',
             data: {
-                labels: monthLabels,
+                labels: monthLabels2,
                 datasets: [
                     {
                         label: i18nStrings.annual_stats.chart_real,
-                        data: realData,
+                        data: realData2,
                         backgroundColor: '#dc3545',  // Red
                         borderColor: '#dc3545',
                         borderWidth: 1,
@@ -794,7 +794,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     },
                     {
                         label: i18nStrings.annual_stats.chart_relative,
-                        data: relativeData,
+                        data: relativeData2,
                         backgroundColor: '#28a745',  // Green
                         borderColor: '#28a745',
                         borderWidth: 1,
