@@ -7314,7 +7314,7 @@ async function showChangePasswordDialog() {
                     }
                     const changeUrl = apiBase === '' ? '/api/change-password' : `${apiBase.replace(/\/$/, '')}/api/change-password`;
                     const response = await fetch(changeUrl, {
-                        method: 'POST',
+                        method: 'PUT',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
                             target_user: selectedUser,
@@ -7367,7 +7367,7 @@ async function showChangePasswordDialog() {
                     }
                     const changeUrl = apiBase === '' ? '/api/change-password' : `${apiBase.replace(/\/$/, '')}/api/change-password`;
                     const response = await fetch(changeUrl, {
-                        method: 'POST',
+                        method: 'PUT',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
                             current_password: currentPassword,

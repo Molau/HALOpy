@@ -131,7 +131,7 @@ def logout_api() -> Dict[str, Any]:
     return jsonify({'success': True})
 
 
-@api_blueprint.route('/change-password', methods=['POST'])
+@api_blueprint.route('/change-password', methods=['PUT'])
 def change_password() -> Dict[str, Any]:
     """
     Change user password in AWS Parameter Store.

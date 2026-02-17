@@ -532,7 +532,7 @@
     "startup_file_changed": "Startup file has been saved.",
     "startup_file_disabled": "Automatic loading has been disabled.",
     "startup_file_in_use": "Startup file is being used",
-    "date_default": "Date",
+    "date_default": "Default Date",
     "date_setting_title": "Date Default Setting",
     "date_setting_question": "Which date default would you like to use?",
     "date_none": "no default",
