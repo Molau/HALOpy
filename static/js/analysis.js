@@ -190,10 +190,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         }, { once: true });
         
         modal.show();
+
+        // Decision #033: setupModalKeyboard for Enter key (OK has data-bs-dismiss)
+        const okBtn = modalEl.querySelector('.modal-footer .btn-primary');
+        setupModalKeyboard(modalEl, okBtn);
+
+        // Navigate home when modal closes
         modalEl.addEventListener('hidden.bs.modal', () => {
-            modalEl.remove();
             window.navigateInternal('/');
-        });
+        }, { once: true });
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(modalEl);
     }
 
     // Populate parameter dropdowns with all available parameters
@@ -1696,12 +1704,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const btnPrint = document.getElementById('btn-result-print');
         const btnSave = document.getElementById('btn-result-save');
         
-        // OK button - close modal and return to main
+        // OK button - close modal (hidden.bs.modal handler navigates home)
         if (btnOk) {
             btnOk.onclick = () => {
                 const modalInstance = bootstrap.Modal.getInstance(modal);
                 if (modalInstance) modalInstance.hide();
-                window.navigateInternal('/');
             };
         }
         
@@ -1725,32 +1732,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             };
         }
         
-        // Enter key support when modal is visible
-        const enterKeyHandler = (e) => {
-            if (e.key === 'Enter' && modal.classList.contains('show')) {
-                e.preventDefault();
-                const modalInstance = bootstrap.Modal.getInstance(modal);
-                if (modalInstance) modalInstance.hide();
-                window.navigateInternal('/');
-            }
-        };
-        
-        // ESC key support when modal is visible
-        const escKeyHandler = (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('show')) {
-                e.preventDefault();
-                const modalInstance = bootstrap.Modal.getInstance(modal);
-                if (modalInstance) modalInstance.hide();
-                window.navigateInternal('/');
-            }
-        };
-        
-        // Remove any existing handlers first to avoid duplicates
-        document.removeEventListener('keypress', enterKeyHandler);
-        document.addEventListener('keypress', enterKeyHandler);
-        document.removeEventListener('keydown', escKeyHandler);
-        document.addEventListener('keydown', escKeyHandler);
-        
+        // Decision #033: setupModalKeyboard for Enter key → OK button
+        setupModalKeyboard(modal, btnOk);
+
+        // Navigate home when modal is closed (ESC, OK, or X button)
+        modal.addEventListener('hidden.bs.modal', () => {
+            window.navigateInternal('/');
+        }, { once: true });
+
         // Print button
         if (btnPrint) {
             btnPrint.onclick = () => {
@@ -1988,16 +1977,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         const modalInstance = new bootstrap.Modal(chartModal, { backdrop: 'static' });
         modalInstance.show();
         
-        // Prevent ESC key from propagating to parent modal
-        chartModal.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-            }
-        });
-        
+        // Decision #033: setupModalKeyboard for Enter key → OK button (data-bs-dismiss)
+        const okBtn3d = chartModal.querySelector('.modal-footer .btn-primary');
+        setupModalKeyboard(chartModal, okBtn3d);
+
+        // Clean up Plotly when modal closes
+        chartModal.addEventListener('hidden.bs.modal', () => {
+            Plotly.purge('plotly3DChart');
+        }, { once: true });
+
         // Create chart after modal is shown
         chartModal.addEventListener('shown.bs.modal', () => {
-            // Set focus to this modal to capture ESC key
             chartModal.focus();
             
             Plotly.newPlot('plotly3DChart', traces, layout, config);
@@ -2013,11 +2003,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
             };
         }, { once: true });
-        
-        // Clean up on hide
-        chartModal.addEventListener('hidden.bs.modal', () => {
-            Plotly.purge('plotly3DChart');
-        }, { once: true });
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(chartModal);
     }
     
     // Show 2D chart in a modal using Chart.js
@@ -2036,7 +2024,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         chartModal.id = 'chartModal';
         chartModal.className = 'modal fade';
         chartModal.setAttribute('tabindex', '-1');
-        chartModal.setAttribute('data-bs-backdrop', 'true');
+        chartModal.setAttribute('data-bs-backdrop', 'static');
         chartModal.setAttribute('data-bs-keyboard', 'true');
         chartModal.style.zIndex = '10000';
         chartModal.innerHTML = `
@@ -2063,12 +2051,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const modalInstance = new bootstrap.Modal(chartModal, { backdrop: 'static' });
         modalInstance.show();
         
-        // Prevent ESC key from propagating to parent modal
-        chartModal.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-            }
-        });
+        // Decision #033: setupModalKeyboard for Enter key → OK button (data-bs-dismiss)
+        const okBtn2d = chartModal.querySelector('.modal-footer .btn-primary');
+        setupModalKeyboard(chartModal, okBtn2d);
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(chartModal);
         
         // Create chart after modal is shown
         chartModal.addEventListener('shown.bs.modal', () => {
@@ -3199,4 +3187,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Show parameter dialog on load
     const modal = new bootstrap.Modal(paramDialog, { backdrop: 'static' });
     modal.show();
+
+    // Decision #033: setupModalKeyboard for Enter key → OK button
+    setupModalKeyboard(paramDialog, btnApplyParam);
 });
