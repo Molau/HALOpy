@@ -8210,8 +8210,8 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
                         </div>
                     </div>
                     <div class="modal-footer py-1">
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-observer-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-observer-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-observer-no">${i18nStrings.common.no}</button>
+                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-observer-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>
@@ -9551,8 +9551,8 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-site-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-site-no">${i18nStrings.common.no}</button>
+                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>
