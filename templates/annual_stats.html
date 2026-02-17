@@ -161,8 +161,8 @@
                         <div id="stats-content"></div>
                     </div>
                     <div class="modal-footer d-flex justify-content-end gap-2">
-                        <button type="button" id="btn-stats-chart-line" class="btn btn-secondary btn-sm px-4">{{ g.i18n.get('common.line_chart') or 'Liniengrafik' }}</button>
-                        <button type="button" id="btn-stats-chart-bar" class="btn btn-secondary btn-sm px-4">{{ g.i18n.get('common.bar_chart') or 'Balkengrafik' }}</button>
+                        <button type="button" id="btn-stats-chart-line" class="btn btn-secondary btn-sm px-4">{{ g.i18n.get('common.line_chart') }}</button>
+                        <button type="button" id="btn-stats-chart-bar" class="btn btn-secondary btn-sm px-4">{{ g.i18n.get('common.bar_chart') }}</button>
                         <button type="button" id="btn-stats-print" class="btn btn-secondary btn-sm px-4">{{ g.i18n.get('common.print') }}</button>
                         <button type="button" id="btn-stats-save" class="btn btn-secondary btn-sm px-4">{{ g.i18n.get('common.save') }}</button>
                         <button type="button" id="btn-stats-ok" class="btn btn-primary btn-sm px-4">{{ g.i18n.get('common.ok') }}</button>
@@ -176,7 +176,7 @@
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">{{ g.i18n.get('monthly_stats.activity_title') or 'Haloaktivität' }}</h5>
+                        <h5 class="modal-title">{{ g.i18n.get('monthly_stats.activity_title') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
@@ -197,7 +197,7 @@
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">{{ g.i18n.get('monthly_stats.activity_title') or 'Haloaktivität' }}</h5>
+                        <h5 class="modal-title">{{ g.i18n.get('monthly_stats.activity_title') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
@@ -223,8 +223,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/github-markdown.min.css') }}">
     <!-- Chart.js for activity visualization -->
     <script src="{{ url_for('static', filename='js/chart.umd.js') }}"></script>
-    <!-- Bootstrap JS Bundle -->
-    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}?v={{ static_version }}"></script>
     <script src="{{ url_for('static', filename='js/annual_stats.js') }}?v={{ static_version }}"></script>
 </body>

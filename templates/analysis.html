@@ -127,6 +127,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">{{ g.i18n.get('analysis_dialog.title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <!-- First Parameter (mandatory) -->
@@ -992,7 +993,6 @@
 
     {% include 'footer.html' %}
 
-    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chart.umd.js') }}"></script>
     <script src="{{ url_for('static', filename='js/plotly.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
