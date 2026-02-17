@@ -83,15 +83,20 @@ function setupModalCleanup(modalEl) {
         modalEl.removeEventListener('hidden.bs.modal', cleanup);
         modalEl.remove();
 
-        // Clean orphaned backdrops if no modals are visible
+        // Clean orphaned backdrops if no other modals exist in DOM.
+        // Use 200ms delay to allow chained modals (opened in hidden.bs.modal
+        // callbacks) to be inserted into DOM before we check.
+        // Check for any .modal element in DOM (not just .show) because
+        // Bootstrap's fade animation may not have added .show yet.
         setTimeout(() => {
-            if (document.querySelectorAll('.modal.show').length === 0) {
+            const otherModals = document.querySelectorAll('.modal');
+            if (otherModals.length === 0) {
                 document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
                 document.body.classList.remove('modal-open');
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('padding-right');
             }
-        }, 100);
+        }, 200);
     }, { once: true });
 }
 

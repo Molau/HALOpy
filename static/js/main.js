@@ -7862,7 +7862,7 @@ async function showAddObserverDialog(formData = null) {
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-add-observer-ok">${i18nStrings.common.ok}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-add-observer-ok" disabled>${i18nStrings.common.ok}</button>
                     </div>
                 </div>
             </div>
@@ -7874,6 +7874,29 @@ async function showAddObserverDialog(formData = null) {
     modal.show();
     
     const errEl = document.getElementById('observer-error');
+    const okBtn = document.getElementById('btn-add-observer-ok');
+    
+    // Check required fields - OK button only enabled when all filled
+    const checkRequired = () => {
+        const allFilled = 
+            document.getElementById('obs-kk').value.trim() !== '' &&
+            document.getElementById('obs-vname').value.trim() !== '' &&
+            document.getElementById('obs-nname').value.trim() !== '' &&
+            document.getElementById('obs-hb-ort').value.trim() !== '' &&
+            document.getElementById('obs-gh').value !== '' &&
+            document.getElementById('obs-nb-ort').value.trim() !== '' &&
+            document.getElementById('obs-gn').value !== '';
+        okBtn.disabled = !allFilled;
+    };
+    
+    // Attach listeners for required text inputs (input event for real-time feedback)
+    ['obs-kk', 'obs-vname', 'obs-nname', 'obs-hb-ort', 'obs-nb-ort'].forEach(id => {
+        document.getElementById(id).addEventListener('input', checkRequired);
+    });
+    // Attach listeners for required selects (change event)
+    ['obs-gh', 'obs-gn'].forEach(id => {
+        document.getElementById(id).addEventListener('change', checkRequired);
+    });
     
     // Focus KK input when modal is shown and restore form data if provided
     modalEl.addEventListener('shown.bs.modal', () => {
@@ -7914,6 +7937,9 @@ async function showAddObserverDialog(formData = null) {
         } else {
             document.getElementById('obs-kk').focus();
         }
+        
+        // Enable OK button if form data was restored with all required fields
+        checkRequired();
     });
     
     // Decision #033: Enter key triggers OK, excludes TEXTAREA and SELECT
@@ -7949,21 +7975,6 @@ async function showAddObserverDialog(formData = null) {
                 NBM: parseInt(document.getElementById('obs-nbm').value),
                 NNS: document.getElementById('obs-nns').value
             };
-            
-            // Validate required fields
-            if (!observerData.KK || !observerData.VName || !observerData.NName || 
-                !observerData.HbOrt || !observerData.GH || !observerData.NbOrt || !observerData.GN) {
-                // Store form data
-                const formData = observerData;
-                modal.hide();
-                modalEl.addEventListener('hidden.bs.modal', () => {
-                    modalEl.remove();
-                    showErrorDialog(i18nStrings.observers.error_missing_required, () => {
-                        showAddObserverDialog(formData);
-                    });
-                }, { once: true });
-                return;
-            }
             
             // Validate KK format
             if (!/^\d{2}$/.test(observerData.KK) || parseInt(observerData.KK) < 1 || parseInt(observerData.KK) > 99) {
