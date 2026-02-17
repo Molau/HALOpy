@@ -1537,6 +1537,69 @@ window.navigateInternal('/');
 
 ---
 
+## OK Button Activation Standard - Decision #034
+
+- **Date**: 2026-02-17
+- **Status**: ✓ Approved
+- **Scope**: All modal dialogs with mandatory input fields
+
+### Core Rule
+
+**OK/Apply/Submit buttons MUST be disabled until ALL mandatory fields are filled.** No click-to-validate-and-show-error pattern for mandatory field presence checks.
+
+### Rationale
+- Better UX: User immediately sees that input is still needed
+- Cleaner code: No error message display/hide logic for simple "field required" checks
+- Visual feedback: Disabled button clearly communicates "not ready yet"
+- Reduces noise: No unnecessary warning messages or error text
+
+### Implementation Pattern
+
+```javascript
+// 1. Start with OK button disabled
+btnOk.disabled = true;
+
+// 2. Add change listeners to ALL mandatory fields
+function updateOkState() {
+    const allFilled = mandatoryField1.value && mandatoryField2.value && ...;
+    btnOk.disabled = !allFilled;
+}
+
+mandatoryField1.addEventListener('change', updateOkState);
+mandatoryField2.addEventListener('change', updateOkState);
+// ... for all mandatory fields
+
+// 3. Call once to set initial state
+updateOkState();
+```
+
+### Rules
+
+1. ✓ **OK button starts disabled** (`disabled` attribute) when dialog has mandatory empty fields
+2. ✓ **Change/input event listeners** on all mandatory fields call a shared `updateOkState()` function
+3. ✓ **Button enables** only when ALL mandatory fields have valid values
+4. ✓ **No error messages** for simple "field is empty" mandatory checks — the disabled button is the feedback
+5. ✓ **Error messages remain** for complex validation (format errors, business rule violations, server-side errors)
+6. ✓ **Enter key** via `setupModalKeyboard()` naturally does nothing when button is disabled
+7. ✗ **NEVER** have an always-enabled OK button that shows "please fill required fields" on click
+
+### Exceptions
+- Dialogs where ALL fields have valid defaults (e.g., radio buttons with pre-selection)
+- Confirmation dialogs (Yes/No) with no input fields
+- Display-only result dialogs
+
+### Already Compliant ✅
+- `analysis.js` param-dialog: `btnOk.disabled = true` + enables on param1 change
+- `observation-form.js`: `updateSaveButtonState()` checks all 8 mandatory fields
+
+### Needs Migration ❌ → ✅ (Fixed)
+- `annual_stats.js` filter: Year select
+- `monthly_stats.js` filter: Month + Year selects
+- `monthly_report.js` filter: Month + Year selects (observer auto-filled)
+- `observer_sites.js` add-site: seit_month, seit_year, HbOrt, GH, NbOrt, GN
+
+---
+
 ## Deferred Features
 
 ### Features NOT Yet Approved for Modification

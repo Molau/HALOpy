@@ -82,16 +82,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Validate year selection
     function validateYear() {
-        if (yearError) {
-            yearError.style.display = 'none';
-        }
-
         const jj = yearSelect.value;
         if (!jj) {
-            if (yearError) {
-                yearError.textContent = i18nStrings.annual_stats.error_year_required;
-                yearError.style.display = 'block';
-            }
             return null;
         }
 
@@ -1206,6 +1198,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Decision #033: setupModalKeyboard for Enter key → Apply button
     setupModalKeyboard(filterDialog, btnApply);
+    
+    // Decision #034: OK disabled until year selected
+    btnApply.disabled = true;
+    yearSelect.addEventListener('change', () => {
+        btnApply.disabled = !yearSelect.value;
+    });
     
     // Focus year select when modal is shown
     filterDialog.addEventListener('shown.bs.modal', () => {

@@ -93,14 +93,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Validate month/year selection from dropdowns
     function validateMonthYear() {
-        monthYearError.style.display = 'none';
-        
         const mm = monthSelect.value;
         const jj = yearSelect.value;
         
         if (!mm || !jj) {
-            monthYearError.textContent = i18nStrings.monthly_stats.error_month_year_required;
-            monthYearError.style.display = 'block';
             return null;
         }
 
@@ -1312,6 +1308,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Decision #033: setupModalKeyboard for Enter key → Apply button
             setupModalKeyboard(filterDialog, btnApply);
+
+            // Decision #034: OK disabled until month and year selected
+            function updateApplyState() {
+                btnApply.disabled = !monthSelect.value || !yearSelect.value;
+            }
+            monthSelect.addEventListener('change', updateApplyState);
+            yearSelect.addEventListener('change', updateApplyState);
+            updateApplyState();
 
             // Focus month select when modal is shown
             filterDialog.addEventListener('shown.bs.modal', () => {

@@ -149,15 +149,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Validate month/year selection from dropdowns
     function validateMonthYear() {
-        monthYearError.style.display = 'none';
-        
         const mm = monthSelect.value;
         const jj = yearSelect.value;
         
         if (!mm || !jj) {
-            const msg = i18nStrings.monthly_report.error_month_year_required;
-            monthYearError.textContent = msg;
-            monthYearError.style.display = 'block';
             return null;
         }
 
@@ -769,6 +764,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                     
                     // Decision #033: setupModalKeyboard for Enter key → Apply button
                     setupModalKeyboard(filterDialog, document.getElementById('btn-apply-filter'));
+                    
+                    // Decision #034: OK disabled until month and year selected
+                    function updateApplyState() {
+                        btnApply.disabled = !monthSelect.value || !yearSelect.value;
+                    }
+                    monthSelect.addEventListener('change', updateApplyState);
+                    yearSelect.addEventListener('change', updateApplyState);
+                    updateApplyState();
                     
                     return;
                 }

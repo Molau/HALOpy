@@ -191,6 +191,21 @@ async function showAddSiteDialog(observer) {
     setupModalKeyboard(modalEl, document.getElementById('btn-add-site-ok'));
     
     const errEl = document.getElementById('site-error');
+    const btnAddSiteOk = document.getElementById('btn-add-site-ok');
+    
+    // Decision #034: OK disabled until mandatory fields filled
+    const mandatorySelects = ['site-seit-month', 'site-seit-year', 'site-gh', 'site-gn'];
+    const mandatoryInputs = ['site-hb-ort', 'site-nb-ort'];
+    
+    function updateAddSiteOkState() {
+        const selectsFilled = mandatorySelects.every(id => document.getElementById(id).value);
+        const inputsFilled = mandatoryInputs.every(id => document.getElementById(id).value.trim());
+        btnAddSiteOk.disabled = !(selectsFilled && inputsFilled);
+    }
+    
+    mandatorySelects.forEach(id => document.getElementById(id).addEventListener('change', updateAddSiteOkState));
+    mandatoryInputs.forEach(id => document.getElementById(id).addEventListener('input', updateAddSiteOkState));
+    btnAddSiteOk.disabled = true;
     
     // Handle save
     document.getElementById('btn-add-site-ok').addEventListener('click', async () => {
@@ -224,11 +239,7 @@ async function showAddSiteDialog(observer) {
             };
             
             // Validate
-            if (!siteData.seit_month || !siteData.seit_year || !siteData.HbOrt || !siteData.GH || !siteData.NbOrt || !siteData.GN) {
-                errEl.textContent = i18nStrings.observers.error_missing_required;
-                errEl.style.display = 'block';
-                return;
-            }
+            // (Mandatory fields are enforced by disabled OK button - Decision #034)
             
             // Send to API
             const resp = await fetch(`/api/observers/${observer.KK}/sites`, {
