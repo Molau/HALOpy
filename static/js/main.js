@@ -7285,7 +7285,7 @@ async function showChangePasswordDialog() {
                 }
                 
                 if (!newPassword) {
-                    showError(i18nStrings.messages.filter_value_required);
+                    showError(i18nStrings.messages.target_user_password_required);
                     return;
                 }
                 
@@ -7342,7 +7342,7 @@ async function showChangePasswordDialog() {
                 const confirmPassword = document.getElementById('confirm-password').value;
                 
                 if (!currentPassword || !newPassword || !confirmPassword) {
-                    showError(i18nStrings.messages.filter_value_required);
+                    showError(i18nStrings.messages.current_new_password_required);
                     return;
                 }
                 
