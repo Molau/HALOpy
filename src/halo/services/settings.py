@@ -44,7 +44,8 @@ class Settings:
         resources_dir.mkdir(parents=True, exist_ok=True)
         
         # In cloud mode, use user-specific config file
-        if is_cloud_mode() and observer_kk:
+        if is_cloud_mode() and observer_kk is not None:
+            # observer_kk='admin' for admin user, or KK number for regular users
             filename = f'halo.{observer_kk}.cfg'
         else:
             filename = Settings.DEFAULT_FILENAME
@@ -57,10 +58,12 @@ class Settings:
         # Local Mode: get observer KK from app_config (optional UI filter, single-user)
         observer_kk = None
         if is_cloud_mode():
-            observer_kk = session.get('observer_kk', '')
-            if not observer_kk:
+            if 'observer_kk' not in session:
                 # No observer set yet (before login) - skip loading config
                 return
+            raw_kk = session.get('observer_kk')
+            # Admin user has observer_kk=None → use 'admin' as config identifier
+            observer_kk = str(raw_kk) if raw_kk is not None else 'admin'
         else:
             # Local Mode: Read optional fixed observer from app_config
             observer_kk = app_config.get('FIXED_OBSERVER', '')
@@ -119,10 +122,12 @@ class Settings:
         # Local Mode: get observer KK from app_config (optional UI filter)
         observer_kk = None
         if is_cloud_mode():
-            observer_kk = session.get('observer_kk', '')
-            if not observer_kk:
+            if 'observer_kk' not in session:
                 # No observer set yet (before login) - skip saving config
                 return
+            raw_kk = session.get('observer_kk')
+            # Admin user has observer_kk=None → use 'admin' as config identifier
+            observer_kk = str(raw_kk) if raw_kk is not None else 'admin'
         else:
             # Local Mode: Read optional fixed observer from app_config
             observer_kk = app_config.get('FIXED_OBSERVER', '')
