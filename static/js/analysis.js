@@ -2592,14 +2592,56 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
             });
 
+            // Sorted param1 values (rows)
+            const param1Values_pre = Object.keys(data).sort((a, b) => {
+                const numA = parseFloat(a);
+                const numB = parseFloat(b);
+                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                return String(a).localeCompare(String(b));
+            });
+
+            // Row totals
+            const mdRowTotals = {};
+            param1Values_pre.forEach(param1Val => {
+                const rowData = data[param1Val];
+                let rowTotal = 0;
+                columns.forEach(col => { rowTotal += rowData[col] !== undefined ? rowData[col] : 0; });
+                mdRowTotals[param1Val] = rowTotal;
+            });
+
+            // Precompute cells for percentage mode calculations
+            const mdCells = {};
+            param1Values_pre.forEach(r => {
+                const rowData = data[r];
+                mdCells[r] = {};
+                const rTotal = mdRowTotals[r];
+                columns.forEach(c => {
+                    const count = rowData[c] !== undefined ? rowData[c] : 0;
+                    const pRow = rTotal > 0 ? (count / rTotal) * 100 : 0;
+                    const pCol = columnTotals[c] > 0 ? (count / columnTotals[c]) * 100 : 0;
+                    mdCells[r][c] = { count, pRow, pCol };
+                });
+            });
+
             // Header row: param names with overall total in brackets
             const firstHeader = `**${escapeCell(param1Name)} \\ ${escapeCell(param2Name)}** (Σ=${result.total})`;
             let headerLine = `| ${firstHeader} |`;
             columns.forEach(col => {
                 const colTotal = columnTotals[col];
-                const colPercentage = result.total > 0 ? ((colTotal / result.total) * 100).toFixed(1) : '0.0';
+                let colPercentageStr;
+                if (params.percentage_mode === 'param2') {
+                    colPercentageStr = 'Σ=100.0%';
+                } else if (params.percentage_mode === 'param1') {
+                    let sum = 0, cnt = 0;
+                    param1Values_pre.forEach(r => {
+                        if (mdCells[r][col].count > 0) { sum += mdCells[r][col].pRow; cnt++; }
+                    });
+                    colPercentageStr = cnt > 0 ? 'Ø=' + (sum / cnt).toFixed(1) + '%' : 'Ø=0.0%';
+                } else {
+                    colPercentageStr = result.total > 0 ? (colTotal / result.total * 100).toFixed(1) + '%' : '0.0%';
+                }
                 const colLabel = formatParamValue(params.param2, col);
-                headerLine += ` **${escapeCell(colLabel)}** Σ=${colTotal} (Σ=${colPercentage}%) |`;
+                headerLine += ` **${escapeCell(colLabel)}** Σ=${colTotal} (${colPercentageStr}) |`;
             });
             lines.push(headerLine);
 
@@ -2608,32 +2650,26 @@ document.addEventListener('DOMContentLoaded', async function() {
             columns.forEach(() => { sepLine += ' --- |'; });
             lines.push(sepLine);
 
-            // Rows
-            const param1Values = Object.keys(data).sort((a, b) => {
-                const numA = parseFloat(a);
-                const numB = parseFloat(b);
-                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                return String(a).localeCompare(String(b));
-            });
-
-            // Row totals
-            const rowTotals = {};
-            param1Values.forEach(param1Val => {
-                const rowData = data[param1Val];
-                let rowTotal = 0;
-                columns.forEach(col => { rowTotal += rowData[col] !== undefined ? rowData[col] : 0; });
-                rowTotals[param1Val] = rowTotal;
-            });
-
             // Build rows: merge label and row total into first cell
-            param1Values.forEach(param1Val => {
+            param1Values_pre.forEach(param1Val => {
                 const rowData = data[param1Val];
-                const rowTotal = rowTotals[param1Val];
-                const rowPercentage = result.total > 0 ? ((rowTotal / result.total) * 100).toFixed(1) : '0.0';
+                const rowTotal = mdRowTotals[param1Val];
+                let rowPercentageStr;
+                if (params.percentage_mode === 'param1') {
+                    rowPercentageStr = 'Σ=100.0%';
+                } else if (params.percentage_mode === 'param2') {
+                    let sum = 0, cnt = 0;
+                    columns.forEach(c => {
+                        if (mdCells[param1Val][c].count > 0) { sum += mdCells[param1Val][c].pCol; cnt++; }
+                    });
+                    rowPercentageStr = cnt > 0 ? 'Ø=' + (sum / cnt).toFixed(1) + '%' : 'Ø=0.0%';
+                } else {
+                    rowPercentageStr = result.total > 0 ? (rowTotal / result.total * 100).toFixed(1) + '%' : '0.0%';
+                }
                 const rowLabel = formatParamValue(params.param1, param1Val);
 
                 // First cell contains label and row total
-                let rowLine = `| **${escapeCell(rowLabel)}** Σ=${rowTotal} (Σ=${rowPercentage}%) |`;
+                let rowLine = `| **${escapeCell(rowLabel)}** Σ=${rowTotal} (${rowPercentageStr}) |`;
                 columns.forEach(col => {
                     const count = rowData[col] !== undefined ? rowData[col] : 0;
                     let pct = 0.0;
@@ -2651,11 +2687,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
 
             // Totals row: merge label and total into first cell
-            let totalsLine = `| **${escapeCell(i18nStrings.analysis_results.total)}** Σ=${result.total} (Σ=100%) |`;
+            let totalsLine = `| **${escapeCell(i18nStrings.analysis_results.total)}** Σ=${result.total} (Σ=100.0%) |`;
             columns.forEach(col => {
                 const colTotal = columnTotals[col];
-                const colPercentage = result.total > 0 ? ((colTotal / result.total) * 100).toFixed(1) : '0.0';
-                totalsLine += ` ${colTotal} (${colPercentage}%) |`;
+                let colTotalPctStr;
+                if (params.percentage_mode === 'param2') {
+                    colTotalPctStr = 'Σ=100.0%';
+                } else if (params.percentage_mode === 'param1') {
+                    colTotalPctStr = result.total > 0 ? (colTotal / result.total * 100).toFixed(1) + '%' : '0.0%';
+                } else {
+                    colTotalPctStr = result.total > 0 ? (colTotal / result.total * 100).toFixed(1) + '%' : '0.0%';
+                }
+                totalsLine += ` ${colTotal} (${colTotalPctStr}) |`;
             });
             lines.push(totalsLine);
         }
