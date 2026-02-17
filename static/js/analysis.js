@@ -2007,7 +2007,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                         <h5 class="modal-title">${chartTitle}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body" style="height: 600px;">
+                    <div class="modal-body" style="height: 600px; position: relative;">
+                        <div id="chart3DSpinner" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: white; z-index: 10;">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
                         <div id="plotly3DChart" style="width: 100%; height: 100%;"></div>
                     </div>
                     <div class="modal-footer">
@@ -2042,7 +2047,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         chartModal.addEventListener('shown.bs.modal', () => {
             chartModal.focus();
             
-            Plotly.newPlot('plotly3DChart', traces, layout, config);
+            Plotly.newPlot('plotly3DChart', traces, layout, config).then(() => {
+                const spinner = document.getElementById('chart3DSpinner');
+                if (spinner) spinner.style.display = 'none';
+            });
             
             // Setup save button handler
             document.getElementById('btn-save-3d-chart').onclick = () => {
@@ -2086,7 +2094,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                         <h5 class="modal-title">${chartTitle}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body">
+                    <div class="modal-body" style="position: relative;">
+                        <div id="chart2DSpinner" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: white; z-index: 10;">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
                         <canvas id="analysisChart"></canvas>
                     </div>
                     <div class="modal-footer">
@@ -2137,6 +2150,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
+                    animation: {
+                        onComplete: () => {
+                            const spinner = document.getElementById('chart2DSpinner');
+                            if (spinner) spinner.style.display = 'none';
+                        }
+                    },
                     plugins: {
                         title: {
                             display: true,
