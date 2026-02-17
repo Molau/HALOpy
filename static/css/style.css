@@ -46,6 +46,24 @@ main {
     }
 }
 
+/* Make numeric observation input visible on touch devices so virtual keyboard appears */
+@media (pointer: coarse) {
+    #obs-code-input {
+        opacity: 1 !important;
+        height: auto !important;
+        padding: 0.25rem 0.5rem !important;
+        margin-top: 0.25rem !important;
+        border: 1px solid #dee2e6 !important;
+        font-size: 16px !important;  /* Prevent iOS zoom on focus */
+    }
+    
+    /* Ensure guide box scrolls horizontally on narrow screens */
+    #obs-guide-box {
+        overflow-x: auto !important;
+        font-size: 12px !important;
+    }
+}
+
 /* Remove hover effects on touch devices to prevent double-tap requirement */
 @media (pointer: coarse) {
     .nav-link:hover {

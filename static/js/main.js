@@ -680,8 +680,8 @@ async function showAddObservationDialogNumeric() {
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body py-2">
-                        <div class="border rounded mb-2" style="font-family: var(--bs-font-monospace, monospace); white-space: pre; background: #f8f9fa; padding: 4px 6px; font-size: 14px; color: #000;"><div id="obs-guide-header" style="margin: 0; padding: 0; line-height: 1.4;">${i18nStrings.observations.input_pattern}</div><div id="obs-guide-entered" style="margin: 0; padding: 0; line-height: 1.4;"></div><div id="obs-guide-remarks" style="margin: 0; padding: 0; line-height: 1.4; display: none;"></div><div id="obs-guide-caret" style="color:#0d6efd; margin: 0; padding: 0; line-height: 1.4;"></div></div>
-                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" spellcheck="false" style="opacity: 0; height: 0; padding: 0; margin: 0; border: none; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
+                        <div id="obs-guide-box" class="border rounded mb-2" style="font-family: var(--bs-font-monospace, monospace); white-space: pre; background: #f8f9fa; padding: 4px 6px; font-size: 14px; color: #000; cursor: text; overflow-x: auto;"><div id="obs-guide-header" style="margin: 0; padding: 0; line-height: 1.4;">${i18nStrings.observations.input_pattern}</div><div id="obs-guide-entered" style="margin: 0; padding: 0; line-height: 1.4;"></div><div id="obs-guide-remarks" style="margin: 0; padding: 0; line-height: 1.4; display: none;"></div><div id="obs-guide-caret" style="color:#0d6efd; margin: 0; padding: 0; line-height: 1.4;"></div></div>
+                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" spellcheck="false" inputmode="text" style="opacity: 0; height: 0; padding: 0; margin: 0; border: none; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
                         <div id="obs-code-error" class="text-danger mt-1" style="display:none; font-size: 12px;"></div>
                     </div>
                     <div class="modal-footer py-1">
@@ -742,6 +742,12 @@ async function showAddObservationDialogNumeric() {
     window.addEventListener('focus', ensureNumericInputFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     modalEl.addEventListener('mousedown', ensureNumericInputFocus);
+    
+    // Tap on guide box focuses input (important for mobile - direct user action triggers keyboard)
+    const guideBox = document.getElementById('obs-guide-box');
+    if (guideBox) {
+        guideBox.addEventListener('click', () => { input.focus(); });
+    }
     
     // Restore focus when clicking anywhere in the document (handles clicks outside modal)
     const handleDocumentClick = (e) => {
