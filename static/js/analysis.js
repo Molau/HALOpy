@@ -1736,9 +1736,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         setupModalKeyboard(modal, btnOk);
 
         // Navigate home when modal is closed (ESC, OK, or X button)
-        modal.addEventListener('hidden.bs.modal', () => {
+        // Check e.target to avoid reacting to child modal (chart) close events bubbling up
+        modal.addEventListener('hidden.bs.modal', (e) => {
+            if (e.target !== modal) return;
             window.navigateInternal('/');
-        }, { once: true });
+        });
 
         // Print button
         if (btnPrint) {
