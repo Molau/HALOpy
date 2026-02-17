@@ -13,6 +13,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         1, -1, 0, -8, 9
     ];
 
+    // Combined halo types that can be split into individual components
+    // From constants.py COMBINED_TO_INDIVIDUAL_HALOS
+    const COMBINED_HALO_TYPES = new Set([4, 10, 16, 20, 26, 43, 47, 50, 55, 76]);
+
     // Modal elements
     const paramDialog = document.getElementById('param-dialog');
 
@@ -698,6 +702,43 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
+    // Show/hide EE split option for filter1 based on selected value
+    function updateFilter1EeSplitVisibility() {
+        const selectedValue = parseInt(filter1ValueSelect.value);
+        if (COMBINED_HALO_TYPES.has(selectedValue)) {
+            filter1EeFieldsDiv.style.display = 'block';
+        } else {
+            filter1EeFieldsDiv.style.display = 'none';
+            // Reset to "nicht aufteilen" when hidden (non-combined type)
+            document.getElementById('filter1-ee-split-no').checked = true;
+        }
+    }
+
+    // Show/hide EE split option for filter2 based on selected value
+    function updateFilter2EeSplitVisibility() {
+        const selectedValue = parseInt(filter2ValueSelect.value);
+        if (COMBINED_HALO_TYPES.has(selectedValue)) {
+            filter2EeFieldsDiv.style.display = 'block';
+        } else {
+            filter2EeFieldsDiv.style.display = 'none';
+            // Reset to "nicht aufteilen" when hidden (non-combined type)
+            document.getElementById('filter2-ee-split-no').checked = true;
+        }
+    }
+
+    // Listen for filter value changes to update EE split visibility
+    filter1ValueSelect.addEventListener('change', function() {
+        if (filter1Select.value === 'EE') {
+            updateFilter1EeSplitVisibility();
+        }
+    });
+
+    filter2ValueSelect.addEventListener('change', function() {
+        if (filter2Select.value === 'EE') {
+            updateFilter2EeSplitVisibility();
+        }
+    });
+
     // Populate range dropdowns for first parameter
     function populateParam1Range(paramCode) {
         const range = getParameterRange(paramCode);
@@ -1185,10 +1226,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1ShFieldsDiv.style.display = 'none';
                 filter1CFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'none';
-                filter1EeFieldsDiv.style.display = 'block';
+                filter1EeFieldsDiv.style.display = 'none';
                 populateFilter1Value('EE');
                 // Reset to split (default)
                 document.getElementById('filter1-ee-split-yes').checked = true;
+                // Show split option only for combined halo types
+                updateFilter1EeSplitVisibility();
             }
             // Check if this is the cirrus type (C) parameter
             else if (filter1Select.value === 'C') {
@@ -1303,10 +1346,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2ShFieldsDiv.style.display = 'none';
                 filter2CFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'none';
-                filter2EeFieldsDiv.style.display = 'block';
+                filter2EeFieldsDiv.style.display = 'none';
                 populateFilter2Value('EE');
                 // Reset to split (default)
                 document.getElementById('filter2-ee-split-yes').checked = true;
+                // Show split option only for combined halo types
+                updateFilter2EeSplitVisibility();
             }
             // Check if this is the cirrus type (C) parameter
             else if (filter2Select.value === 'C') {
