@@ -195,32 +195,20 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
             observer_found_count += 1
             observer_record = observers[kk]
             
-            # Helper function to access observer record fields (supports both dict and list format)
-            def get_observer_field(obs_rec, key, index):
-                """Get field from observer record (dict from DB or list from file)."""
-                if isinstance(obs_rec, dict):
-                    return obs_rec.get(key, '')
-                else:
-                    return obs_rec[index] if len(obs_rec) > index else ''
-            
-            # CORRECTED COLUMN INDICES FOR LATITUDE
-            # Format: KK, VName, NName, seit, active, Ort, lonDeg, lonMin, lonSec, lonDir, latDeg, latMin, latDir, ...
-            # Columns: 0    1     2      3    4      5    6       7       8       9       10      11      12    ...
-            # Ort2, lonDeg, lonMin, lonSec, lonDir, latDeg, latMin, latDir
-            # 13   14      15      16      17      18      19      20
-            # Primary site (g=0): columns 10, 11, 12 = lat_deg, lat_min, lat_dir
-            # Secondary site (g=2): columns 18, 19, 20 = lat_deg, lat_min, lat_dir
+            # Extract latitude from observer record (now always a dict)
+            # Primary site (g=0): HBG, HBM, HNS
+            # Secondary site (g=2): NBG, NBM, NNS
             if obs.g == 0:  # Primary site
-                lat_deg_str = get_observer_field(observer_record, 'HBG', 10)
-                lat_min_str = get_observer_field(observer_record, 'HBM', 11)
-                lat_ns = get_observer_field(observer_record, 'HNS', 12)
+                lat_deg_str = observer_record.get('HBG', '')
+                lat_min_str = observer_record.get('HBM', '')
+                lat_ns = observer_record.get('HNS', '')
                 lat_deg = int(lat_deg_str) if lat_deg_str and lat_deg_str != '' else 50
                 lat_min = int(lat_min_str) if lat_min_str and lat_min_str != '' else 0
                 lat_ns = lat_ns if lat_ns else 'N'
             else:  # Secondary site (g=2)
-                lat_deg_str = get_observer_field(observer_record, 'NBG', 18)
-                lat_min_str = get_observer_field(observer_record, 'NBM', 19)
-                lat_ns = get_observer_field(observer_record, 'NNS', 20)
+                lat_deg_str = observer_record.get('NBG', '')
+                lat_min_str = observer_record.get('NBM', '')
+                lat_ns = observer_record.get('NNS', '')
                 lat_deg = int(lat_deg_str) if lat_deg_str and lat_deg_str != '' else 50
                 lat_min = int(lat_min_str) if lat_min_str and lat_min_str != '' else 0
                 lat_ns = lat_ns if lat_ns else 'N'

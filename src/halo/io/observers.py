@@ -5,29 +5,29 @@ Storage-agnostic observer operations - NO file I/O or database access.
 This module provides business logic for observer record management.
 
 Observer record format:
-    List[str] with 21 fields:
+    Dict[str, str] with 21 fields (keys match CSV header / DB columns):
     
-    [0] KK - Observer code (01-99)
-    [1] VName - First name
-    [2] NName - Last name
-    [3] seit - Start date (MM/YY format)
-    [4] active - Active status (1=active, 0=inactive)
-    [5] HbOrt - Primary observation site name
-    [6] GH - Primary site geographic region code (1-39)
-    [7] HLG - Primary site longitude degrees
-    [8] HLM - Primary site longitude minutes
-    [9] HOW - Primary site longitude hemisphere (O=East, W=West)
-    [10] HBG - Primary site latitude degrees
-    [11] HBM - Primary site latitude minutes
-    [12] HNS - Primary site latitude hemisphere (N=North, S=South)
-    [13] NbOrt - Secondary observation site name
-    [14] GN - Secondary site geographic region code
-    [15] NLG - Secondary site longitude degrees
-    [16] NLM - Secondary site longitude minutes
-    [17] NOW - Secondary site longitude hemisphere
-    [18] NBG - Secondary site latitude degrees
-    [19] NBM - Secondary site latitude minutes
-    [20] NNS - Secondary site latitude hemisphere
+    KK     - Observer code (01-99)
+    VName  - First name
+    NName  - Last name
+    seit   - Start date (MM/YY format)
+    aktiv  - Active status (1=active, 0=inactive)
+    HbOrt  - Primary observation site name
+    GH     - Primary site geographic region code (1-39)
+    HLG    - Primary site longitude degrees
+    HLM    - Primary site longitude minutes
+    HOW    - Primary site longitude hemisphere (O=East, W=West)
+    HBG    - Primary site latitude degrees
+    HBM    - Primary site latitude minutes
+    HNS    - Primary site latitude hemisphere (N=North, S=South)
+    NbOrt  - Secondary observation site name
+    GN     - Secondary site geographic region code
+    NLG    - Secondary site longitude degrees
+    NLM    - Secondary site longitude minutes
+    NOW    - Secondary site longitude hemisphere
+    NBG    - Secondary site latitude degrees
+    NBM    - Secondary site latitude minutes
+    NNS    - Secondary site latitude hemisphere
 
 Sorting rules:
     - Primary: KK (observer code)
@@ -37,7 +37,7 @@ Sorting rules:
 Layer Architecture:
     - Layer 2: This module (storage-agnostic business logic)
     - Layer 3a: observers_file.py (File I/O)
-    - Layer 3b: observers_db.py (Database I/O - future)
+    - Layer 3b: observers_db.py (Database I/O)
 
 Usage:
     from halo.io import observers
@@ -59,12 +59,12 @@ Usage:
     observers_file.save_file(records)
 """
 
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from halo.models.constants import jj_to_full_year
 
 
-def sort_observers(observers: List[List[str]]) -> List[List[str]]:
+def sort_observers(observers: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
     Sort observer records by KK and seit.
     
@@ -76,7 +76,7 @@ def sort_observers(observers: List[List[str]]) -> List[List[str]]:
         - Year conversion: YY < YEAR_CUTOFF → 20YY, YY ≥ YEAR_CUTOFF → 19YY
     
     Args:
-        observers: List of observer records
+        observers: List of observer records (dicts)
         
     Returns:
         New list with sorted records
@@ -90,7 +90,7 @@ def sort_observers(observers: List[List[str]]) -> List[List[str]]:
     return sorted(observers, key=_observer_sort_key)
 
 
-def _observer_sort_key(obs: List[str]) -> Tuple[str, int]:
+def _observer_sort_key(obs: Dict[str, str]) -> Tuple[str, int]:
     """
     Generate sort key for observer record.
     
@@ -101,13 +101,13 @@ def _observer_sort_key(obs: List[str]) -> Tuple[str, int]:
         - Secondary: seit date converted to numeric YYYYMM
     
     Args:
-        obs: Observer record (list of strings)
+        obs: Observer record (dict)
         
     Returns:
         Tuple of (KK, seit_numeric) for sorting
     """
-    kk = obs[0] if len(obs) > 0 else ''  # Observer code
-    seit = obs[3] if len(obs) > 3 else ''  # Start date (MM/YY)
+    kk = obs.get('KK', '')
+    seit = obs.get('seit', '')
     
     # Parse seit to numeric value for proper chronological sorting
     try:
@@ -127,7 +127,7 @@ def _observer_sort_key(obs: List[str]) -> Tuple[str, int]:
     return (kk, 0)
 
 
-def find_observer_records(kk: str, observers: List[List[str]]) -> List[List[str]]:
+def find_observer_records(kk: str, observers: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
     Find all records for a specific observer.
     
@@ -144,22 +144,22 @@ def find_observer_records(kk: str, observers: List[List[str]]) -> List[List[str]
     Example:
         >>> records = find_observer_records('44', all_observers)
         >>> for rec in records:
-        ...     print(f"Site since {rec[3]}: {rec[5]}")
+        ...     print(f"Site since {rec['seit']}: {rec['HbOrt']}")
     """
     # Normalize KK to 2 digits
     kk_normalized = str(kk).zfill(2)
     
-    return [obs for obs in observers if len(obs) > 0 and obs[0] == kk_normalized]
+    return [obs for obs in observers if obs.get('KK', '') == kk_normalized]
 
 
-def add_observer_record(new_record: List[str], observers: List[List[str]]) -> List[List[str]]:
+def add_observer_record(new_record: Dict[str, str], observers: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
     Add a new observer record to the collection.
     
     Storage-agnostic business logic - does NOT save to file/database.
     
     Args:
-        new_record: Observer record to add (list of strings)
+        new_record: Observer record to add (dict)
         observers: Existing observer records
         
     Returns:
@@ -169,7 +169,7 @@ def add_observer_record(new_record: List[str], observers: List[List[str]]) -> Li
         Caller must save to storage (file or database) if needed.
         
     Example:
-        >>> new_obs = ['44', 'John', 'Doe', '01/25', '1', 'Berlin', ...]
+        >>> new_obs = {'KK': '44', 'VName': 'John', 'NName': 'Doe', 'seit': '01/25', ...}
         >>> observers = add_observer_record(new_obs, observers)
         >>> # Then save: observers_file.save_file(observers)
     """
@@ -178,8 +178,8 @@ def add_observer_record(new_record: List[str], observers: List[List[str]]) -> Li
     return sort_observers(updated)
 
 
-def update_observer_record(kk: str, seit: str, updated_fields: dict, 
-                          observers: List[List[str]]) -> Tuple[bool, List[List[str]]]:
+def update_observer_record(kk: str, seit: str, updated_fields: Dict[str, str], 
+                          observers: List[Dict[str, str]]) -> Tuple[bool, List[Dict[str, str]]]:
     """
     Update a specific observer record in the collection.
     
@@ -188,7 +188,7 @@ def update_observer_record(kk: str, seit: str, updated_fields: dict,
     Args:
         kk: Observer code (2 digits)
         seit: Start date (MM/YY) to identify the record
-        updated_fields: Dictionary of field_index → new_value
+        updated_fields: Dictionary of field_name → new_value (e.g. {'aktiv': '0'})
         observers: Existing observer records
         
     Returns:
@@ -198,22 +198,21 @@ def update_observer_record(kk: str, seit: str, updated_fields: dict,
         Caller must save to storage (file or database) if needed.
         
     Example:
-        >>> # Update active status (field 4) for observer 44, site since 01/25
-        >>> success, observers = update_observer_record('44', '01/25', {4: '0'}, observers)
+        >>> # Update active status for observer 44, site since 01/25
+        >>> success, observers = update_observer_record('44', '01/25', {'aktiv': '0'}, observers)
         >>> if success:
         ...     observers_file.save_file(observers)
     """
     kk_normalized = str(kk).zfill(2)
     
-    updated = [obs.copy() if isinstance(obs, list) else list(obs) for obs in observers]
+    updated = [obs.copy() for obs in observers]
     found = False
     
     for i, obs in enumerate(updated):
-        if len(obs) > 3 and obs[0] == kk_normalized and obs[3] == seit:
+        if obs.get('KK', '') == kk_normalized and obs.get('seit', '') == seit:
             # Apply updates
-            for field_idx, value in updated_fields.items():
-                if field_idx < len(obs):
-                    obs[field_idx] = value
+            for field_name, value in updated_fields.items():
+                obs[field_name] = value
             updated[i] = obs
             found = True
             break
@@ -222,7 +221,7 @@ def update_observer_record(kk: str, seit: str, updated_fields: dict,
 
 
 def delete_observer_record(kk: str, seit: str, 
-                          observers: List[List[str]]) -> Tuple[int, List[List[str]]]:
+                          observers: List[Dict[str, str]]) -> Tuple[int, List[Dict[str, str]]]:
     """
     Delete observer record(s) from the collection.
     
@@ -254,11 +253,11 @@ def delete_observer_record(kk: str, seit: str,
     
     if seit is None:
         # Delete all records for this observer
-        updated = [obs for obs in observers if not (len(obs) > 0 and obs[0] == kk_normalized)]
+        updated = [obs for obs in observers if obs.get('KK', '') != kk_normalized]
     else:
         # Delete specific record
         updated = [obs for obs in observers 
-                  if not (len(obs) > 3 and obs[0] == kk_normalized and obs[3] == seit)]
+                  if not (obs.get('KK', '') == kk_normalized and obs.get('seit', '') == seit)]
     
     deleted_count = initial_count - len(updated)
     

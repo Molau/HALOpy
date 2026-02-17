@@ -33,7 +33,16 @@ Usage:
 import csv
 import shutil
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
+
+
+# Canonical field order for observer CSV files.
+# Matches database column names in setup_database.sql.
+OBSERVER_FIELDS = [
+    'KK', 'VName', 'NName', 'seit', 'aktiv',
+    'HbOrt', 'GH', 'HLG', 'HLM', 'HOW', 'HBG', 'HBM', 'HNS',
+    'NbOrt', 'GN', 'NLG', 'NLM', 'NOW', 'NBG', 'NBM', 'NNS'
+]
 
 
 def get_default_path() -> Path:
@@ -74,18 +83,19 @@ def file_exists(file_path: Path = None) -> bool:
     return file_path.exists()
 
 
-def open_file(file_path: Path = None) -> Tuple[List[List[str]], Path]:
+def open_file(file_path: Path = None) -> Tuple[List[Dict[str, str]], Path]:
     """
-    Open observer file and read all records.
+    Open observer file and read all records as dicts.
     
-    Pure I/O operation - returns raw CSV data without any processing.
+    Pure I/O operation - returns CSV data as list of dicts with
+    column-name keys (KK, VName, NName, seit, aktiv, ...).
     
     Args:
         file_path: Path to CSV file (default: resources/halobeo.csv)
         
     Returns:
         Tuple of (records, full_path)
-        - records: List of observer records (each is List[str])
+        - records: List of observer records (each is Dict[str, str])
         - full_path: Resolved absolute path to file
         
     Raises:
@@ -94,6 +104,7 @@ def open_file(file_path: Path = None) -> Tuple[List[List[str]], Path]:
     Example:
         >>> records, path = open_file()
         >>> print(f"Loaded {len(records)} records from {path}")
+        >>> print(records[0]['KK'], records[0]['VName'])
     """
     if file_path is None:
         file_path = get_default_path()
@@ -105,22 +116,27 @@ def open_file(file_path: Path = None) -> Tuple[List[List[str]], Path]:
         with open(file_path, 'r', encoding='utf-8') as f:
             # Remove NULL characters that can cause PostgreSQL import issues
             content = f.read().replace('\x00', '')
-            reader = csv.reader(content.splitlines())
-            records = list(reader)
+            reader = csv.DictReader(content.splitlines(), fieldnames=OBSERVER_FIELDS)
+            records = []
+            for i, row in enumerate(reader):
+                # Skip header row if present (KK value equals the field name)
+                if i == 0 and row.get('KK', '') == 'KK':
+                    continue
+                records.append(dict(row))
         return records, file_path
     except Exception as e:
         raise IOError(f"Failed to read observers from {file_path}: {str(e)}")
 
 
-def save_file(records: List[List[str]], file_path: Path = None) -> None:
+def save_file(records: List[Dict[str, str]], file_path: Path = None) -> None:
     """
-    Save observer records to CSV file.
+    Save observer records to CSV file with header row.
     
     Pure I/O operation - writes data as-is without sorting or validation.
     Creates backup (halobeo.bak) before writing if original file exists.
     
     Args:
-        records: List of observer records (each is List[str])
+        records: List of observer records (each is Dict[str, str])
         file_path: Path to CSV file (default: resources/halobeo.csv)
         
     Raises:
@@ -146,7 +162,8 @@ def save_file(records: List[List[str]], file_path: Path = None) -> None:
     
     try:
         with open(file_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f)
+            writer = csv.DictWriter(f, fieldnames=OBSERVER_FIELDS)
+            writer.writeheader()
             writer.writerows(records)
     except Exception as e:
         raise IOError(f"Failed to write observers to {file_path}: {str(e)}")
@@ -184,7 +201,7 @@ def create_backup(file_path: Path = None) -> Optional[Path]:
         raise IOError(f"Failed to create backup from {file_path} to {backup_path}: {str(e)}")
 
 
-def restore_from_backup() -> Optional[List[List[str]]]:
+def restore_from_backup() -> Optional[List[Dict[str, str]]]:
     """
     Restore observers from backup file (halobeo.bak).
     
@@ -192,7 +209,7 @@ def restore_from_backup() -> Optional[List[List[str]]]:
     Caller must decide whether to save restored data.
     
     Returns:
-        List of observer records if backup exists, None otherwise
+        List of observer dicts if backup exists, None otherwise
         
     Raises:
         IOError: If backup read fails
@@ -211,8 +228,14 @@ def restore_from_backup() -> Optional[List[List[str]]]:
         with open(backup_path, 'r', encoding='utf-8') as f:
             # Remove NULL characters that can cause PostgreSQL import issues
             content = f.read().replace('\x00', '')
-            reader = csv.reader(content.splitlines())
-            return list(reader)
+            reader = csv.DictReader(content.splitlines(), fieldnames=OBSERVER_FIELDS)
+            records = []
+            for i, row in enumerate(reader):
+                # Skip header row if present
+                if i == 0 and row.get('KK', '') == 'KK':
+                    continue
+                records.append(dict(row))
+            return records
     except Exception as e:
         raise IOError(f"Failed to restore from backup {backup_path}: {str(e)}")
 

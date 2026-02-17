@@ -21,6 +21,7 @@ from .observers import (
 
 # Observer Layer 3a (File Storage)
 from .observers_file import (
+    OBSERVER_FIELDS,
     get_default_path as get_observers_path,
     get_backup_path as get_observers_backup_path,
     file_exists as observer_file_exists,
@@ -65,6 +66,7 @@ __all__ = [
     'update_observer_record',
     'delete_observer_record',
     # Observer Layer 3a (File Storage)
+    'OBSERVER_FIELDS',
     'get_observers_path',
     'get_observers_backup_path',
     'observer_file_exists',

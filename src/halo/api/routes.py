@@ -1602,12 +1602,12 @@ def upload_observers() -> Dict[str, Any]:
             rejected_count = 0
             
             for obs_record in observers:
-                if len(obs_record) >= 1:
-                    record_kk = str(obs_record[0])
-                    if record_kk == str(authenticated_kk):
-                        filtered_observers.append(obs_record)
-                    else:
-                        rejected_count += 1
+                # obs_record is a raw list from frontend JSON upload
+                record_kk = str(obs_record[0]) if isinstance(obs_record, list) else str(obs_record.get('KK', ''))
+                if record_kk == str(authenticated_kk):
+                    filtered_observers.append(obs_record)
+                else:
+                    rejected_count += 1
             
             if rejected_count > 0:
                 observers = filtered_observers
@@ -1625,8 +1625,10 @@ def upload_observers() -> Dict[str, Any]:
         # Replace mode: Remove all existing records for uploaded observers
         uploaded_kks = set()
         for obs_record in observers:
-            if len(obs_record) >= 1:
-                uploaded_kks.add(int(obs_record[0]))
+            # obs_record is a raw list from frontend JSON upload
+            rec_kk = obs_record[0] if isinstance(obs_record, list) else obs_record.get('KK', '')
+            if rec_kk:
+                uploaded_kks.add(int(rec_kk))
         
         # Delete existing records for uploaded KKs
         try:
@@ -1724,9 +1726,9 @@ def download_observers() -> Dict[str, Any]:
         if not all_observers:
             return jsonify({'error': 'no_observers'}), 404
         
-        # Generate CSV content
+        # Generate CSV content using DictWriter with canonical field order
         csv_buffer = io.StringIO()
-        writer = csv.writer(csv_buffer)
+        writer = csv.DictWriter(csv_buffer, fieldnames=observer_file.OBSERVER_FIELDS, extrasaction='ignore')
         writer.writerows(all_observers)
         csv_content = csv_buffer.getvalue()
         
@@ -1759,30 +1761,32 @@ def save_observers() -> Dict[str, Any]:
         return jsonify({'error': 'no_csv_content'}), 400
     
     try:
-        # Parse downloaded CSV content to get list of observers
+        # Parse downloaded CSV content to list of dicts using OBSERVER_FIELDS
         downloaded_observers = []
-        csv_reader = csv.reader(io.StringIO(csv_content))
+        csv_reader = csv.DictReader(io.StringIO(csv_content), fieldnames=observer_file.OBSERVER_FIELDS)
         for row in csv_reader:
-            if row and row[0].isdigit():  # Skip header and empty lines
-                downloaded_observers.append(row)
+            # Skip header row if present
+            if row.get('KK', '') == 'KK':
+                continue
+            if row.get('KK', '').isdigit():  # Skip empty lines
+                downloaded_observers.append(dict(row))
         
         # Get list of KKs in downloaded data
         downloaded_kks = set()
         for obs in downloaded_observers:
-            if obs:
-                downloaded_kks.add(int(obs[0]))  # KK is first field
+            downloaded_kks.add(int(obs['KK']))
         
         # Load existing observers from file
         existing_observers, file_path = observer_file.open_file()
         
         # Keep only observers NOT in the downloaded data
-        kept_observers = [obs for obs in existing_observers if int(obs[0]) not in downloaded_kks]
+        kept_observers = [obs for obs in existing_observers if int(obs['KK']) not in downloaded_kks]
         
         # Combine: kept observers + downloaded observers
         merged_observers = kept_observers + downloaded_observers
         
-        # Sort by KK, then by seit (same as original HALO sort order)
-        merged_observers.sort(key=lambda obs: (int(obs[0]), obs[2]))
+        # Sort using Layer 2 sort logic
+        merged_observers = observer_logic.sort_observers(merged_observers)
         
         # Save merged list to file
         observer_file.save_file(merged_observers, file_path)
@@ -2601,19 +2605,10 @@ def get_monthly_report() -> Dict[str, Any]:
     obs_year = jj_to_full_year(jj_int)
     month_year_comparable = obs_year * 100 + mm_int
     
-    # Helper function to access observer record fields (supports both dict and list format)
-    def get_observer_field(obs_rec, key, index):
-        """Get field from observer record (dict from DB or list from file)."""
-        if isinstance(obs_rec, dict):
-            return obs_rec.get(key, '')
-        else:
-            return obs_rec[index] if len(obs_rec) > index else ''
-    
     # Find the observer record valid for this month/year
     candidates = []
     for obs_rec in observers:
-        # Get KK field (dict key 'KK' or array index 0)
-        rec_kk = get_observer_field(obs_rec, 'KK', 0)
+        rec_kk = obs_rec.get('KK', '')
         try:
             rec_kk_int = int(rec_kk)
         except (ValueError, TypeError):
@@ -2621,8 +2616,7 @@ def get_monthly_report() -> Dict[str, Any]:
         
         if rec_kk_int == kk_int:
             try:
-                # Get seit field (dict key 'seit' or array index 3)
-                seit_str = get_observer_field(obs_rec, 'seit', 3)
+                seit_str = obs_rec.get('seit', '')
                 seit_parts = seit_str.split('/')
                 seit_month = int(seit_parts[0])
                 seit_year_2digit = int(seit_parts[1])
@@ -2639,17 +2633,15 @@ def get_monthly_report() -> Dict[str, Any]:
         candidates.sort(key=lambda x: x[0], reverse=True)
         obs_rec = candidates[0][1]
         
-        # Extract observer data (dict keys or array indices)
-        vname = get_observer_field(obs_rec, 'VName', 1)
-        nname = get_observer_field(obs_rec, 'NName', 2)
+        vname = obs_rec.get('VName', '')
+        nname = obs_rec.get('NName', '')
         observer_name = f"{vname} {nname}".strip()
-        observer_hbort = get_observer_field(obs_rec, 'HbOrt', 5)
-        observer_nbort = get_observer_field(obs_rec, 'NbOrt', 13)
+        observer_hbort = obs_rec.get('HbOrt', '')
+        observer_nbort = obs_rec.get('NbOrt', '')
         
-        # Get region indices (dict keys 'GH', 'GN' or array indices 6, 14)
         try:
-            gh_str = get_observer_field(obs_rec, 'GH', 6)
-            gn_str = get_observer_field(obs_rec, 'GN', 14)
+            gh_str = obs_rec.get('GH', '')
+            gn_str = obs_rec.get('GN', '')
             gh_idx = int(gh_str) if gh_str else 0
             gn_idx = int(gn_str) if gn_str else 0
         except (ValueError, TypeError):
@@ -3188,14 +3180,6 @@ def get_monthly_stats() -> Dict[str, Any]:
         observers = current_app.config.get('OBSERVERS', [])
         active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
     
-    # Helper function to access observer record fields (supports both dict and list format)
-    def get_observer_field(obs_rec, key, index):
-        """Get field from observer record (dict from DB or list from file)."""
-        if isinstance(obs_rec, dict):
-            return obs_rec.get(key, '')
-        else:
-            return obs_rec[index] if len(obs_rec) > index else ''
-    
     # Get all active observers at the end of this month/year (SEIT <= MMJJ)
     # Build SEIT value for comparison using same formula as _parse_seit: mm + 13 * jj
     month_year_value = mm_int + 13 * jj_int
@@ -3203,9 +3187,9 @@ def get_monthly_stats() -> Dict[str, Any]:
     # Get unique active observers up to this month/year
     active_observers = {}
     for obs_record in observers:
-        kk = get_observer_field(obs_record, 'KK', 0)
-        seit_str = get_observer_field(obs_record, 'seit', 3)
-        aktiv_str = get_observer_field(obs_record, 'aktiv', 4)
+        kk = obs_record.get('KK', '')
+        seit_str = obs_record.get('seit', '')
+        aktiv_str = obs_record.get('aktiv', '')
         
         # Parse seit from "MM/JJ" to integer MMJJ
         seit = _parse_seit(seit_str) if seit_str else 0
@@ -3223,7 +3207,7 @@ def get_monthly_stats() -> Dict[str, Any]:
         if seit <= month_year_value:
             if not active_observers_only or aktiv == 1:
                 # Keep the most recent record for each KK
-                kk_seit_str = get_observer_field(active_observers.get(kk, {}), 'seit', 3) if kk in active_observers else None
+                kk_seit_str = active_observers.get(kk, {}).get('seit', '') if kk in active_observers else None
                 if kk not in active_observers or seit > _parse_seit(kk_seit_str if kk_seit_str else ''):
                     active_observers[kk] = obs_record
     
@@ -3240,7 +3224,7 @@ def get_monthly_stats() -> Dict[str, Any]:
     
     # Initialize all active observers with empty data
     for kk, obs_record in active_observers.items():
-        gh_str = get_observer_field(obs_record, 'GH', 6)
+        gh_str = obs_record.get('GH', '')
         observer_data[kk] = {
             'days': {},
             'total_solar': 0,
@@ -3320,15 +3304,15 @@ def get_monthly_stats() -> Dict[str, Any]:
             predominant_region = 39
         elif predominant_g == 0:
             # Most observations at primary site -> use GH from observer record
-            gh_str = get_observer_field(active_observers[kk], 'GH', 6)
+            gh_str = active_observers[kk].get('GH', '')
             predominant_region = int(gh_str) if gh_str else 39
         elif predominant_g == 2:
             # Most observations at secondary site -> use GN from observer record
-            gn_str = get_observer_field(active_observers[kk], 'GN', 14)
+            gn_str = active_observers[kk].get('GN', '')
             predominant_region = int(gn_str) if gn_str else 39
         else:
             # Fallback
-            gh_str = get_observer_field(active_observers[kk], 'GH', 6)
+            gh_str = active_observers[kk].get('GH', '')
             predominant_region = int(gh_str) if gh_str else 39
         
         observer_data[kk]['region'] = predominant_region
@@ -4432,14 +4416,6 @@ def get_annual_stats() -> Dict[str, Any]:
         observers = current_app.config.get('OBSERVERS', [])
         active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
     
-    # Helper function to access observer record fields (supports both dict and list format)
-    def get_observer_field(obs_rec, key, index):
-        """Get field from observer record (dict from DB or list from file)."""
-        if isinstance(obs_rec, dict):
-            return obs_rec.get(key, '')
-        else:
-            return obs_rec[index] if len(obs_rec) > index else ''
-    
     # Get all active observers up to end of year
     # Use December of the year as reference (month 12)
     month_year_value = 12 + 13 * jj_int
@@ -4447,9 +4423,9 @@ def get_annual_stats() -> Dict[str, Any]:
     # Get unique active observers up to this year
     active_observers = {}
     for obs_record in observers:
-        kk = get_observer_field(obs_record, 'KK', 0)
-        seit_str = get_observer_field(obs_record, 'seit', 3)
-        aktiv_str = get_observer_field(obs_record, 'aktiv', 4)
+        kk = obs_record.get('KK', '')
+        seit_str = obs_record.get('seit', '')
+        aktiv_str = obs_record.get('aktiv', '')
         
         # Parse seit from "MM/JJ" to integer MMJJ
         seit = _parse_seit(seit_str) if seit_str else 0
@@ -4466,7 +4442,7 @@ def get_annual_stats() -> Dict[str, Any]:
         if seit <= month_year_value:
             if not active_observers_only or aktiv == 1:
                 # Keep the most recent record for each KK
-                kk_seit_str = get_observer_field(active_observers.get(kk, {}), 'seit', 3) if kk in active_observers else None
+                kk_seit_str = active_observers.get(kk, {}).get('seit', '') if kk in active_observers else None
                 if kk not in active_observers or seit > _parse_seit(kk_seit_str if kk_seit_str else ''):
                     active_observers[kk] = obs_record
     
@@ -4802,7 +4778,7 @@ def get_observers() -> Dict[str, Any]:
             else:
                 # Local Mode: Find all records for this observer
                 observers = current_app.config.get('OBSERVERS', [])
-                kk_records = [obs for obs in observers if obs[0] == kk_param]
+                kk_records = [obs for obs in observers if obs['KK'] == kk_param]
                 
                 # Handle century boundary for observation year (same as _parse_seit)
                 # Years 00-((YEAR_MIN-1900)-1) are treated as 2000-20xx, so add 100 to year
@@ -4811,41 +4787,23 @@ def get_observers() -> Dict[str, Any]:
                 
                 # Calculate seit value for observation date: month + 13 × year
                 obs_seit = mm + 13 * jj
-                kk_records = [obs for obs in kk_records if obs[3] and _parse_seit(obs[3]) <= obs_seit]
+                kk_records = [obs for obs in kk_records if obs['seit'] and _parse_seit(obs['seit']) <= obs_seit]
             
             if kk_records:
-                if is_cloud_mode():
-                    # Cloud mode returns CSV-format dicts
-                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs['seit'])) if kk_records else None
-                    
-                    if latest_record:
-                        result = {
-                            'KK': latest_record['KK'],
-                            'VName': latest_record['VName'],
-                            'NName': latest_record['NName'],
-                            'seit': latest_record['seit'],
-                            'aktiv': str(latest_record['aktiv']),
-                            'HbOrt': latest_record['HbOrt'],
-                            'GH': latest_record['GH'],
-                            'GN': latest_record['GN']
-                        }
-                        return jsonify({'observer': result})
-                else:
-                    # Local mode: CSV arrays - use index positions
-                    latest_record = max(kk_records, key=lambda obs: _parse_seit(obs[3])) if kk_records else None
-                    
-                    if latest_record:
-                        result = {
-                            'KK': latest_record[0],
-                            'VName': latest_record[1],
-                            'NName': latest_record[2],
-                            'seit': latest_record[3],
-                            'aktiv': latest_record[4],
-                            'HbOrt': latest_record[5],
-                            'GH': latest_record[6],
-                            'GN': latest_record[14]
-                        }
-                        return jsonify({'observer': result})
+                latest_record = max(kk_records, key=lambda obs: _parse_seit(obs['seit'])) if kk_records else None
+                
+                if latest_record:
+                    result = {
+                        'KK': latest_record['KK'],
+                        'VName': latest_record['VName'],
+                        'NName': latest_record['NName'],
+                        'seit': latest_record['seit'],
+                        'aktiv': str(latest_record['aktiv']),
+                        'HbOrt': latest_record['HbOrt'],
+                        'GH': latest_record['GH'],
+                        'GN': latest_record['GN']
+                    }
+                    return jsonify({'observer': result})
             
             # If no matching record found, return empty
             return jsonify({'observer': None})
@@ -4881,31 +4839,27 @@ def get_observers() -> Dict[str, Any]:
         # Return all observers
         filtered = observers
     elif filter_type == 'kk':
-        # Filter by observer ID (KK field is at index 0)
-        filtered = [obs for obs in observers if len(obs) >= 21 and obs[0] == filter_value]
+        # Filter by observer ID (KK field)
+        filtered = [obs for obs in observers if obs['KK'] == filter_value]
     elif filter_type == 'site':
-        # Filter by observation site (HbOrt at index 5, NbOrt at index 13)
+        # Filter by observation site (HbOrt, NbOrt)
         search_term = filter_value.lower()
         filtered = [obs for obs in observers 
-                   if len(obs) >= 21 and (search_term in obs[5].lower() or search_term in obs[13].lower())]
+                   if search_term in obs['HbOrt'].lower() or search_term in obs['NbOrt'].lower()]
     elif filter_type == 'region':
-        # Filter by geographic region (GH at index 6, GN at index 14)
+        # Filter by geographic region (GH, GN)
         filtered = [obs for obs in observers 
-                   if len(obs) >= 21 and (str(obs[6]) == filter_value or str(obs[14]) == filter_value)]
+                   if str(obs['GH']) == filter_value or str(obs['GN']) == filter_value]
     else:
-        filtered = [obs for obs in observers if len(obs) >= 21]
+        filtered = observers
     
     # Filter to latest site only if requested
     if latest_only:
         # Group by KK and keep only the record with the latest 'seit' date
         latest_sites = {}
         for obs in filtered:
-            # Skip entries that don't have enough columns
-            if len(obs) < 21:
-                continue
-                
-            kk = obs[0]
-            seit = obs[3]  # seit field in MM/YY format
+            kk = obs['KK']
+            seit = obs['seit']  # seit field in MM/YY format
             
             # Parse seit (MM/YY) to compare dates
             try:
@@ -4923,36 +4877,8 @@ def get_observers() -> Dict[str, Any]:
         
         filtered = [obs_tuple[0] for obs_tuple in latest_sites.values()]
     
-    # Convert to dict format for JSON
-    result = []
-    for obs in filtered:
-        # Skip entries that don't have enough columns
-        if len(obs) < 21:
-            continue
-            
-        result.append({
-            'KK': obs[0],
-            'VName': obs[1],
-            'NName': obs[2],
-            'seit': obs[3],
-            'aktiv': obs[4],
-            'HbOrt': obs[5],
-            'GH': obs[6],
-            'HLG': obs[7],
-            'HLM': obs[8],
-            'HOW': obs[9],
-            'HBG': obs[10],
-            'HBM': obs[11],
-            'HNS': obs[12],
-            'NbOrt': obs[13],
-            'GN': obs[14],
-            'NLG': obs[15],
-            'NLM': obs[16],
-            'NOW': obs[17],
-            'NBG': obs[18],
-            'NBM': obs[19],
-            'NNS': obs[20]
-        })
+    # obs is already a dict - just append directly
+    result = [dict(obs) for obs in filtered]
     
     return jsonify({'observers': result, 'count': len(result)})
 
@@ -5003,11 +4929,9 @@ def get_observers_list() -> Dict[str, Any]:
         # Get unique observers by KK (only latest record)
         unique_observers = {}
         for obs in csv_observers:
-            if len(obs) < 3:
-                continue
-            kk = obs[0]
-            vname = obs[1] if obs[1] else ''
-            nname = obs[2] if obs[2] else ''
+            kk = obs['KK']
+            vname = obs['VName'] if obs['VName'] else ''
+            nname = obs['NName'] if obs['NName'] else ''
             
             # Skip if KK is empty or both names are empty
             if not kk or (not vname and not nname):
@@ -5071,14 +4995,8 @@ def get_observer_regions() -> Dict[str, Any]:
     # Get unique regions
     regions = set()
     for obs in observers:
-        if is_cloud_mode():
-            # Cloud mode: dict with CSV-format keys
-            regions.add(int(obs['GH']))   # HbReg - Hauptbeobachtungsort Region
-            regions.add(int(obs['GN']))   # NbReg - Nebenbeobachtungsort Region
-        else:
-            # Local mode: list with numeric indices
-            regions.add(int(obs[6]))   # HbReg - Hauptbeobachtungsort Region
-            regions.add(int(obs[14]))  # NbReg - Nebenbeobachtungsort Region (GN)
+        regions.add(int(obs['GH']))   # HbReg - Hauptbeobachtungsort Region
+        regions.add(int(obs['GN']))   # NbReg - Nebenbeobachtungsort Region
     
     # Get region names from i18n (no fallbacks)
     i18n = g.i18n if hasattr(g, 'i18n') else get_i18n()
@@ -5187,41 +5105,40 @@ def add_observer() -> Dict[str, Any]:
     
     # Check if this KK already exists (any observer with this KK)
     for obs in observers:
-        obs_kk = obs['KK'] if is_cloud_mode() else obs[0]  # Cloud: dict, Local: list
-        if obs_kk == kk:
+        if obs['KK'] == kk:
             return jsonify({'error': 'observer_code_exists', 'kk': kk}), 400
     
-    # Build the CSV row
-    # Format: KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
-    new_row = [
-        kk,
-        data.get('VName', '')[:15],  # Max 15 chars
-        data.get('NName', '')[:15],  # Max 15 chars
-        seit_str,
-        str(data.get('active', 1)),
-        data.get('HbOrt', '')[:20],  # Max 20 chars
-        str(data.get('GH', 0)),
-        str(data.get('HLG', 0)),
-        str(data.get('HLM', 0)),
-        data.get('HOW', 'O'),
-        str(data.get('HBG', 0)),
-        str(data.get('HBM', 0)),
-        data.get('HNS', 'N'),
-        data.get('NbOrt', '')[:20],  # Max 20 chars
-        str(data.get('GN', 0)),
-        str(data.get('NLG', 0)),
-        str(data.get('NLM', 0)),
-        data.get('NOW', 'O'),
-        str(data.get('NBG', 0)),
-        str(data.get('NBM', 0)),
-        data.get('NNS', 'N')
-    ]
+    # Build the observer record as dict
+    # Keys: KK,VName,NName,seit,aktiv,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
+    new_row = {
+        'KK': kk,
+        'VName': data.get('VName', '')[:15],
+        'NName': data.get('NName', '')[:15],
+        'seit': seit_str,
+        'aktiv': str(data.get('active', 1)),
+        'HbOrt': data.get('HbOrt', '')[:20],
+        'GH': str(data.get('GH', 0)),
+        'HLG': str(data.get('HLG', 0)),
+        'HLM': str(data.get('HLM', 0)),
+        'HOW': data.get('HOW', 'O'),
+        'HBG': str(data.get('HBG', 0)),
+        'HBM': str(data.get('HBM', 0)),
+        'HNS': data.get('HNS', 'N'),
+        'NbOrt': data.get('NbOrt', '')[:20],
+        'GN': str(data.get('GN', 0)),
+        'NLG': str(data.get('NLG', 0)),
+        'NLM': str(data.get('NLM', 0)),
+        'NOW': data.get('NOW', 'O'),
+        'NBG': str(data.get('NBG', 0)),
+        'NBM': str(data.get('NBM', 0)),
+        'NNS': data.get('NNS', 'N')
+    }
     
     # Add observer using io module
     try:
         if is_cloud_mode():
-            # Cloud Mode: Direct SQL INSERT - convert list to dict
-            record_dict = _observer_row_to_dict(new_row)
+            # Cloud Mode: Direct SQL INSERT
+            record_dict = _observer_row_to_dict(new_row) if isinstance(new_row, list) else new_row
             success = observer_db.save_one(record_dict)
             if not success:
                 return jsonify({'error': 'observer_site_exists', 'kk': kk, 'seit': seit_str}), 400
@@ -5235,8 +5152,8 @@ def add_observer() -> Dict[str, Any]:
             'success': True,
             'observer': {
                 'KK': kk,
-                'VName': new_row[1],
-                'NName': new_row[2],
+                'VName': new_row['VName'],
+                'NName': new_row['NName'],
                 'seit': seit_str
             }
         })
@@ -5333,36 +5250,17 @@ def update_observer(kk: str) -> Dict[str, Any]:
             # Local Mode: Update all entries with delete+insert pattern
             observer_indices = []
             for idx, obs in enumerate(observers):
-                if obs[0] == kk:
+                if obs['KK'] == kk:
                     observer_indices.append(idx)
             
             updated_count = 0
             for idx in observer_indices:
                 old_observer = observers[idx]
                 # Keep all data unchanged except VName and NName
-                observers[idx] = [
-                    kk,  # KK (unchanged)
-                    data.get('VName', '')[:15],  # VName (updated)
-                    data.get('NName', '')[:15],  # NName (updated)
-                    old_observer[3],  # seit (unchanged)
-                    old_observer[4],  # active (unchanged)
-                    old_observer[5],  # HbOrt (unchanged)
-                    old_observer[6],  # GH (unchanged)
-                    old_observer[7],  # HLG (unchanged)
-                    old_observer[8],  # HLM (unchanged)
-                    old_observer[9],  # HOW (unchanged)
-                    old_observer[10],  # HBG (unchanged)
-                    old_observer[11],  # HBM (unchanged)
-                    old_observer[12],  # HNS (unchanged)
-                    old_observer[13],  # NbOrt (unchanged)
-                    old_observer[14],  # GN (unchanged)
-                    old_observer[15],  # NLG (unchanged)
-                    old_observer[16],  # NLM (unchanged)
-                    old_observer[17],  # NOW (unchanged)
-                    old_observer[18],  # NBG (unchanged)
-                    old_observer[19],  # NBM (unchanged)
-                    old_observer[20]   # NNS (unchanged)
-                ]
+                updated = dict(old_observer)
+                updated['VName'] = data.get('VName', '')[:15]
+                updated['NName'] = data.get('NName', '')[:15]
+                observers[idx] = updated
                 updated_count += 1
             
             # Get the first updated entry for response
@@ -5382,18 +5280,18 @@ def update_observer(kk: str) -> Dict[str, Any]:
                 for obs in observations:
                     # Check if observation belongs to this observer
                     if getattr(obs, 'KK', None) == kk:
-                        obs.VName = first_updated[1]
-                        obs.NName = first_updated[2]
+                        obs.VName = first_updated['VName']
+                        obs.NName = first_updated['NName']
                         obs_updated_count += 1
             
             return jsonify({
                 'success': True,
                 'observer': {
                     'KK': kk,
-                    'VName': first_updated[1],
-                    'NName': first_updated[2],
-                    'seit': first_updated[3],
-                    'active': int(first_updated[4])
+                    'VName': first_updated['VName'],
+                    'NName': first_updated['NName'],
+                    'seit': first_updated['seit'],
+                    'active': int(first_updated['aktiv'])
                 }
             })
     except Exception as e:
@@ -5419,74 +5317,38 @@ def get_observer_sites(kk):
     # Find all entries for this observer
     sites = []
     for obs in observers:
-        if is_cloud_mode():
-            # Cloud mode: dict with CSV-format keys
-            if obs['KK'] != kk:
-                continue
-            
-            seit_parts = obs['seit'].split('/')
-            seit_month = int(seit_parts[0])
-            seit_year = int(seit_parts[1])
-            
-            sites.append({
-                'KK': obs['KK'],
-                'VName': obs['VName'],
-                'NName': obs['NName'],
-                'seit': obs['seit'],
-                'seit_month': seit_month,
-                'seit_year': seit_year,
-                'active': int(obs['aktiv']),
-                'HbOrt': obs['HbOrt'],
-                'GH': obs['GH'],
-                'HLG': int(obs['HLG']) if obs['HLG'] else 0,
-                'HLM': int(obs['HLM']) if obs['HLM'] else 0,
-                'HOW': obs['HOW'],
-                'HBG': int(obs['HBG']) if obs['HBG'] else 0,
-                'HBM': int(obs['HBM']) if obs['HBM'] else 0,
-                'HNS': obs['HNS'],
-                'NbOrt': obs['NbOrt'],
-                'GN': obs['GN'],
-                'NLG': int(obs['NLG']) if obs['NLG'] else 0,
-                'NLM': int(obs['NLM']) if obs['NLM'] else 0,
-                'NOW': obs['NOW'],
-                'NBG': int(obs['NBG']) if obs['NBG'] else 0,
-                'NBM': int(obs['NBM']) if obs['NBM'] else 0,
-                'NNS': obs['NNS']
-            })
-        else:
-            # Local mode: list with numeric indices
-            if obs[0] != kk:
-                continue
-            
-            seit_parts = obs[3].split('/')
-            seit_month = int(seit_parts[0])
-            seit_year = int(seit_parts[1])
-            
-            sites.append({
-                'KK': obs[0],
-                'VName': obs[1],
-                'NName': obs[2],
-                'seit': obs[3],
-                'seit_month': seit_month,
-                'seit_year': seit_year,
-                'active': int(obs[4]),
-                'HbOrt': obs[5],
-                'GH': obs[6],
-                'HLG': int(obs[7]) if obs[7] else 0,
-                'HLM': int(obs[8]) if obs[8] else 0,
-                'HOW': obs[9],
-                'HBG': int(obs[10]) if obs[10] else 0,
-                'HBM': int(obs[11]) if obs[11] else 0,
-                'HNS': obs[12],
-                'NbOrt': obs[13],
-                'GN': obs[14],
-                'NLG': int(obs[15]) if obs[15] else 0,
-                'NLM': int(obs[16]) if obs[16] else 0,
-                'NOW': obs[17],
-                'NBG': int(obs[18]) if obs[18] else 0,
-                'NBM': int(obs[19]) if obs[19] else 0,
-                'NNS': obs[20]
-            })
+        if obs['KK'] != kk:
+            continue
+        
+        seit_parts = obs['seit'].split('/')
+        seit_month = int(seit_parts[0])
+        seit_year = int(seit_parts[1])
+        
+        sites.append({
+            'KK': obs['KK'],
+            'VName': obs['VName'],
+            'NName': obs['NName'],
+            'seit': obs['seit'],
+            'seit_month': seit_month,
+            'seit_year': seit_year,
+            'active': int(obs['aktiv']),
+            'HbOrt': obs['HbOrt'],
+            'GH': obs['GH'],
+            'HLG': int(obs['HLG']) if obs['HLG'] else 0,
+            'HLM': int(obs['HLM']) if obs['HLM'] else 0,
+            'HOW': obs['HOW'],
+            'HBG': int(obs['HBG']) if obs['HBG'] else 0,
+            'HBM': int(obs['HBM']) if obs['HBM'] else 0,
+            'HNS': obs['HNS'],
+            'NbOrt': obs['NbOrt'],
+            'GN': obs['GN'],
+            'NLG': int(obs['NLG']) if obs['NLG'] else 0,
+            'NLM': int(obs['NLM']) if obs['NLM'] else 0,
+            'NOW': obs['NOW'],
+            'NBG': int(obs['NBG']) if obs['NBG'] else 0,
+            'NBM': int(obs['NBM']) if obs['NBM'] else 0,
+            'NNS': obs['NNS']
+        })
     
     if not sites:
         return jsonify({'error': 'Observer not found'}), 404
@@ -5542,16 +5404,9 @@ def check_observer_active(kk):
     # Find all site entries for this observer where seit <= check_date
     matching_records = []
     for obs in observers:
-        if is_cloud_mode():
-            # Cloud mode: dict with CSV-format keys
-            if obs['KK'] != kk:
-                continue
-            seit_str = obs['seit']
-        else:
-            # Local mode: list with numeric indices
-            if obs[0] != kk:
-                continue
-            seit_str = obs[3]
+        if obs['KK'] != kk:
+            continue
+        seit_str = obs['seit']
         
         # Parse seit (start date)
         seit_parts = seit_str.split('/')
@@ -5573,10 +5428,7 @@ def check_observer_active(kk):
     latest_record = matching_records[0][1]
 
     # Check if that record is active (aktiv=1)
-    if is_cloud_mode():
-        is_active = int(latest_record['aktiv']) == 1
-    else:
-        is_active = int(latest_record[4]) == 1
+    is_active = int(latest_record['aktiv']) == 1
 
     return jsonify({'active': is_active})
 
@@ -5608,8 +5460,7 @@ def add_observer_site(kk):
     # Find an existing entry for this observer to get VName/NName
     existing = None
     for obs in observers:
-        obs_kk = obs['KK'] if is_cloud_mode() else obs[0]
-        if obs_kk == kk:
+        if obs['KK'] == kk:
             existing = obs
             break
     
@@ -5618,42 +5469,39 @@ def add_observer_site(kk):
     
     # Check if entry with this seit already exists
     for obs in observers:
-        obs_kk = obs['KK'] if is_cloud_mode() else obs[0]
-        obs_seit = obs['seit'] if is_cloud_mode() else obs[3]
-        if obs_kk == kk and obs_seit == seit:
+        if obs['KK'] == kk and obs['seit'] == seit:
             return jsonify({'error': 'site_date_exists', 'kk': kk, 'seit': seit}), 400
     
-    # Create new CSV row
-    # Format: KK,VName,NName,seit,active,HbOrt,GH,HLG,HLM,HOW,HBG,HBM,HNS,NbOrt,GN,NLG,NLM,NOW,NBG,NBM,NNS
-    new_row = [
-        kk,                                      # 0: KK
-        existing['VName'] if is_cloud_mode() else existing[1],  # 1: VName
-        existing['NName'] if is_cloud_mode() else existing[2],  # 2: NName
-        seit,                                    # 3: seit
-        str(data['active']),                     # 4: active
-        data['HbOrt'],                           # 5: HbOrt (H_Ort)
-        data['GH'],                              # 6: GH (H_GG)
-        str(data['HLG']),                        # 7: HLG (H_LaenGrad)
-        str(data['HLM']),                        # 8: HLM (H_LaenMin)
-        data['HOW'],                             # 9: HOW (H_EW)
-        str(data['HBG']),                        # 10: HBG (H_BreiGrad)
-        str(data['HBM']),                        # 11: HBM (H_BreiMin)
-        data['HNS'],                             # 12: HNS (H_NS)
-        data.get('NbOrt', ''),                   # 13: NbOrt (N_Ort)
-        data.get('GN', ''),                      # 14: GN (N_GG)
-        str(data.get('NLG', 0)),                 # 15: NLG (N_LaenGrad)
-        str(data.get('NLM', 0)),                 # 16: NLM (N_LaenMin)
-        data.get('NOW', ''),                     # 17: NOW (N_EW)
-        str(data.get('NBG', 0)),                 # 18: NBG (N_BreiGrad)
-        str(data.get('NBM', 0)),                 # 19: NBM (N_BreiMin)
-        data.get('NNS', '')                      # 20: NNS (N_NS)
-    ]
+    # Create new observer record as dict
+    new_row = {
+        'KK': kk,
+        'VName': existing['VName'],
+        'NName': existing['NName'],
+        'seit': seit,
+        'aktiv': str(data['active']),
+        'HbOrt': data['HbOrt'],
+        'GH': data['GH'],
+        'HLG': str(data['HLG']),
+        'HLM': str(data['HLM']),
+        'HOW': data['HOW'],
+        'HBG': str(data['HBG']),
+        'HBM': str(data['HBM']),
+        'HNS': data['HNS'],
+        'NbOrt': data.get('NbOrt', ''),
+        'GN': data.get('GN', ''),
+        'NLG': str(data.get('NLG', 0)),
+        'NLM': str(data.get('NLM', 0)),
+        'NOW': data.get('NOW', ''),
+        'NBG': str(data.get('NBG', 0)),
+        'NBM': str(data.get('NBM', 0)),
+        'NNS': data.get('NNS', '')
+    }
     
     # Save using io module
     try:
         if is_cloud_mode():
-            # Cloud Mode: Direct SQL INSERT - convert list to dict
-            record_dict = _observer_row_to_dict(new_row)
+            # Cloud Mode: Direct SQL INSERT
+            record_dict = _observer_row_to_dict(new_row) if isinstance(new_row, list) else new_row
             success = observer_db.save_one(record_dict)
             if not success:
                 return jsonify({'error': 'site_date_exists', 'seit': seit}), 400
@@ -5663,10 +5511,10 @@ def add_observer_site(kk):
             
             # Sort observers by KK, then by seit
             def sort_key(obs):
-                kk_val = obs[0]
-                seit = obs[3]
-                if seit and '/' in seit:
-                    parts = seit.split('/')
+                kk_val = obs['KK']
+                seit_val = obs['seit']
+                if seit_val and '/' in seit_val:
+                    parts = seit_val.split('/')
                     if len(parts) == 2:
                         month = int(parts[0])
                         year = int(parts[1])
@@ -5682,9 +5530,9 @@ def add_observer_site(kk):
         return jsonify({
             'success': True,
             'site': {
-                'KK': new_row[0],
-                'seit': new_row[3],
-                'active': int(new_row[4])
+                'KK': new_row['KK'],
+                'seit': new_row['seit'],
+                'active': int(new_row['aktiv'])
             }
         })
     except Exception as e:
@@ -5767,32 +5615,32 @@ def update_observer_site(kk):
             # Local Mode: Delete+insert pattern
             updated_observers = []
             for obs in observers:
-                if obs[0] == kk and obs[3] == seit:
+                if obs['KK'] == kk and obs['seit'] == seit:
                     entry_found = True
                     new_seit = f"{str(data['seit_month']).zfill(2)}/{str(data['seit_year']).zfill(2)}"
-                    updated_row = [
-                        kk,
-                        data.get('VName', obs[1] if len(obs) > 1 else ''),
-                        data.get('NName', obs[2] if len(obs) > 2 else ''),
-                        new_seit,
-                        str(data.get('active', 1)),
-                        data.get('HbOrt', ''),
-                        data.get('GH', ''),
-                        str(data.get('HLG', 0)),
-                        str(data.get('HLM', 0)),
-                        data.get('HOW', 'O'),
-                        str(data.get('HBG', 0)),
-                        str(data.get('HBM', 0)),
-                        data.get('HNS', 'N'),
-                        data.get('NbOrt', ''),
-                        data.get('GN', ''),
-                        str(data.get('NLG', 0)),
-                        str(data.get('NLM', 0)),
-                        data.get('NOW', 'O'),
-                        str(data.get('NBG', 0)),
-                        str(data.get('NBM', 0)),
-                        data.get('NNS', 'N')
-                    ]
+                    updated_row = {
+                        'KK': kk,
+                        'VName': data.get('VName', obs.get('VName', '')),
+                        'NName': data.get('NName', obs.get('NName', '')),
+                        'seit': new_seit,
+                        'aktiv': str(data.get('active', 1)),
+                        'HbOrt': data.get('HbOrt', ''),
+                        'GH': data.get('GH', ''),
+                        'HLG': str(data.get('HLG', 0)),
+                        'HLM': str(data.get('HLM', 0)),
+                        'HOW': data.get('HOW', 'O'),
+                        'HBG': str(data.get('HBG', 0)),
+                        'HBM': str(data.get('HBM', 0)),
+                        'HNS': data.get('HNS', 'N'),
+                        'NbOrt': data.get('NbOrt', ''),
+                        'GN': data.get('GN', ''),
+                        'NLG': str(data.get('NLG', 0)),
+                        'NLM': str(data.get('NLM', 0)),
+                        'NOW': data.get('NOW', 'O'),
+                        'NBG': str(data.get('NBG', 0)),
+                        'NBM': str(data.get('NBM', 0)),
+                        'NNS': data.get('NNS', 'N')
+                    }
                     updated_observers.append(updated_row)
                 else:
                     updated_observers.append(obs)
@@ -5801,8 +5649,8 @@ def update_observer_site(kk):
                 return jsonify({'error': 'site_entry_not_found', 'kk': kk, 'seit': seit}), 404
             
             def sort_key(obs):
-                kk_val = obs[0]
-                seit_parts = obs[3].split('/')
+                kk_val = obs['KK']
+                seit_parts = obs['seit'].split('/')
                 month = int(seit_parts[0])
                 year = int(seit_parts[1])
                 full_year = jj_to_full_year(year)
@@ -5841,10 +5689,7 @@ def delete_observer_site(kk):
         observers = current_app.config.get('OBSERVERS', [])
     
     # Count how many entries exist for this observer
-    if is_cloud_mode():
-        observer_entries = [obs for obs in observers if obs['KK'] == kk]
-    else:
-        observer_entries = [obs for obs in observers if obs[0] == kk]
+    observer_entries = [obs for obs in observers if obs['KK'] == kk]
     
     if len(observer_entries) <= 1:
         return jsonify({'error': 'cannot_delete_last_site', 'kk': kk}), 400
@@ -5861,7 +5706,7 @@ def delete_observer_site(kk):
             entry_found = False
             new_observers = []
             for obs in observers:
-                if obs[0] == kk and obs[3] == seit:
+                if obs['KK'] == kk and obs['seit'] == seit:
                     entry_found = True
                     continue
                 new_observers.append(obs)
@@ -5901,10 +5746,7 @@ def delete_observer():
         observers = current_app.config.get('OBSERVERS', [])
     
     # Find all entries for this observer
-    if is_cloud_mode():
-        observer_entries = [obs for obs in observers if obs['KK'] == kk]
-    else:
-        observer_entries = [obs for obs in observers if obs[0] == kk]
+    observer_entries = [obs for obs in observers if obs['KK'] == kk]
     
     if not observer_entries:
         return jsonify({'error': 'observer_not_found', 'kk': kk}), 404
@@ -5926,7 +5768,7 @@ def delete_observer():
             })
         else:
             # Local Mode: Filter out all entries for this KK
-            new_observers = [obs for obs in observers if obs[0] != kk]
+            new_observers = [obs for obs in observers if obs['KK'] != kk]
             new_observers = observer_logic.sort_observers(new_observers)
             observer_file.save_file(new_observers)
             current_app.config['OBSERVERS'] = new_observers
@@ -6245,10 +6087,9 @@ def _calculate_observation_solar_altitude(obs, observers_list, sh_type='mean'):
     # Multiple records per observer - find the latest one with seit <= obs_seit
     candidates = []
     for obs_rec in observers_list:
-        if obs_rec[0] == observer_kk:  # obs_rec[0] is KK field
-            # obs_rec[3] is seit field in format "MM/YY"
+        if obs_rec['KK'] == observer_kk:
             try:
-                seit_parts = obs_rec[3].split('/')
+                seit_parts = obs_rec['seit'].split('/')
                 seit_month = int(seit_parts[0])
                 seit_year_2digit = int(seit_parts[1])
                 seit_year = jj_to_full_year(seit_year_2digit)
@@ -6270,25 +6111,8 @@ def _calculate_observation_solar_altitude(obs, observers_list, sh_type='mean'):
     if not observer_record:
         return None
     
-    # Convert observer record tuple to dict for easier access
-    # Format: (KK, VName, NName, seit, aktiv, HbOrt, GH, HLG, HLM, HOW, HBG, HBM, HNS, NbOrt, GN, NLG, NLM, NOW, NBG, NBM, NNS)
-    observer_dict = {
-        'HLG': observer_record[7],   # Main site longitude degrees
-        'HLM': observer_record[8],   # Main site longitude minutes
-        'HOW': observer_record[9],   # Main site E/W ('O' for Ost/East, 'W' for West)
-        'HBG': observer_record[10],  # Main site latitude degrees
-        'HBM': observer_record[11],  # Main site latitude minutes
-        'HNS': observer_record[12],  # Main site N/S
-        'NLG': observer_record[15],  # Alternate site longitude degrees
-        'NLM': observer_record[16],  # Alternate site longitude minutes
-        'NOW': observer_record[17],  # Alternate site E/W ('O' for Ost/East, 'W' for West)
-        'NBG': observer_record[18],  # Alternate site latitude degrees
-        'NBM': observer_record[19],  # Alternate site latitude minutes
-        'NNS': observer_record[20],  # Alternate site N/S
-    }
-    
-    # Get observer coordinates
-    longitude, latitude = get_observer_coordinates(observer_dict, obs.g)
+    # observer_record is already a dict - pass directly to get_observer_coordinates
+    longitude, latitude = get_observer_coordinates(observer_record, obs.g)
     
     # Calculate solar altitude
     # Convert DD (duration in units of 10 minutes) to actual minutes
@@ -7170,8 +6994,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                     elif param1_name == 'KK':
                         # Observers - show all that exist in observer database, regardless of observations
                         observers = current_app.config.get('OBSERVERS', [])
-                        # Observers are lists, KK is at index 0
-                        existing_kk = sorted(set(int(obs[0]) for obs in observers))
+                        existing_kk = sorted(set(int(obs['KK']) for obs in observers))
                         param1_range_values = []
                         for val in range(from_val, to_val + 1):
                             if val in existing_kk:
@@ -7219,8 +7042,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                     elif param2_name == 'KK':
                         # Observers - show all that exist in observer database, regardless of observations
                         observers = current_app.config.get('OBSERVERS', [])
-                        # Observers are lists, KK is at index 0
-                        existing_kk = sorted(set(int(obs[0]) for obs in observers))
+                        existing_kk = sorted(set(int(obs['KK']) for obs in observers))
                         param2_range_values = []
                         for val in range(from_val, to_val + 1):
                             if val in existing_kk:
@@ -7329,12 +7151,11 @@ def _format_parameter_value(value, param_name, all_params, prefix):
             if kk is not None:
                 # Get observers from app config
                 observers = current_app.config.get('OBSERVERS', [])
-                # Find observer with matching KK (observers are tuples with KK at index 0)
-                observer = next((obs for obs in observers if obs[0] == str(kk).zfill(2)), None)
+                # Find observer with matching KK (observers are dicts with 'KK' key)
+                observer = next((obs for obs in observers if obs['KK'] == str(kk).zfill(2)), None)
                 if observer:
-                    # observer tuple: (KK, VName, NName, seit, aktiv, HbOrt, ...)
-                    vname = observer[1] if len(observer) > 1 else ''
-                    nname = observer[2] if len(observer) > 2 else ''
+                    vname = observer['VName']
+                    nname = observer['NName']
                     return f"{str(kk).zfill(2)} - {vname} {nname}".strip()
                 # Fallback if observer not found
                 return str(kk).zfill(2)
