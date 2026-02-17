@@ -7005,7 +7005,7 @@ async function showDatumDialog() {
             modal.hide();
             
             await fetch('/api/config/datedefault', {
-                method: 'POST',
+                method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({mode: newMode, month: month, year: year})
             });
