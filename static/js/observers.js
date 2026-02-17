@@ -122,19 +122,9 @@ async function showFilterDialog() {
     const modal = new bootstrap.Modal(filterDialogEl, { backdrop: 'static' });
     modal.show();
     
-    // Decision #033: Enter key triggers OK button
-    // Note: This dialog is mostly <select> elements, so we allow Enter on SELECT too
-    // (single-select dropdowns, not multi-select — Enter should confirm the selection AND submit)
-    const applyBtn = document.getElementById('apply-filter');
-    filterDialogEl.addEventListener('keydown', function onKeydown(e) {
-        if (e.key === 'Enter' && applyBtn) {
-            e.preventDefault();
-            applyBtn.click();
-        }
-    });
-    filterDialogEl.addEventListener('hidden.bs.modal', function cleanup() {
-        filterDialogEl.removeEventListener('keydown', cleanup);
-    }, { once: true });
+    // Decision #033: Keyboard handling + cleanup
+    setupModalKeyboard(filterDialogEl, document.getElementById('apply-filter'));
+    setupModalCleanup(filterDialogEl);
     
     const filterTypeSelect = document.getElementById('filter-type');
     const kkSelect = document.getElementById('filter-select-kk');
@@ -338,14 +328,8 @@ function displayObservers() {
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
     
-    // Decision #033: Enter key triggers OK (direct handler - no input elements in this modal)
-    const okBtn = modalEl.querySelector('.btn-primary');
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            okBtn.click();
-        }
-    });
+    // Decision #033: Keyboard handling + cleanup
+    setupModalKeyboard(modalEl, modalEl.querySelector('.btn-primary'));
     setupModalCleanup(modalEl);
 }
 

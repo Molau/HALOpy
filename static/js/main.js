@@ -4540,6 +4540,9 @@ async function showSelectDialog() {
         `;
         document.body.appendChild(loadingModal);
         const bsLoadingModal = new bootstrap.Modal(loadingModal, { backdrop: 'static', keyboard: false });
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(loadingModal);
         
         try {
             // Show progress spinner
@@ -4585,7 +4588,6 @@ async function showSelectDialog() {
                 const error = await filterResponse.json();
                 showWarningModal(error.error);
                 bsLoadingModal.hide();
-                loadingModal.remove();
                 return;
             }
             
@@ -4604,7 +4606,6 @@ async function showSelectDialog() {
                 const emptyMessage = i18nStrings.messages.empty_filter_result;
                 showWarningModal(emptyMessage);
                 bsLoadingModal.hide();
-                loadingModal.remove();
                 modal.hide();
                 window.navigateInternal('/');
                 return;
@@ -4618,7 +4619,6 @@ async function showSelectDialog() {
             });
             
             bsLoadingModal.hide();
-            loadingModal.remove();
             
             if (!replaceResponse.ok) {
                 const error = await replaceResponse.json();
@@ -4656,23 +4656,19 @@ async function showSelectDialog() {
             
         } catch (error) {
             bsLoadingModal.hide();
-            loadingModal.remove();
             modal.hide();
             showWarningModal(error.message);
         }
     }
 
-    // Handle ESC key
-    modalEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            modal.hide();
-        }
-    });
+    // Decision #033: setupModalKeyboard for Enter key → OK button
+    setupModalKeyboard(modalEl, btnOk);
 
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        clearMenuHighlights();
-        modalEl.remove();
-    });
+    // clearMenuHighlights when modal closes
+    modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+
+    // Decision #033: setupModalCleanup for DOM cleanup
+    setupModalCleanup(modalEl);
 }
 
 // Create new file
@@ -5142,14 +5138,6 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             passwordIcon.className = type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
         });
         
-        // Handle Enter key in password field
-        passwordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('btn-upload-file').click();
-            }
-        });
-        
         // Load startup file settings (Local Mode only)        
         // Setup startup file UI (Local Mode only)
         if (startupFilePath) {
@@ -5205,9 +5193,8 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
 
         const uploadMode = document.querySelector('input[name="upload_mode"]:checked').value;
         
-        // CLOSE upload modal FIRST
+        // CLOSE upload modal FIRST (setupModalCleanup handles DOM removal)
         modal.hide();
-        setTimeout(() => modalEl.remove(), 300);
         
         // Show single spinner for entire operation (reading + uploading)
         const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);
@@ -5321,6 +5308,12 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
     });
     
     modal.show();
+
+    // Decision #033: setupModalKeyboard for Enter key → Upload button
+    setupModalKeyboard(modalEl, document.getElementById('btn-upload-file'));
+
+    // Decision #033: setupModalCleanup for DOM cleanup
+    setupModalCleanup(modalEl);
 }
 
 // Download file from HALO server
@@ -5631,11 +5624,12 @@ async function showDownloadDialog() {
     
     // Show modal
     modal.show();
-    
-    // Cleanup on close
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        modalEl.remove();
-    });
+
+    // Decision #033: setupModalKeyboard for Enter key → OK button
+    setupModalKeyboard(modalEl, document.getElementById('btn-download-file'));
+
+    // Decision #033: setupModalCleanup for DOM cleanup
+    setupModalCleanup(modalEl);
 }
 
 function triggerFileSaveDialog(csvContent, defaultFilename, spinner = null) {
@@ -6437,7 +6431,12 @@ async function checkAutosaveRecovery() {
             }
         });
         
-        modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+        // Decision #033: setupModalKeyboard for Enter key → Restore (Yes) button
+        setupModalKeyboard(modalEl, document.getElementById('btn-restore-autosave'));
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(modalEl);
+
         modal.show();
     } catch (error) {
         // Silently ignore - autosave check is optional and may fail if feature not enabled
@@ -6512,6 +6511,10 @@ async function continueLoadFile() {
         `;
         document.body.appendChild(loadingModal);
         const bsModal = new bootstrap.Modal(loadingModal, { backdrop: 'static', keyboard: false });
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(loadingModal);
+
         bsModal.show();
         
         try {
@@ -6548,27 +6551,8 @@ async function continueLoadFile() {
             // Update file info in header
             updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
             
-            // Hide loading modal
+            // Hide loading modal (setupModalCleanup handles DOM removal)
             bsModal.hide();
-            
-            // Wait for modal to be fully hidden, then remove backdrop and modal
-            loadingModal.addEventListener('hidden.bs.modal', () => {
-                // Remove backdrop explicitly
-                const backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) {
-                    backdrop.remove();
-                }
-                loadingModal.remove();
-            }, { once: true });
-            
-            // Fallback: force removal after timeout
-            setTimeout(() => {
-                if (document.body.contains(loadingModal)) {
-                    const backdrop = document.querySelector('.modal-backdrop');
-                    if (backdrop) backdrop.remove();
-                    loadingModal.remove();
-                }
-            }, 500);
             
             // Show conversion modal if legacy format was converted
             if (uploadResult.converted) {
@@ -6582,9 +6566,6 @@ async function continueLoadFile() {
             showNotification(`<strong>✓</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
         } catch (error) {
             bsModal.hide();
-            setTimeout(() => {
-                loadingModal.remove();
-            }, 300);
             showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
         }
     });
@@ -6659,6 +6640,10 @@ async function continueMergeFile() {
         `;
         document.body.appendChild(loadingModal);
         const bsModal = new bootstrap.Modal(loadingModal, { backdrop: 'static', keyboard: false });
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(loadingModal);
+
         bsModal.show();
         
         try {
@@ -6694,16 +6679,14 @@ async function continueMergeFile() {
             // Update file info in header
             updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
             
-            // Hide loading modal
+            // Hide loading modal (setupModalCleanup handles DOM removal)
             bsModal.hide();
-            setTimeout(() => loadingModal.remove(), 300);
             
             // Show success message with count of added observations
             // (addedCount already computed above)
             showNotification(`<strong>✓</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
         } catch (error) {
             bsModal.hide();
-            setTimeout(() => loadingModal.remove(), 300);
             showNotification(`<strong>✗</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
             document.body.appendChild(errorMsg);
             setTimeout(() => errorMsg.remove(), 5000);
@@ -9532,8 +9515,8 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
-                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-site-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-site-no">${i18nStrings.common.no}</button>
+                        <button type="button" class="btn btn-danger btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>
