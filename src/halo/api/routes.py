@@ -772,9 +772,7 @@ def save_observations() -> Dict[str, Any]:
         return jsonify({'success': False, 'exists': True, 'filename': filename}), 200
     
     try:
-        
         obs_file.save_file(observations, filepath)
-        
         
         return jsonify({
             'success': True,
@@ -1418,14 +1416,12 @@ def download_file() -> Dict[str, Any]:
     Returns CSV content for client-side file save dialog.
     """
     
-    
     data = request.get_json()
     
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
     use_session = data.get('use_session', False)
     download_all = data.get('download_all', False)
-    
     
     if not observer_kk:
         return jsonify({'error': 'observer_kk_missing'}), 400
@@ -1458,21 +1454,17 @@ def download_file() -> Dict[str, Any]:
             authenticated_kk = user_kk
         
         # Load observations from database (Cloud Server)
-        
         if is_admin or download_all:
             all_observations = obs_db.load_all()
         else:
             all_observations = obs_db.load_filtered(kk=int(authenticated_kk))
-        
         
         if not all_observations:
             return jsonify({'error': 'no_observations'}), 404
         
         # Generate CSV content
         csv_buffer = io.StringIO()
-        
         ObservationCSV.write_to_buffer(all_observations, csv_buffer)
-        
         csv_content = csv_buffer.getvalue()
         
         return jsonify({
@@ -2159,7 +2151,6 @@ def upload_password() -> Dict[str, Any]:
         password = data.get('password', '')
         observer_kk = data.get('observer_kk', '')
         
-        
         # Obfuscate password before storing
         obfuscated = Settings.obfuscate(password) if password else ''
         
@@ -2171,7 +2162,6 @@ def upload_password() -> Dict[str, Any]:
         Settings.save_key(current_app.config, root_path, 'UPLOAD_PASSWORD', obfuscated)
         Settings.save_key(current_app.config, root_path, 'UPLOAD_OBSERVER_KK', str(observer_kk))
         
-        
         return jsonify({
             'success': True
         })
@@ -2180,7 +2170,6 @@ def upload_password() -> Dict[str, Any]:
         obfuscated = current_app.config.get('UPLOAD_PASSWORD', '')
         password = Settings.deobfuscate(obfuscated) if obfuscated else ''
         observer_kk = current_app.config.get('UPLOAD_OBSERVER_KK', '')
-        
         
         return jsonify({
             'password': password,
@@ -6042,6 +6031,7 @@ def analyze_observations() -> Dict[str, Any]:
                 if not param2:
                     data = _group_by_parameter(filtered_obs, param1, params, 'param1')
                 else:
+                    data, debug_info = _group_by_two_parameters(filtered_obs, param1, param2, params)
                 
                 total = len(filtered_obs)
                 
@@ -6100,6 +6090,7 @@ def analyze_observations() -> Dict[str, Any]:
                 # Data is nested dict - keep as is for cross-tabulation
                 total = sum(sum(inner.values()) for inner in data.values())
             
+            debug_info = None  # DB analysis doesn't provide debug info yet
             
         else:
             # Local Mode: Load observations and use Python filtering
@@ -6142,6 +6133,7 @@ def analyze_observations() -> Dict[str, Any]:
                 data = _group_by_parameter(filtered_obs, param1, params, 'param1')
             else:
                 # Two parameter analysis (cross-tabulation)
+                data, debug_info = _group_by_two_parameters(filtered_obs, param1, param2, params)
             
             total = len(filtered_obs)
         
@@ -6150,7 +6142,9 @@ def analyze_observations() -> Dict[str, Any]:
             'data': data,
             'total': total
         }
+        # Include SH debug info when present (Local Mode only)
         if not is_cloud_mode() and param2 and param1 and (param1 == 'SH' or param2 == 'SH'):
+            response_payload['debug'] = debug_info
 
         return jsonify(response_payload)
         
@@ -6923,6 +6917,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
     if param1_name == 'SH' or param2_name == 'SH':
         observers = current_app.config.get('OBSERVERS', [])
 
+    # Debug counters for SH and HO_HU calculations
     hohu_debug = {
         'processed': 0,
         'samples': []
@@ -7122,6 +7117,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             for v2 in val2_list:
                 groups[v1][v2] += 1
 
+    # Debug: summarize HO_HU counts before range expansion
     if (param1_name == 'HO_HU' or param2_name == 'HO_HU'):
         hohu_total = 0
         hohu_rows = []
@@ -7297,16 +7293,20 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             for combined_ee in combined_ee_list:
                 result[param1_val].pop(combined_ee, None)
 
+    # Emit debug info for SH calculations to diagnose empty tables
     if (param1_name == 'SH' or param2_name == 'SH'):
         if current_app and current_app.logger:
             current_app.logger.debug(
+                "SH debug: param1_attempts=%s param1_none=%s param2_attempts=%s param2_none=%s",
                 sh_debug['param1_attempts'],
                 sh_debug['param1_none'],
                 sh_debug['param2_attempts'],
                 sh_debug['param2_none']
             )
+        # Also print to stdout in case logger level filters debug
         try:
             print(
+                f"SH debug: param1_attempts={sh_debug['param1_attempts']} param1_none={sh_debug['param1_none']} "
                 f"param2_attempts={sh_debug['param2_attempts']} param2_none={sh_debug['param2_none']}"
             )
         except Exception:
