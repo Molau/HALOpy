@@ -187,7 +187,7 @@ window.showErrorDialog = function(message) {
         const { modalEl } = showSimpleModal({
             title: i18nStrings.common.error,
             body: `<p>${message}</p>`,
-            okType: 'danger'
+            okType: 'primary'
         });
         modalEl.addEventListener('hidden.bs.modal', () => resolve(), { once: true });
     });

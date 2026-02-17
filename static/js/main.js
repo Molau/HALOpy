@@ -5444,6 +5444,9 @@ async function showDownloadDialog() {
     const modalEl = document.getElementById('download-file-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
+    // Ensure default radio selection is applied
+    document.getElementById('scope-own').checked = true;
+    
     // Setup auth fields (Local Mode only)
     let observerKK = null;
     let password = null;
@@ -8001,7 +8004,7 @@ async function showAddObserverDialog(formData = null) {
             if (!resp.ok) {
                 // Check for specific error messages
                 const formData = observerData;
-                if (result.error && result.error.includes('already exists')) {
+                if (result.error && result.error.includes('observer_code_exists')) {
                     // Show modal error for duplicate KK
                     modal.hide();
                     modalEl.addEventListener('hidden.bs.modal', () => {
