@@ -3823,13 +3823,7 @@ async function showStartupFileDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
 
-        // Handle Enter key to submit
-        modalEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('btn-startup-ok').click();
-            }
-        });
+        setupModalKeyboard(modalEl, document.getElementById('btn-startup-ok'));
 
         document.getElementById('btn-startup-ok').addEventListener('click', async () => {
             const selectedFile = document.getElementById('startup-file-select').value;
@@ -3850,10 +3844,8 @@ async function showStartupFileDialog() {
             }
         });
 
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+        setupModalCleanup(modalEl);
     } catch (error) {
         showErrorDialog(i18nStrings.messages.error_loading_file_list + ': ' + error.message);
     }
@@ -4903,14 +4895,6 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         }
     });
     
-    // Handle Enter key in password field
-    passwordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            loginBtn.click();
-        }
-    });
-    
     // Handle login button click
     loginBtn.addEventListener('click', async () => {
         const observerKK = observerSelect.value;
@@ -4941,15 +4925,10 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         }, 300);
     });
     
-    // Clean up when modal is closed
-    document.getElementById('auth-modal').addEventListener('hidden.bs.modal', () => {
-        setTimeout(() => {
-            const modalEl = document.getElementById('auth-modal');
-            if (modalEl) modalEl.remove();
-        }, 300);
-    });
+    setupModalCleanup(document.getElementById('auth-modal'));
     
     modal.show();
+    setupModalKeyboard(document.getElementById('auth-modal'), loginBtn);
 }
 
 // Upload file to HALO server
@@ -7006,6 +6985,8 @@ async function showDatumDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
+        setupModalKeyboard(modalEl, document.getElementById('btn-datum-ok'));
+        
         // Show/hide constant month inputs based on selection
         const radioButtons = document.querySelectorAll('input[name="datum"]');
         const constantInputs = document.getElementById('constant-month-inputs');
@@ -7030,10 +7011,8 @@ async function showDatumDialog() {
             });
         });
         
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+        setupModalCleanup(modalEl);
         
     } catch (error) {}
 }
@@ -7079,6 +7058,8 @@ async function showEingabeartDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
+        setupModalKeyboard(modalEl, document.getElementById('btn-eingabeart-ok'));
+        
         document.getElementById('btn-eingabeart-ok').addEventListener('click', async () => {
             const selected = document.querySelector('input[name="eingabeart"]:checked');
             const newMode = selected ? selected.value : 'Z';
@@ -7095,10 +7076,8 @@ async function showEingabeartDialog() {
             }
         });
         
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+        setupModalCleanup(modalEl);
         
     } catch (error) {}
 }
@@ -7147,6 +7126,8 @@ async function showAusgabeartDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
         
+        setupModalKeyboard(modalEl, document.getElementById('btn-ausgabeart-ok'));
+        
         document.getElementById('btn-ausgabeart-ok').addEventListener('click', async () => {
             const selected = document.querySelector('input[name="ausgabeart"]:checked');
             const newMode = selected ? selected.value : 'P';
@@ -7163,10 +7144,8 @@ async function showAusgabeartDialog() {
             }
         });
         
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+        setupModalCleanup(modalEl);
         
     } catch (error) {}
 }
@@ -7266,6 +7245,8 @@ async function showChangePasswordDialog() {
         const modalEl = document.getElementById('change-password-modal');
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
+        
+        setupModalKeyboard(modalEl, document.getElementById('btn-change-password'));
         
         const showError = (message) => {
             const errorDiv = document.getElementById('password-error');
@@ -7409,10 +7390,8 @@ async function showChangePasswordDialog() {
             }
         });
         
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+        setupModalCleanup(modalEl);
         
     } catch (error) {}
 }
@@ -7452,7 +7431,7 @@ function showVersionDialog() {
                         ${versionText}
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-version-ok" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
                     </div>
                 </div>
             </div>
@@ -7462,10 +7441,9 @@ function showVersionDialog() {
     const modalEl = document.getElementById('version-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     modal.show();
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        clearMenuHighlights();
-        modalEl.remove();
-    });
+    setupModalKeyboard(modalEl, document.getElementById('btn-version-ok'));
+    modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+    setupModalCleanup(modalEl);
 }
 
 // Show what's new dialog
@@ -7508,7 +7486,7 @@ async function showWhatsNewDialog() {
                             ${htmlContent}
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-whatsnew-ok" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
                         </div>
                     </div>
                 </div>
@@ -7518,10 +7496,9 @@ async function showWhatsNewDialog() {
         const modalEl = document.getElementById('whatsnew-modal');
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        setupModalKeyboard(modalEl, document.getElementById('btn-whatsnew-ok'));
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+        setupModalCleanup(modalEl);
         
     } catch (error) {
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);
@@ -7572,7 +7549,7 @@ async function showHelpDialog() {
                             ${htmlContent}
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-help-ok" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
                         </div>
                     </div>
                 </div>
@@ -7582,10 +7559,9 @@ async function showHelpDialog() {
         const modalEl = document.getElementById('help-modal');
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         modal.show();
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            clearMenuHighlights();
-            modalEl.remove();
-        });
+        setupModalKeyboard(modalEl, document.getElementById('btn-help-ok'));
+        modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
+        setupModalCleanup(modalEl);
         
     } catch (error) {
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);
@@ -7619,6 +7595,8 @@ window.handleLogout = async function() {
     const modalEl = document.getElementById('logout-confirm-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
+    setupModalKeyboard(modalEl, document.getElementById('logout-confirm-yes'));
+    
     // Handle Yes button
     document.getElementById('logout-confirm-yes').addEventListener('click', async () => {
         modal.hide();
@@ -7650,10 +7628,7 @@ window.handleLogout = async function() {
         }
     });
     
-    // Cleanup modal after close
-    modalEl.addEventListener('hidden.bs.modal', () => {
-        modalEl.remove();
-    });
+    setupModalCleanup(modalEl);
     
     modal.show();
 }
