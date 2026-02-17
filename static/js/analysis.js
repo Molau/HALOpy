@@ -2766,8 +2766,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         let html = `
             <table class="table table-bordered analysis-table">
                 <thead>
-                    <tr>
-                        <th>${param1Name} \\ ${param2Name} (Σ=${total})</th>
+                    <tr class="table-primary">
+                        <th class="bg-primary text-white">${param1Name} \\ ${param2Name} (Σ=${total})</th>
         `;
         
         // Add column headers with totals
@@ -2793,7 +2793,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 colPercentage = total > 0 ? (colTotal / total * 100).toFixed(1) + '%' : '0.0%';
             }
             const colLabel = formatParamValue(param2Code, col);
-            html += `<th><strong>${colLabel}</strong><br/>Σ=${colTotal} (${colPercentage})</th>`;
+            html += `<th class="bg-primary text-white"><strong>${colLabel}</strong><br/>Σ=${colTotal} (${colPercentage})</th>`;
         });
         
         html += `
