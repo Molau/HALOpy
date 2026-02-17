@@ -848,11 +848,66 @@ async function showAddObservationDialogNumeric() {
         }
     }
 
+    // Flag to track whether keydown already handled the event (prevents double processing)
+    let keydownHandledLastEvent = false;
+
     // Queue-based keydown handler to prevent race conditions
     input.addEventListener('keydown', (ev) => {
+        // On mobile virtual keyboards, keydown often has key='Unidentified' or 'Process'
+        // In that case, skip keydown and let the 'input' event handler below process it
+        if (ev.key === 'Unidentified' || ev.key === 'Process') {
+            keydownHandledLastEvent = false;
+            return;  // Will be handled by 'input' event listener
+        }
+        keydownHandledLastEvent = true;
         // Add to queue and process sequentially
         inputQueue.push(ev);
         processInputQueue();
+    });
+    
+    // Mobile fallback: virtual keyboards may not fire usable keydown events.
+    // The 'input' event fires AFTER the value has changed, so we compare with 'eing'.
+    input.addEventListener('input', (e) => {
+        // Skip if keydown already handled this event (desktop browsers)
+        if (keydownHandledLastEvent) {
+            keydownHandledLastEvent = false;
+            // On desktop, keydown already updated 'eing' and set input.value.
+            // But the browser also applied the keystroke to input.value, so reset it.
+            input.value = eing;
+            return;
+        }
+        
+        const newVal = input.value;
+        
+        if (newVal.length > eing.length) {
+            // Characters were added - process each new character
+            const added = newVal.slice(eing.length);
+            // Reset input to current eing (we'll re-add via simulated keydown)
+            input.value = eing;
+            for (const ch of added) {
+                const syntheticEv = {
+                    key: ch,
+                    preventDefault: () => {},
+                    stopPropagation: () => {}
+                };
+                inputQueue.push(syntheticEv);
+            }
+            processInputQueue();
+        } else if (newVal.length < eing.length) {
+            // Characters were deleted - simulate backspace(s)
+            const deletedCount = eing.length - newVal.length;
+            input.value = eing;
+            for (let i = 0; i < deletedCount; i++) {
+                const syntheticEv = {
+                    key: 'Backspace',
+                    preventDefault: () => {},
+                    stopPropagation: () => {}
+                };
+                inputQueue.push(syntheticEv);
+            }
+            processInputQueue();
+        }
+        // If same length, nothing to do (could be selection change)
     });
     
     // Main keydown event handler (now called sequentially from queue)
