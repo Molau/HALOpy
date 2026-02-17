@@ -24,6 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
         window.navigateInternal('/');
     });
     
+    // Decision #034: Filter value change listeners for OK button state
+    document.getElementById('filter-select-kk').addEventListener('change', updateFilterOkState);
+    document.getElementById('filter-input-site').addEventListener('input', updateFilterOkState);
+    document.getElementById('filter-select-region').addEventListener('change', updateFilterOkState);
+    
     // Pagination event listeners
     document.getElementById('btn-first-page').addEventListener('click', () => goToPage(1));
     document.getElementById('btn-prev-page').addEventListener('click', () => goToPage(currentPage - 1));
@@ -128,6 +133,7 @@ async function showFilterDialog() {
     
     const filterTypeSelect = document.getElementById('filter-type');
     const kkSelect = document.getElementById('filter-select-kk');
+    const applyFilterBtn = document.getElementById('apply-filter');
     
     // If fixed observer is set, pre-select and disable
     if (fixedObserver) {
@@ -148,6 +154,9 @@ async function showFilterDialog() {
         kkSelect.disabled = false;
         handleFilterTypeChange();
     }
+    
+    // Decision #034: OK disabled until filter value selected (when filter type requires it)
+    updateFilterOkState();
 }
 
 /**
@@ -178,6 +187,33 @@ function handleFilterTypeChange() {
             regionSelect.style.display = 'block';
         }
     }
+    
+    // Decision #034: Update OK button state when filter type changes
+    updateFilterOkState();
+}
+
+/**
+ * Decision #034: OK disabled until filter value is selected (when filter type requires it)
+ */
+function updateFilterOkState() {
+    const filterType = document.getElementById('filter-type').value;
+    const applyFilterBtn = document.getElementById('apply-filter');
+    
+    if (filterType === 'none') {
+        applyFilterBtn.disabled = false;
+        return;
+    }
+    
+    let hasValue = false;
+    if (filterType === 'kk') {
+        hasValue = !!document.getElementById('filter-select-kk').value;
+    } else if (filterType === 'site') {
+        hasValue = !!document.getElementById('filter-input-site').value.trim();
+    } else if (filterType === 'region') {
+        hasValue = !!document.getElementById('filter-select-region').value;
+    }
+    
+    applyFilterBtn.disabled = !hasValue;
 }
 
 /**

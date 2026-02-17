@@ -7801,7 +7801,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="obs-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -7818,7 +7818,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="obs-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -7853,7 +7853,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="obs-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -7870,7 +7870,7 @@ async function showAddObserverDialog(formData = null) {
                                         <select class="form-select" id="obs-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="obs-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -8456,7 +8456,7 @@ function showEditBaseDataDialog(observer) {
     
     const modalHtml = `
         <div class="modal fade" id="edit-base-modal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
                         <h5 class="modal-title">${i18nStrings.observers.edit_base_title}</h5>
@@ -8646,7 +8646,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="site-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -8663,7 +8663,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="site-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -8698,7 +8698,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="site-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -8715,7 +8715,7 @@ async function showAddSiteDialog(observer) {
                                         <select class="form-select" id="site-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="site-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -8748,6 +8748,22 @@ async function showAddSiteDialog(observer) {
     // Decision #033: Keyboard handling + cleanup
     setupModalKeyboard(modalEl, document.getElementById('btn-add-site-ok'));
     setupModalCleanup(modalEl);
+    
+    const btnAddSiteOk = document.getElementById('btn-add-site-ok');
+    
+    // Decision #034: OK disabled until mandatory fields filled
+    const mandatorySelects = ['site-seit-month', 'site-seit-year', 'site-gh', 'site-gn'];
+    const mandatoryInputs = ['site-hb-ort', 'site-nb-ort'];
+    
+    function updateAddSiteOkState() {
+        const selectsFilled = mandatorySelects.every(id => document.getElementById(id).value);
+        const inputsFilled = mandatoryInputs.every(id => document.getElementById(id).value.trim());
+        btnAddSiteOk.disabled = !(selectsFilled && inputsFilled);
+    }
+    
+    mandatorySelects.forEach(id => document.getElementById(id).addEventListener('change', updateAddSiteOkState));
+    mandatoryInputs.forEach(id => document.getElementById(id).addEventListener('input', updateAddSiteOkState));
+    btnAddSiteOk.disabled = true;
     
     // Handle save
     document.getElementById('btn-add-site-ok').addEventListener('click', async () => {
@@ -8931,7 +8947,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-hlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="confirm-edit-site-hlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8948,7 +8964,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-hbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="confirm-edit-site-hbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -8983,7 +8999,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-nlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="confirm-edit-site-nlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -9000,7 +9016,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="confirm-edit-site-nbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="confirm-edit-site-nbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -9168,7 +9184,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-hlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="edit-site-hlm" required>
                                             ${minOptions}
                                         </select>
@@ -9185,7 +9201,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-hbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="edit-site-hbm" required>
                                             ${minOptions}
                                         </select>
@@ -9220,7 +9236,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-nlg" required>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="edit-site-nlm" required>
                                             ${minOptions}
                                         </select>
@@ -9237,7 +9253,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                                         <select class="form-select" id="edit-site-nbg" required>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="edit-site-nbm" required>
                                             ${minOptions}
                                         </select>
@@ -9491,7 +9507,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-hlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="delete-site-hlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -9508,7 +9524,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-hbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="delete-site-hbm" disabled>
                                             ${minOptions}
                                         </select>
@@ -9543,7 +9559,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-nlg" disabled>
                                             ${lonDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="delete-site-nlm" disabled>
                                             ${minOptions}
                                         </select>
@@ -9560,7 +9576,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                                         <select class="form-select" id="delete-site-nbg" disabled>
                                             ${latDegOptions}
                                         </select>
-                                        <span class="input-group-text">?</span>
+                                        <span class="input-group-text">°</span>
                                         <select class="form-select" id="delete-site-nbm" disabled>
                                             ${minOptions}
                                         </select>
