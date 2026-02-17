@@ -1983,6 +1983,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const okBtn3d = chartModal.querySelector('.modal-footer .btn-primary');
         setupModalKeyboard(chartModal, okBtn3d);
 
+        // Stop ESC from propagating to parent/result modal
+        chartModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') e.stopPropagation();
+        });
+
         // Clean up Plotly when modal closes
         chartModal.addEventListener('hidden.bs.modal', () => {
             Plotly.purge('plotly3DChart');
@@ -2056,6 +2061,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Decision #033: setupModalKeyboard for Enter key → OK button (data-bs-dismiss)
         const okBtn2d = chartModal.querySelector('.modal-footer .btn-primary');
         setupModalKeyboard(chartModal, okBtn2d);
+
+        // Stop ESC from propagating to parent/result modal
+        chartModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') e.stopPropagation();
+        });
 
         // Decision #033: setupModalCleanup for DOM cleanup
         setupModalCleanup(chartModal);
