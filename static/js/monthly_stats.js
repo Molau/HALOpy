@@ -51,10 +51,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         }, { once: true });
         
         modal.show();
+
+        // Decision #033: setupModalKeyboard for Enter key (OK has data-bs-dismiss)
+        const okBtn = modalEl.querySelector('.modal-footer .btn-primary');
+        setupModalKeyboard(modalEl, okBtn);
+
+        // Navigate home when modal closes
         modalEl.addEventListener('hidden.bs.modal', () => {
-            modalEl.remove();
             window.navigateInternal('/');
-        });
+        }, { once: true });
+
+        // Decision #033: setupModalCleanup for DOM cleanup
+        setupModalCleanup(modalEl);
     }
 
     // Placeholder is already set in HTML template via Jinja2
@@ -271,14 +279,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         statsContent.innerHTML = html;
         
         // Show results modal
-        const resultsModal = new bootstrap.Modal(document.getElementById('results-modal'), {
-            backdrop: 'static',
-            keyboard: false
+        const resultsModalEl = document.getElementById('results-modal');
+        const resultsModal = new bootstrap.Modal(resultsModalEl, {
+            backdrop: 'static'
         });
         resultsModal.show();
         
         // Wire up action buttons
-        setupActionButtons();
+        setupActionButtons(resultsModalEl);
     }
     
     // Render observer overview table
@@ -593,30 +601,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         btnApply.addEventListener('click', applyFilter);
     }
     
-    // Enter key support
-    monthSelect.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            applyFilter();
-        }
-    });
-
-    yearSelect.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            applyFilter();
-        }
-    });
-    
-    // Enter key support when filter dialog is visible
-    const filterEnterKeyHandler = (e) => {
-        if (e.key === 'Enter' && filterDialog.classList.contains('show')) {
-            e.preventDefault();
-            applyFilter();
-        }
-    };
-    
-    // ESC key support - close monthly statistics and return to main
+    // ESC key support - close monthly statistics and return to main (page-level)
     const escKeyHandler = (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
@@ -624,41 +609,38 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     };
     
-    // Remove any existing handlers first to avoid duplicates
-    document.removeEventListener('keypress', filterEnterKeyHandler);
-    document.addEventListener('keypress', filterEnterKeyHandler);
     document.removeEventListener('keydown', escKeyHandler);
     document.addEventListener('keydown', escKeyHandler);
     
     // Setup action button handlers
-    function setupActionButtons() {
+    function setupActionButtons(resultsModalEl) {
         const btnStatsOk = document.getElementById('btn-stats-ok');
         const btnStatsPrint = document.getElementById('btn-stats-print');
         const btnStatsSave = document.getElementById('btn-stats-save');
-        const resultsModal = document.getElementById('results-modal');
+        if (!resultsModalEl) resultsModalEl = document.getElementById('results-modal');
         
-        // OK button - close modal and return to main
+        // OK button - close modal (hidden.bs.modal handler navigates home)
         if (btnStatsOk) {
             btnStatsOk.onclick = () => {
-                const modal = bootstrap.Modal.getInstance(resultsModal);
+                const modal = bootstrap.Modal.getInstance(resultsModalEl);
                 if (modal) modal.hide();
-                window.navigateInternal('/');
             };
         }
         
-        // Enter key support when modal is visible
-        const enterKeyHandler = (e) => {
-            if (e.key === 'Enter' && resultsModal.classList.contains('show')) {
-                e.preventDefault();
-                const modal = bootstrap.Modal.getInstance(resultsModal);
-                if (modal) modal.hide();
-                window.navigateInternal('/');
-            }
-        };
-        
-        // Remove any existing handler first to avoid duplicates
-        document.removeEventListener('keypress', enterKeyHandler);
-        document.addEventListener('keypress', enterKeyHandler);
+        // Decision #033: setupModalKeyboard for Enter key → OK button
+        setupModalKeyboard(resultsModalEl, btnStatsOk);
+
+        // Stop ESC from propagating to page-level handler
+        resultsModalEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') e.stopPropagation();
+        });
+
+        // Navigate home when result modal is closed (ESC, OK, or X button)
+        // Check e.target to avoid reacting to child modal (chart) close events bubbling up
+        resultsModalEl.addEventListener('hidden.bs.modal', (e) => {
+            if (e.target !== resultsModalEl) return;
+            window.navigateInternal('/');
+        });
         
         // Print button
         if (btnStatsPrint) {
@@ -847,11 +829,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Store data for print/save buttons
         window.chartData = data;
         
+        // Decision #033: setupModalKeyboard for Enter key → OK button (data-bs-dismiss)
+        const okBtnLine = document.getElementById('btn-chart-close-line');
+        setupModalKeyboard(chartModalElement, okBtnLine);
+
         // Prevent ESC key from closing parent modal
         chartModalElement.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-            }
+            if (e.key === 'Escape') e.stopPropagation();
         });
         
         chartModal.show();
@@ -967,11 +951,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Store data for print/save buttons
         window.chartData = data;
         
+        // Decision #033: setupModalKeyboard for Enter key → OK button (data-bs-dismiss)
+        const okBtnBar = document.getElementById('btn-chart-close-bar');
+        setupModalKeyboard(chartModalElement, okBtnBar);
+
         // Prevent ESC key from closing parent modal
         chartModalElement.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-            }
+            if (e.key === 'Escape') e.stopPropagation();
         });
         
         chartModal.show();
@@ -1320,11 +1306,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Show filter dialog automatically with explicit backdrop configuration
             const modal = new bootstrap.Modal(filterDialog, {
-                backdrop: 'static',
-                keyboard: false
+                backdrop: 'static'
             });
             modal.show();
             
+            // Decision #033: setupModalKeyboard for Enter key → Apply button
+            setupModalKeyboard(filterDialog, btnApply);
+
             // Focus month select when modal is shown
             filterDialog.addEventListener('shown.bs.modal', () => {
                 if (monthSelect) {
