@@ -6117,6 +6117,9 @@ async function showObserverDownloadDialog() {
     const modalEl = document.getElementById('download-observer-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
+    // Ensure default radio selection is applied
+    document.getElementById('scope-observer-own').checked = true;
+    
     // Setup auth fields (Local Mode only)
     let observerKK = null;
     let password = null;
