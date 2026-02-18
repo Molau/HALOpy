@@ -16,8 +16,7 @@ try:
 except ImportError:
     psycopg2 = None  # type: ignore
 
-from typing import List, Optional, Tuple
-from halo.models.types import Observation
+from typing import Dict, List, Optional, Tuple
 from halo.models.constants import YEAR_CUTOFF
 from halo.io.db_connection import get_connection
 
@@ -42,112 +41,140 @@ ZEITZONE = [
 # Helper Functions: Python ↔ PostgreSQL Mapping
 # ========================================
 
-def _observation_to_tuple(obs: Observation) -> Tuple:
+def _observation_to_tuple(obs: Dict[str, str]) -> Tuple:
     """
-    Convert Observation object to tuple for SQL INSERT/UPDATE.
+    Convert observation dict to tuple for SQL INSERT/UPDATE.
     
-    No mapping needed - DB column names match Python field names exactly.
     HO/HU fields → pillar column ("8HHHH" format)
     
     Args:
-        obs: Observation object
+        obs: Observation dict
         
     Returns:
         Tuple of 23 values matching PostgreSQL column order:
         KK, O, JJ, MM, TT, g, ZS, ZM, d, DD, N, C, c, EE, H, F, V, f, zz, GG, pillar, sectors, remarks
     """
+    # Helper to safely convert to int, returning None for empty
+    def to_int_or_none(val):
+        if val is None or val == '' or val == '/' or val == '//':
+            return None
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return None
+    
     # Format pillar field: "8HHHH" where HH=HO, HH=HU
-    pillar = f"8{obs.HO:02d}{obs.HU:02d}" if obs.HO > 0 or obs.HU > 0 else ""
+    ho = obs.get('HO', '')
+    hu = obs.get('HU', '')
+    ho_int = to_int_or_none(ho)
+    hu_int = to_int_or_none(hu)
+    if ho_int is not None and ho_int > 0 or hu_int is not None and hu_int > 0:
+        pillar = f"8{(ho_int or 0):02d}{(hu_int or 0):02d}"
+    else:
+        pillar = ""
     
     return (
-        obs.KK, obs.O, obs.JJ, obs.MM, obs.TT, obs.g,
-        obs.ZS, obs.ZM, obs.d, obs.DD, obs.N, obs.C, obs.c,
-        obs.EE, obs.H, obs.F, obs.V, obs.f, obs.zz, obs.GG,
-        pillar, obs.sectors, obs.remarks
+        to_int_or_none(obs.get('KK', '')),
+        to_int_or_none(obs.get('O', '')),
+        to_int_or_none(obs.get('JJ', '')),
+        to_int_or_none(obs.get('MM', '')),
+        to_int_or_none(obs.get('TT', '')),
+        to_int_or_none(obs.get('g', '')),
+        to_int_or_none(obs.get('ZS', '')),
+        to_int_or_none(obs.get('ZM', '')),
+        to_int_or_none(obs.get('d', '')),
+        to_int_or_none(obs.get('DD', '')),
+        to_int_or_none(obs.get('N', '')),
+        to_int_or_none(obs.get('C', '')),
+        to_int_or_none(obs.get('c', '')),
+        to_int_or_none(obs.get('EE', '')),
+        to_int_or_none(obs.get('H', '')),
+        to_int_or_none(obs.get('F', '')),
+        to_int_or_none(obs.get('V', '')),
+        to_int_or_none(obs.get('f', '')),
+        to_int_or_none(obs.get('zz', '')),
+        to_int_or_none(obs.get('GG', '')),
+        pillar,
+        obs.get('sectors', ''),
+        obs.get('remarks', '')
     )
 
 
-def _tuple_to_observation(row: Tuple) -> Observation:
+def _tuple_to_observation(row: Tuple) -> Dict[str, str]:
     """
-    Convert PostgreSQL row to Observation object.
+    Convert PostgreSQL row to observation dict.
     
-    No mapping needed - DB column names match Python field names exactly.
-    PostgreSQL NULL → Python -1 (not observed)
+    PostgreSQL NULL → empty string ''
     pillar column → HO/HU fields (parse "8HHHH")
     
     Args:
         row: Database row tuple (23 values)
         
     Returns:
-        Observation object
+        Observation dict with string values
     """
-    # Helper to convert NULL to -1 for OPTIONAL fields
-    # NOT NULL fields: KK, O, JJ, MM, TT, g, EE, GG (always have values)
-    # Optional fields with DEFAULT -1: ZS, ZM, d, DD, N, C, c, H, F, V, f, zz
-    def null_to_minus1(value):
-        return value if value is not None else -1
+    # Helper to convert SQL value to string; NULL → ''
+    def to_str(value):
+        if value is None:
+            return ''
+        return str(value)
     
     # Parse pillar field: "8HHHH" → HO, HU
-    # Special values: "//" or NULL = not observed (stored as -1 in Python)
+    # Special values: "//" or NULL = not observed (stored as '' in Dict)
     pillar = row[20] or ""
     if not pillar or pillar == "//":
-        HO = -1
-        HU = -1
+        HO = ''
+        HU = ''
     elif len(pillar) >= 3 and pillar[1:3].isdigit():
-        HO = int(pillar[1:3])
-        HU = int(pillar[3:5]) if len(pillar) >= 5 and pillar[3:5].isdigit() else 0
+        HO = pillar[1:3].lstrip('0') or '0'
+        HU = pillar[3:5].lstrip('0') or '0' if len(pillar) >= 5 and pillar[3:5].isdigit() else '0'
     else:
-        HO = -1
-        HU = -1
+        HO = ''
+        HU = ''
     
     # SQL SELECT order: KK, O, JJ, MM, TT, g, ZS, ZM, d, DD, N, C, c, EE, H, F, V, f, zz, GG, pillar, sectors, remarks
     # Index mapping:    0   1  2   3   4   5  6   7   8  9   10  11 12 13  14 15 16 17 18  19  20      21       22
-    # DB columns now match Python fields exactly (with quotes in SQL)
     
-    return Observation(
-        # NOT NULL fields - use directly (never NULL in database)
-        KK=row[0], 
-        O=row[1], 
-        JJ=row[2], 
-        MM=row[3], 
-        TT=row[4], 
-        g=row[5],
-        EE=row[13],
-        GG=row[19],
-        
-        # Optional fields - convert NULL to -1
-        ZS=null_to_minus1(row[6]), 
-        ZM=null_to_minus1(row[7]), 
-        d=null_to_minus1(row[8]), 
-        DD=null_to_minus1(row[9]), 
-        N=null_to_minus1(row[10]), 
-        C=null_to_minus1(row[11]),
-        c=null_to_minus1(row[12]),
-        H=null_to_minus1(row[14]), 
-        F=null_to_minus1(row[15]),
-        V=null_to_minus1(row[16]), 
-        f=null_to_minus1(row[17]),
-        zz=null_to_minus1(row[18]), 
-        
-        # Pillar and text fields
-        HO=HO, HU=HU, 
-        sectors=row[21] or "", 
-        remarks=row[22] or ""
-    )
+    return {
+        'KK': to_str(row[0]),
+        'O': to_str(row[1]),
+        'JJ': to_str(row[2]),
+        'MM': to_str(row[3]),
+        'TT': to_str(row[4]),
+        'g': to_str(row[5]),
+        'ZS': to_str(row[6]),
+        'ZM': to_str(row[7]),
+        'd': to_str(row[8]),
+        'DD': to_str(row[9]),
+        'N': to_str(row[10]),
+        'C': to_str(row[11]),
+        'c': to_str(row[12]),
+        'EE': to_str(row[13]),
+        'H': to_str(row[14]),
+        'F': to_str(row[15]),
+        'V': to_str(row[16]),
+        'f': to_str(row[17]),
+        'zz': to_str(row[18]),
+        'GG': to_str(row[19]),
+        'HO': HO,
+        'HU': HU,
+        'sectors': row[21] or '',
+        'remarks': row[22] or ''
+    }
 
 
 # ========================================
 # READ Operations
 # ========================================
 
-def load_all() -> List[Observation]:
+def load_all() -> List[Dict[str, str]]:
     """
     Load all observations from database, sorted by HALO standard.
     
     Sort order: jj → mm → tt → zs → zm → kk → ee → gg
     
     Returns:
-        List of Observation objects, sorted
+        List of observation dicts, sorted
         
     Example:
         >>> observations = load_all()
@@ -172,7 +199,7 @@ def load_all() -> List[Observation]:
             return observations
 
 
-def load_filtered(**filters) -> List[Observation]:
+def load_filtered(**filters) -> List[Dict[str, str]]:
     """
     Load observations with filters (any HALO Key field).
     
@@ -184,7 +211,7 @@ def load_filtered(**filters) -> List[Observation]:
         **filters: Field name → value or (min, max) tuple
         
     Returns:
-        List of Observation objects matching filters, sorted
+        List of observation dicts matching filters, sorted
         
     Examples:
         >>> # Observer 44, year 2025
@@ -269,19 +296,19 @@ def count() -> int:
 # WRITE Operations
 # ========================================
 
-def save_one(obs: Observation) -> bool:
+def save_one(obs: Dict[str, str]) -> bool:
     """
     Insert new observation (fails on duplicate key).
     
     Args:
-        obs: Observation to insert
+        obs: Observation dict to insert
         
     Returns:
         True if inserted successfully
         False if duplicate key (kk, o, jj, mm, tt, g, zs, zm, ee, gg)
         
     Example:
-        >>> obs = Observation(KK=44, O=1, JJ=25, MM=12, TT=31, ...)
+        >>> obs = {'KK': '44', 'O': '1', 'JJ': '25', 'MM': '12', 'TT': '31', ...}
         >>> if save_one(obs):
         ...     print("Observation saved")
         ... else:
@@ -315,13 +342,13 @@ def save_one(obs: Observation) -> bool:
             return False
 
 
-def update_one(key: Tuple, obs: Observation) -> bool:
+def update_one(key: Tuple, obs: Dict[str, str]) -> bool:
     """
     Update existing observation (proper SQL UPDATE).
     
     Args:
         key: 7-tuple (KK, O, JJ, MM, TT, EE, GG)
-        obs: Updated observation
+        obs: Updated observation dict
         
     Returns:
         True if updated (1 row affected)
@@ -329,7 +356,7 @@ def update_one(key: Tuple, obs: Observation) -> bool:
         
     Example:
         >>> key = (44, 1, 25, 12, 31, 22, 26)
-        >>> obs = Observation(KK=44, O=1, JJ=25, MM=12, TT=31, EE=22, GG=26, ...)
+        >>> obs = {'KK': '44', 'O': '1', 'JJ': '25', 'MM': '12', 'TT': '31', 'EE': '22', 'GG': '26', ...}
         >>> if update_one(key, obs):
         ...     print("Observation updated")
         ... else:
@@ -408,7 +435,7 @@ def delete_all_for_observer(kk: str) -> int:
             return affected_rows
 
 
-def save_many(observations: List[Observation]) -> int:
+def save_many(observations: List[Dict[str, str]]) -> int:
     """
     Bulk insert observations with transaction (skips duplicates).
     

@@ -25,7 +25,6 @@ import time
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-from halo.models.types import Observation
 from halo.io import observations_file as file_ops
 
 
@@ -51,38 +50,35 @@ def cleanup_test_dir():
 
 def create_test_observation(kk=44, o=1, jj=25, mm=1, tt=15, ee=22, gg=10):
     """
-    Create a test observation with given key fields.
+    Create a test observation dict with given key fields.
     Identical to test_observations_layer2.py for consistency.
     """
-    obs = Observation()
-    obs.vers = 25
-    obs.KK = kk
-    obs.O = o
-    obs.JJ = jj
-    obs.MM = mm
-    obs.TT = tt
-    obs.g = 1
-    obs.ZS = 12
-    obs.ZM = 30
-    obs.d = -1
-    obs.DD = -1
-    obs.N = -1
-    obs.C = -1
-    obs.c = -1
-    obs.EE = ee
-    obs.H = 5
-    obs.F = 3
-    obs.V = 1
-    obs.f = -1
-    obs.zz = -1
-    obs.GG = gg
-    obs.HO = -1
-    obs.HU = -1
-    obs.sectors = ""
-    obs.remarks = "Test observation"
-    obs.VName = "Test"
-    obs.NName = "User"
-    return obs
+    return {
+        'KK': str(kk),
+        'O': str(o),
+        'JJ': str(jj),
+        'MM': str(mm),
+        'TT': str(tt),
+        'g': '1',
+        'ZS': '12',
+        'ZM': '30',
+        'd': '',
+        'DD': '',
+        'N': '',
+        'C': '',
+        'c': '',
+        'EE': str(ee),
+        'H': '5',
+        'F': '3',
+        'V': '1',
+        'f': '',
+        'zz': '',
+        'GG': str(gg),
+        'HO': '',
+        'HU': '',
+        'sectors': '',
+        'remarks': 'Test observation',
+    }
 
 
 # ============================================================================
@@ -138,9 +134,9 @@ def test_open_and_save_file():
     print(f"✓ open_file() loaded {len(loaded_obs)} observations")
     
     # Verify data integrity
-    assert loaded_obs[0].KK == 44, "First observation should be KK=44"
-    assert loaded_obs[1].KK == 45, "Second observation should be KK=45"
-    assert loaded_obs[2].KK == 46, "Third observation should be KK=46"
+    assert loaded_obs[0]['KK'] == '44', "First observation should be KK=44"
+    assert loaded_obs[1]['KK'] == '45', "Second observation should be KK=45"
+    assert loaded_obs[2]['KK'] == '46', "Third observation should be KK=46"
     print(f"✓ Data integrity verified (KK: 44, 45, 46)")
     
     # Cleanup

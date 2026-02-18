@@ -52,6 +52,9 @@ from .observations_file import (
     delete_temp_file
 )
 
+# Observation field definitions (Layer 4 - CSV handler)
+from .csv_handler import OBSERVATION_FIELDS, OBSERVATION_CSV_FIELDS
+
 # Layer 3b (Database Storage) - import entire modules
 from . import observations_db
 from . import observers_db
@@ -67,6 +70,9 @@ __all__ = [
     'delete_observer_record',
     # Observer Layer 3a (File Storage)
     'OBSERVER_FIELDS',
+    # Observation field definitions
+    'OBSERVATION_FIELDS',
+    'OBSERVATION_CSV_FIELDS',
     'get_observers_path',
     'get_observers_backup_path',
     'observer_file_exists',

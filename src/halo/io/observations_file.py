@@ -31,12 +31,11 @@ Usage Example:
 """
 
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 import os
 import time
 from datetime import datetime, timedelta
 
-from halo.models.types import Observation
 from halo.io.csv_handler import ObservationCSV
 
 
@@ -156,7 +155,7 @@ def new_file(filename: str, base_dir: Optional[Path] = None) -> Path:
     return filepath
 
 
-def open_file(filename: str, base_dir: Optional[Path] = None) -> Tuple[List[Observation], Path]:
+def open_file(filename: str, base_dir: Optional[Path] = None) -> Tuple[List[Dict[str, str]], Path]:
     """
     Open observation file and read all observations.
     
@@ -185,12 +184,12 @@ def open_file(filename: str, base_dir: Optional[Path] = None) -> Tuple[List[Obse
     return observations, filepath
 
 
-def save_file(observations: List[Observation], filepath: Path) -> None:
+def save_file(observations: List[Dict[str, str]], filepath: Path) -> None:
     """
     Save observations to file (overwrite).
     
     Args:
-        observations: List of observations to save
+        observations: List of observation dicts to save
         filepath: Absolute path to file
         
     Raises:
@@ -318,12 +317,12 @@ def list_files(base_dir: Optional[Path] = None,
 # Temp & Backup Operations
 # ============================================================================
 
-def create_temp_backup(observations: List[Observation], base_filename: str) -> Path:
+def create_temp_backup(observations: List[Dict[str, str]], base_filename: str) -> Path:
     """
     Create temporary backup file (*.$$$ extension).
     
     Args:
-        observations: Observations to backup
+        observations: Observation dicts to backup
         base_filename: Base filename (e.g., "observations.csv")
         
     Returns:
@@ -344,7 +343,7 @@ def create_temp_backup(observations: List[Observation], base_filename: str) -> P
     return temp_path
 
 
-def restore_from_temp(base_filename: str) -> Optional[List[Observation]]:
+def restore_from_temp(base_filename: str) -> Optional[List[Dict[str, str]]]:
     """
     Restore observations from temp file (*.$$$ extension).
     
@@ -428,7 +427,7 @@ def delete_temp_file(base_filename: str) -> bool:
 # Import/Export Operations (for Cloud Upload/Download)
 # ============================================================================
 
-def import_observations_from_csv(file_stream) -> List[Observation]:
+def import_observations_from_csv(file_stream) -> List[Dict[str, str]]:
     """
     Import observations from uploaded CSV file stream.
     
@@ -436,7 +435,7 @@ def import_observations_from_csv(file_stream) -> List[Observation]:
         file_stream: File-like object from HTTP upload (e.g., request.files['file'])
         
     Returns:
-        List of Observation objects
+        List of observation dicts
         
     Example:
         >>> observations = import_observations_from_csv(request.files['file'])
@@ -447,12 +446,12 @@ def import_observations_from_csv(file_stream) -> List[Observation]:
     return ObservationCSV.read_observations_from_stream(file_stream)
 
 
-def export_observations_to_csv(observations: List[Observation], buffer) -> None:
+def export_observations_to_csv(observations: List[Dict[str, str]], buffer) -> None:
     """
     Export observations to CSV buffer for file download.
     
     Args:
-        observations: List of Observation objects to export
+        observations: List of observation dicts to export
         buffer: StringIO buffer to write CSV content to
         
     Example:

@@ -26,7 +26,6 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-from halo.models.types import Observation
 from halo.io.observations import (
     # Key management
     make_observation_key,
@@ -63,7 +62,7 @@ from halo.io.observations import (
 
 def create_test_observation(kk=44, o=1, jj=25, mm=1, tt=15, ee=22, gg=10):
     """
-    Create a test observation with given key fields.
+    Create a test observation dict with given key fields.
     
     This is the standard test data factory used across all Layer 2 tests.
     Default values create a valid observation for observer KK=44.
@@ -78,37 +77,34 @@ def create_test_observation(kk=44, o=1, jj=25, mm=1, tt=15, ee=22, gg=10):
         gg: Time in hours (0-23)
     
     Returns:
-        Observation with specified key fields and valid default values
+        Dict[str, str] with specified key fields and valid default values
     """
-    obs = Observation()
-    obs.vers = 25
-    obs.KK = kk
-    obs.O = o
-    obs.JJ = jj
-    obs.MM = mm
-    obs.TT = tt
-    obs.g = 1  # Morning
-    obs.ZS = 12
-    obs.ZM = 30
-    obs.d = -1  # Not observed
-    obs.DD = -1
-    obs.N = -1
-    obs.C = -1
-    obs.c = -1
-    obs.EE = ee
-    obs.H = 5
-    obs.F = 3
-    obs.V = 1  # Incomplete halo
-    obs.f = -1
-    obs.zz = -1
-    obs.GG = gg
-    obs.HO = -1
-    obs.HU = -1
-    obs.sectors = ""
-    obs.remarks = "Test observation"
-    obs.VName = "Test"
-    obs.NName = "User"
-    return obs
+    return {
+        'KK': str(kk),
+        'O': str(o),
+        'JJ': str(jj),
+        'MM': str(mm),
+        'TT': str(tt),
+        'g': '1',       # Morning
+        'ZS': '12',
+        'ZM': '30',
+        'd': '',         # Not observed
+        'DD': '',
+        'N': '',
+        'C': '',
+        'c': '',
+        'EE': str(ee),
+        'H': '5',
+        'F': '3',
+        'V': '1',       # Incomplete halo
+        'f': '',
+        'zz': '',
+        'GG': str(gg),
+        'HO': '',
+        'HU': '',
+        'sectors': '',
+        'remarks': 'Test observation',
+    }
 
 
 # ============================================================================
@@ -149,8 +145,8 @@ def test_find_operations():
     found = find_observation(collection, key)
     
     assert found is not None, "find_observation() should find existing observation"
-    assert found.KK == 45, f"Expected KK=45, got {found.KK}"
-    print(f"✓ find_observation() found KK={found.KK}")
+    assert found['KK'] == '45', f"Expected KK='45', got {found['KK']}"
+    print(f"✓ find_observation() found KK={found['KK']}")
     
     # Find by index
     idx = find_observation_index(collection, key)
@@ -208,20 +204,20 @@ def test_update_observation():
     print("\n=== Test: Update Observation ===")
     
     obs1 = create_test_observation(kk=44)
-    obs1.remarks = "Original"
+    obs1['remarks'] = "Original"
     collection = [obs1]
     
     key = make_observation_key(obs1)
     
     # Update observation
     updated = create_test_observation(kk=44)
-    updated.remarks = "Updated"
+    updated['remarks'] = "Updated"
     
     success, collection = update_observation(key, updated, collection)
     
     assert success == True, "update_observation() should succeed for existing key"
-    assert collection[0].remarks == "Updated", f"Expected 'Updated', got '{collection[0].remarks}'"
-    print(f"✓ update_observation() success -> remarks='{collection[0].remarks}'")
+    assert collection[0]['remarks'] == "Updated", f"Expected 'Updated', got '{collection[0]['remarks']}'"
+    print(f"✓ update_observation() success -> remarks='{collection[0]['remarks']}'")
     
     # Try to update non-existent observation
     wrong_key = (99, 1, 25, 1, 15, 22, 10)
@@ -247,8 +243,8 @@ def test_delete_observation():
     
     assert success == True, "delete_observation() should succeed for existing key"
     assert len(collection) == 2, f"Expected 2 observations, got {len(collection)}"
-    assert collection[0].KK == 44, f"First observation should be KK=44, got {collection[0].KK}"
-    assert collection[1].KK == 46, f"Second observation should be KK=46, got {collection[1].KK}"
+    assert collection[0]['KK'] == '44', f"First observation should be KK=44, got {collection[0]['KK']}"
+    assert collection[1]['KK'] == '46', f"Second observation should be KK=46, got {collection[1]['KK']}"
     print(f"✓ delete_observation() success -> {len(collection)} observations remaining")
     
     # Try to delete non-existent observation
@@ -280,14 +276,14 @@ def test_sort_observations():
     
     # HALO sort order: J → M → T → ZS → ZM → K → E → GG
     # Expected: 2024-12-01, 2025-01-01 (08:00), 2025-01-01 (12:00), 2025-03-15
-    assert sorted_col[0].JJ == 24 and sorted_col[0].MM == 12, "First should be 2024-12"
-    assert sorted_col[1].JJ == 25 and sorted_col[1].MM == 1 and sorted_col[1].GG == 8, "Second should be 2025-01 08:00"
-    assert sorted_col[2].JJ == 25 and sorted_col[2].MM == 1 and sorted_col[2].GG == 12, "Third should be 2025-01 12:00"
-    assert sorted_col[3].JJ == 25 and sorted_col[3].MM == 3, "Fourth should be 2025-03"
+    assert sorted_col[0]['JJ'] == '24' and sorted_col[0]['MM'] == '12', "First should be 2024-12"
+    assert sorted_col[1]['JJ'] == '25' and sorted_col[1]['MM'] == '1' and sorted_col[1]['GG'] == '8', "Second should be 2025-01 08:00"
+    assert sorted_col[2]['JJ'] == '25' and sorted_col[2]['MM'] == '1' and sorted_col[2]['GG'] == '12', "Third should be 2025-01 12:00"
+    assert sorted_col[3]['JJ'] == '25' and sorted_col[3]['MM'] == '3', "Fourth should be 2025-03"
     
     print(f"✓ sort_observations() sorted correctly by HALO standard")
     for i, obs in enumerate(sorted_col):
-        print(f"  {i+1}. 20{obs.JJ}-{obs.MM:02d}-{obs.TT:02d} {obs.GG:02d}:00 EE={obs.EE}")
+        print(f"  {i+1}. 20{obs['JJ']}-{int(obs['MM']):02d}-{int(obs['TT']):02d} {int(obs['GG']):02d}:00 EE={obs['EE']}")
 
 
 def test_merge_observations():
@@ -345,8 +341,8 @@ def test_duplicates():
     
     assert removed == 2, f"Expected 2 removed, got {removed}"
     assert len(unique) == 2, f"Expected 2 unique, got {len(unique)}"
-    assert unique[0].KK == 44, "First unique should be KK=44"
-    assert unique[1].KK == 45, "Second unique should be KK=45"
+    assert unique[0]['KK'] == '44', "First unique should be KK=44"
+    assert unique[1]['KK'] == '45', "Second unique should be KK=45"
     print(f"✓ remove_duplicates(keep='first') removed {removed}, {len(unique)} unique remaining")
     
     # Remove duplicates (keep last)
@@ -403,7 +399,7 @@ def test_filter_observations():
     print(f"✓ filter by month=1 -> {len(filtered)} observations")
     
     # Custom filter function
-    filtered = filter_observations(collection, custom_filter=lambda obs: obs.H >= 5)
+    filtered = filter_observations(collection, custom_filter=lambda obs: int(obs.get('H', '0') or '0') >= 5)
     assert len(filtered) == 4, f"Expected 4 observations with H >= 5, got {len(filtered)}"
     print(f"✓ filter by custom_filter (H >= 5) -> {len(filtered)} observations")
 
@@ -453,31 +449,28 @@ def test_format_conversion():
     
     # Create legacy observation
     legacy = create_test_observation()
-    legacy.vers = 20  # Old version
-    legacy.d = 255    # Legacy encoding for "no cirrus"
+    legacy['d'] = '255'    # Legacy encoding for "no cirrus"
     
     collection = [legacy]
     
     # Check if conversion needed
     assert needs_conversion(collection) == True, "needs_conversion() should detect legacy format"
-    print(f"✓ needs_conversion() detected legacy format (vers=20, d=255)")
+    print(f"✓ needs_conversion() detected legacy format (d=255)")
     
     # Convert single observation
     modern = convert_legacy_observation(legacy)
-    assert modern.vers == 25, f"Expected vers=25, got {modern.vers}"
-    assert modern.d == 0, f"Expected d=0 (converted from 255), got {modern.d}"
-    print(f"✓ convert_legacy_observation() converted: vers 20→{modern.vers}, d 255→{modern.d}")
+    assert modern['d'] == '0', f"Expected d='0' (converted from 255), got {modern['d']}"
+    print(f"✓ convert_legacy_observation() converted: d 255→{modern['d']}")
     
     # Convert collection
     converted = convert_all_legacy_format(collection)
-    assert converted[0].vers == 25, f"Expected vers=25, got {converted[0].vers}"
-    assert converted[0].d == 0, f"Expected d=0, got {converted[0].d}"
+    assert converted[0]['d'] == '0', f"Expected d='0', got {converted[0]['d']}"
     print(f"✓ convert_all_legacy_format() converted collection")
     
     # Check modern format doesn't need conversion
     modern_col = [create_test_observation()]
     assert needs_conversion(modern_col) == False, "needs_conversion() should return False for modern format"
-    print(f"✓ needs_conversion() -> False for modern format (vers=25)")
+    print(f"✓ needs_conversion() -> False for modern format")
 
 
 # ============================================================================
@@ -498,9 +491,9 @@ def test_validation():
     
     # Invalid observation (multiple errors)
     invalid_obs = create_test_observation()
-    invalid_obs.KK = 0  # Invalid (must be 1-99)
-    invalid_obs.MM = 13  # Invalid (must be 1-12)
-    invalid_obs.EE = 99  # Invalid halo type
+    invalid_obs['KK'] = '0'   # Invalid (must be 1-99)
+    invalid_obs['MM'] = '13'  # Invalid (must be 1-12)
+    invalid_obs['EE'] = '99'  # Invalid halo type
     
     is_valid, errors = validate_observation(invalid_obs)
     

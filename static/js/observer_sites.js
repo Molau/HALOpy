@@ -397,8 +397,8 @@ function showDeleteSiteConfirmDialog(observer, sites, currentIndex) {
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-danger btn-sm px-3" id="btn-delete-site">${i18nStrings.common.yes}</button>
-                        ${currentIndex < sites.length - 1 ? `<button type="button" class="btn btn-info btn-sm px-3" id="btn-next-site">${i18nStrings.common.next}</button>` : ''}
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-site">${i18nStrings.common.yes}</button>
+                        ${currentIndex < sites.length - 1 ? `<button type="button" class="btn btn-secondary btn-sm px-3" id="btn-next-site">${i18nStrings.common.next}</button>` : ''}
                     </div>
                 </div>
             </div>
