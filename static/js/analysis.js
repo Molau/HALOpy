@@ -467,6 +467,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Map raw parameter value to its display label using the same data used for dropdowns
     const valueLabelCache = {};
     function formatParamValue(paramCode, rawValue) {
+        // Language-neutral sentinel from backend → translate to i18n display text
+        if (rawValue === '__none__') {
+            return i18nStrings.observations.not_observed;
+        }
+
         // Special handling for KK (observer) - search observers array directly
         if (paramCode === 'KK') {
             const kkNum = parseInt(rawValue);
@@ -490,9 +495,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Special handling for SE (sectors) - count by octant letter
         if (paramCode === 'SE') {
-            if (rawValue === 'keine Angabe') {
-                return i18nStrings.fields.not_applicable;
-            }
             return String(rawValue).toLowerCase();
         }
 

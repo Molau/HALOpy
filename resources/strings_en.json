@@ -2,8 +2,8 @@
   "app": {
     "title": "HALO Analysis Program",
     "window_title": "HALO 3.0",
-    "version": "3.0.10",
-    "version_date": "2026-02-15",
+    "version": "3.0.11",
+    "version_date": "2026-02-18",
     "copyright_years": "1992-2026",
     "welcome_title": "Welcome to HALO Analysis Program",
     "description": "Software for recording and analyzing halo observations",
@@ -82,6 +82,7 @@
     "unknown": "Unknown",
     "please_select": "-- Please select --",
     "display": "Display",
+    "loading": "Loading...",
     "add": "Add",
     "modify": "Modify",
     "delete": "Delete",
@@ -212,15 +213,12 @@
     "download": "Download"
   },
   "upload_download": {
-      "upload_auth_title": "Login to HALO server",
       "upload_auth_message": "Please enter your credentials.",
       "upload_auth_username": "Username:",
       "upload_auth_password": "Password:",
-      "upload_auth_login": "Login",
       "upload_mode_add": "Add observations",
       "upload_mode_replace": "Replace all observations",
       "upload_progress": "Uploading...",
-      "upload_success": "Successfully uploaded {0} observations",
       "upload_title": "Upload",
       "duplicates_skipped": "duplicates skipped",
       "replaced": "replaced",
@@ -238,10 +236,15 @@
       "server_unreachable": "HALO Online Service is unreachable",
       "server_unreachable_details": "The HALO Online Service ({0}) cannot be reached at this time. Please check your internet connection or try again later.",
       "upload_success_observer": "Observer data successfully uploaded",
-      "download_success_observer": "Observer data succesfully downloaded"
+      "download_success_observer": "Observer data succesfully downloaded",
+      "download_title_observer": "Observer Download",
+      "upload_auth_missing": "Please enter credentials",
+      "upload_auth_missing_observer": "Please enter observer ID",
+      "upload_auth_missing_password": "Please enter password"
   },
   "observations": {
     "title": "Observations",
+    "not_observed": "not observed",
     "display_title": "Display Observations",
     "new": "New Observation",
     "edit": "Edit Observation",
@@ -441,15 +444,13 @@
     "combined_prompt": "Please enter the observer and the month!",
     "month_year_label": "Month/Year:",
     "report_title_template": "Halo observations by {observer} in {month} {year}",
-    "error_no_observer": "Please select an observer.",
-    "error_month_year_required": "Please enter month and year."
+    "error_no_observer": "Please select an observer."
   },
   "monthly_stats": {
     "title": "Monthly Statistics",
     "month_year_label": "Month/Year:",
     "month_year_prompt": "Please enter the month!",
     "month_year_placeholder": "MM YY (e.g. 12 23)",
-    "error_month_year_required": "Please enter month and year.",
     "error_invalid_format": "Invalid format. Please use \"MM YY\" (e.g. \"12 23\").",
     "error_invalid_month": "Invalid month. Please enter a number between 1 and 12.",
     "error_invalid_year": "Invalid year. Please enter a number between 0 and 99.",
@@ -832,8 +833,7 @@
     "select": "-- Please select --",
     "any": "any",
     "max_15_chars": "max 15 chars",
-    "max_60_chars": "max 60 chars",
-    "not_applicable": "not applicable"
+    "max_60_chars": "max 60 chars"
   },
   "field_constraints": {
     "restricted_by": "The options are restricted by <strong>{triggerField}.</strong>",

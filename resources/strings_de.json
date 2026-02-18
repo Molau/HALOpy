@@ -2,8 +2,8 @@
   "app": {
     "title": "Haloerfassungsprogramm",
     "window_title": "HALO 3.0",
-    "version": "3.0.10",
-    "version_date": "2026-02-15",
+    "version": "3.0.11",
+    "version_date": "2026-02-18",
     "copyright_years": "1992-2026",
     "welcome_title": "Willkommen beim HALO Auswerteprogramm",
     "description": "Programm zur Erfassung und Auswertung von Halobeobachtungen",
@@ -82,6 +82,7 @@
     "unknown": "Unbekannt",
     "please_select": "-- Bitte wählen --",
     "display": "Anzeigen",
+    "loading": "Laden...",
     "add": "Hinzufügen",
     "modify": "Verändern",
     "delete": "Löschen",
@@ -212,15 +213,12 @@
     "download": "Download"
   },
   "upload_download": {
-      "upload_auth_title": "Anmeldung bei HALO Server",
       "upload_auth_message": "Bitte geben Sie Ihre Zugangsdaten ein.",
       "upload_auth_username": "Benutzername:",
       "upload_auth_password": "Passwort:",
-      "upload_auth_login": "Anmelden",
       "upload_mode_add": "Beobachtungen hinzufügen",
       "upload_mode_replace": "Alle Beobachtungen ersetzen",
       "upload_progress": "Lade hoch...",
-      "upload_success": "Upload von {0} Beobachtungen erfolgreich",
       "upload_title": "Upload",
       "duplicates_skipped": "Duplikate übersprungen",
       "replaced": "ersetzt",
@@ -238,10 +236,15 @@
       "server_unreachable": "HALO Online-Service ist nicht erreichbar",
       "server_unreachable_details": "Der HALO Online-Service ({0}) kann aktuell nicht erreicht werden. Bitte überprüfen Sie Ihre Internetverbindung oder versuchen Sie es später erneut.",
       "upload_success_observer": "Beobachterdaten erfolgreich hochgeladen",
-      "download_success_observer": "Beobachterdaten erfolgreich heruntergeladen"
+      "download_success_observer": "Beobachterdaten erfolgreich heruntergeladen",
+      "download_title_observer": "Beobachter-Download",
+      "upload_auth_missing": "Bitte Zugangsdaten eingeben",
+      "upload_auth_missing_observer": "Bitte Beobachter-Kennung eingeben",
+      "upload_auth_missing_password": "Bitte Passwort eingeben"
   },
   "observations": {
     "title": "Beobachtungen",
+    "not_observed": "keine Angabe",
     "display_title": "Beobachtungen anzeigen",
     "new": "Neue Beobachtung",
     "edit": "Beobachtung bearbeiten",
@@ -441,15 +444,13 @@
     "combined_prompt": "Bitte geben Sie den Beobachter und den gewünschten Monat ein!",
     "month_year_label": "Monat/Jahr:",
     "report_title_template": "Halobeobachtungen von {observer} im {month} {year}",
-    "error_no_observer": "Bitte wählen Sie einen Beobachter aus.",
-    "error_month_year_required": "Bitte geben Sie Monat und Jahr ein."
+    "error_no_observer": "Bitte wählen Sie einen Beobachter aus."
   },
   "monthly_stats": {
     "title": "Monatsstatistik",
     "month_year_label": "Monat/Jahr:",
     "month_year_prompt": "Geben Sie bitte den gewünschten Monat ein!",
     "month_year_placeholder": "MM JJ (z.B. 12 23)",
-    "error_month_year_required": "Bitte geben Sie Monat und Jahr ein.",
     "error_invalid_format": "Ungültiges Format. Bitte verwenden Sie \"MM JJ\" (z.B. \"12 23\").",
     "error_invalid_month": "Ungültiger Monat. Bitte geben Sie eine Zahl zwischen 1 und 12 ein.",
     "error_invalid_year": "Ungültiges Jahr. Bitte geben Sie eine Zahl zwischen 0 und 99 ein.",
@@ -832,8 +833,7 @@
     "select": "-- Bitte wählen --",
     "any": "beliebig",
     "max_15_chars": "max 15 Zeichen",
-    "max_60_chars": "max 60 Zeichen",
-    "not_applicable": "nicht zutreffend"
+    "max_60_chars": "max 60 Zeichen"
   },
   "field_constraints": {
     "restricted_by": "Die Optionen werden durch <strong>{triggerField}</strong> eingeschränkt.",

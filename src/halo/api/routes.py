@@ -6627,7 +6627,7 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
                 # For split/combined parameters, component values may already be counted
                 pass
             else:
-                group_key = 'keine Angabe'  # "not observed"
+                group_key = '__none__'  # language-neutral sentinel for "not observed"
                 groups[group_key] += 1
         else:
             group_key = str(value)  # Keep numeric/raw value for grouping
@@ -6711,7 +6711,7 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
     # Sort keys intelligently (before formatting)
     def numeric_sort_key(item):
         key = item[0]
-        if key == 'keine Angabe':
+        if key == '__none__':
             return (0, float('-inf'))  # Sort to beginning
         try:
             return (1, float(key))  # Sort numerically
@@ -6857,7 +6857,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             if hu >= 0:
                 val1_list.append(str(hu))
             if not val1_list:
-                val1_list = ['keine Angabe']
+                val1_list = ['__none__']
             if len(hohu_debug['samples']) < 5:
                 hohu_debug['samples'].append({'obs': obs.get('KK'), 'ho': ho, 'hu': hu, 'val1_list': list(val1_list)})
             hohu_debug['processed'] += 1
@@ -6882,7 +6882,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             else:
                 val1_list = [str(ee_value)]
         else:
-            val1_list = [str(val1) if val1 is not None else 'keine Angabe']
+            val1_list = [str(val1) if val1 is not None else '__none__']
         
         # Handle C (cirrus) splitting for param2
         if param2_name == 'SE':
@@ -6919,7 +6919,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             if hu >= 0:
                 val2_list.append(str(hu))
             if not val2_list:
-                val2_list = ['keine Angabe']
+                val2_list = ['__none__']
             if param1_name != 'HO_HU' and len(hohu_debug['samples']) < 5:
                 hohu_debug['samples'].append({'obs': obs.get('KK'), 'ho': ho, 'hu': hu, 'val2_list': list(val2_list)})
             hohu_debug['processed'] += 1
@@ -6944,7 +6944,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             else:
                 val2_list = [str(ee_value)]
         else:
-            val2_list = [str(val2) if val2 is not None else 'keine Angabe']
+            val2_list = [str(val2) if val2 is not None else '__none__']
         
         # Count all combinations
         for v1 in val1_list:
@@ -7150,13 +7150,8 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
 def _format_parameter_value(value, param_name, all_params, prefix):
     """Format a parameter value for display."""
     
-    # FIXME: 'keine Angabe' is hardcoded German in 7 places across _group_by_parameter
-    # and _group_by_two_parameters (used as dict grouping key AND display value).
-    # Fix: use a language-neutral internal key (e.g. '__not_observed__') for grouping,
-    # then translate to i18n observations.not_observed only here for display.
-    
-    if value is None:
-        return 'keine Angabe'
+    if value is None or value == '__none__':
+        return 'keine Angabe'  # Note: this function is currently unused (formatting done in JS)
     
     # For KK (observer), format as "KK - Firstname Lastname"
     if param_name == 'KK':
