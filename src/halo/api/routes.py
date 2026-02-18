@@ -42,7 +42,6 @@ from halo.models.constants import (
     resolve_halo_type,
     calculate_halo_activity,
 )
-from halo.models.types import Observation
 from halo.resources import I18n, set_language as set_lang
 from halo.resources.i18n import get_i18n
 from halo.services.auth import AuthService
@@ -345,6 +344,78 @@ def _format_lp8(e: int, ho: int | None, hu: int | None) -> str:
         return '/////'
 
 
+def _int(obs: Dict[str, str], key: str, default: int = 0) -> int:
+    """Safely get an integer value from an observation dict.
+    
+    Handles empty strings, '/', '//' by returning default.
+    """
+    val = obs.get(key, '')
+    if val is None or val == '' or val == '/' or val == '//':
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _json_int(obs: Dict[str, str], key: str) -> int:
+    """Get integer value for JSON serialization: '' → None, else int.
+    
+    Used when sending observation data to the frontend.
+    Empty string (not observed) becomes JSON null.
+    """
+    val = obs.get(key, '')
+    if val is None or val == '' or val == '/' or val == '//':
+        return None
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _obs_to_json(obs: Dict[str, str]) -> Dict[str, Any]:
+    """Convert an observation dict (str values) to JSON-friendly dict.
+    
+    Maps empty strings to None (JSON null) for the frontend.
+    Handles the special zz field (99 → 0) and lp8 computed field.
+    """
+    zz_val = _json_int(obs, 'zz')
+    if zz_val == 99:
+        zz_val = 0
+
+    ee = _int(obs, 'EE')
+    ho = _json_int(obs, 'HO')
+    hu = _json_int(obs, 'HU')
+
+    return {
+        'KK': _json_int(obs, 'KK'),
+        'O': _json_int(obs, 'O'),
+        'JJ': _json_int(obs, 'JJ'),
+        'MM': _json_int(obs, 'MM'),
+        'TT': _json_int(obs, 'TT'),
+        'GG': _json_int(obs, 'GG'),
+        'ZS': _json_int(obs, 'ZS'),
+        'ZM': _json_int(obs, 'ZM'),
+        'd': _json_int(obs, 'd'),
+        'DD': _json_int(obs, 'DD'),
+        'N': _json_int(obs, 'N'),
+        'C': _json_int(obs, 'C'),
+        'c': _json_int(obs, 'c'),
+        'EE': _json_int(obs, 'EE'),
+        'H': _json_int(obs, 'H'),
+        'F': _json_int(obs, 'F'),
+        'V': _json_int(obs, 'V'),
+        'f': _json_int(obs, 'f'),
+        'zz': zz_val,
+        'g': _json_int(obs, 'g'),
+        'HO': ho,
+        'HU': hu,
+        'lp8': _format_lp8(ee, ho, hu),
+        'sectors': obs.get('sectors', ''),
+        'remarks': obs.get('remarks', ''),
+    }
+
+
 @api_blueprint.route('/health', methods=['GET'])
 def health_check() -> Dict[str, Any]:
     """Health check endpoint for monitoring and load balancers.
@@ -531,37 +602,7 @@ def get_observations() -> Dict[str, Any]:
         'limit': limit,
         'count': len(paginated),
         'file': loaded_file,
-        'observations': [
-            {
-                'KK': obs.KK if obs.KK != -1 else None,
-                'O': obs.O if obs.O != -1 else None,
-                'JJ': obs.JJ if obs.JJ != -1 else None,
-                'MM': obs.MM if obs.MM != -1 else None,
-                'TT': obs.TT if obs.TT != -1 else None,
-                'GG': obs.GG if obs.GG != -1 else None,
-                'ZS': obs.ZS if obs.ZS != -1 else None,
-                'ZM': obs.ZM if obs.ZM != -1 else None,
-                'd': obs.d if obs.d != -1 else None,
-                'DD': obs.DD if obs.DD != -1 else None,
-                'N': obs.N if obs.N != -1 else None,
-                'C': obs.C if obs.C != -1 else None,
-                'c': obs.c if obs.c != -1 else None,
-                'EE': obs.EE if obs.EE != -1 else None,
-                'H': obs.H if obs.H != -1 else None,
-                'F': obs.F if obs.F != -1 else None,
-                'V': obs.V if obs.V != -1 else None,
-                'f': obs.f if obs.f != -1 else None,
-                'zz': obs.zz if obs.zz not in (-1, 99) else (0 if obs.zz == 99 else None),
-                'g': obs.g if obs.g != -1 else None,
-                'HO': obs.HO if obs.HO != -1 else None,
-                'HU': obs.HU if obs.HU != -1 else None,
-                # Precomputed light pillar field using Pascal's exact logic
-                'lp8': _format_lp8(obs.EE, obs.HO if obs.HO != -1 else None, obs.HU if obs.HU != -1 else None),
-                'sectors': getattr(obs, 'sectors', ''),
-                'remarks': getattr(obs, 'remarks', ''),
-            }
-            for obs in paginated
-        ],
+        'observations': [_obs_to_json(obs) for obs in paginated],
     }
 
     return jsonify(result)
@@ -580,24 +621,41 @@ def _spaeter(a, b) -> int:
     """
     spt = -1
     
+    a_JJ = _int(a, 'JJ')
+    b_JJ = _int(b, 'JJ')
+    a_MM = _int(a, 'MM')
+    b_MM = _int(b, 'MM')
+    a_TT = _int(a, 'TT')
+    b_TT = _int(b, 'TT')
+    a_ZS = _int(a, 'ZS')
+    b_ZS = _int(b, 'ZS')
+    a_ZM = _int(a, 'ZM')
+    b_ZM = _int(b, 'ZM')
+    a_KK = _int(a, 'KK')
+    b_KK = _int(b, 'KK')
+    a_EE = _int(a, 'EE')
+    b_EE = _int(b, 'EE')
+    a_GG = _int(a, 'GG')
+    b_GG = _int(b, 'GG')
+    
     # Year comparison with century wrap ((YEAR_MIN-1900) is boundary for 19xx/20xx)
-    hilf = (((a.JJ > b.JJ) and not ((a.JJ >= (YEAR_MIN-1900)) and (b.JJ < (YEAR_MIN-1900)))) or ((a.JJ < (YEAR_MIN-1900)) and (b.JJ >= (YEAR_MIN-1900))))
+    hilf = (((a_JJ > b_JJ) and not ((a_JJ >= (YEAR_MIN-1900)) and (b_JJ < (YEAR_MIN-1900)))) or ((a_JJ < (YEAR_MIN-1900)) and (b_JJ >= (YEAR_MIN-1900))))
 
-    if a.JJ == b.JJ:
-        hilf = a.MM > b.MM
-        if a.MM == b.MM:
-            hilf = a.TT > b.TT
-            if a.TT == b.TT:
-                hilf = a.ZS > b.ZS
-                if a.ZS == b.ZS:
-                    hilf = a.ZM > b.ZM
-                    if a.ZM == b.ZM:
-                        hilf = a.KK > b.KK
-                        if a.KK == b.KK:
-                            hilf = a.EE > b.EE
-                            if a.EE == b.EE:
-                                hilf = a.GG > b.GG
-                                if a.GG == b.GG:
+    if a_JJ == b_JJ:
+        hilf = a_MM > b_MM
+        if a_MM == b_MM:
+            hilf = a_TT > b_TT
+            if a_TT == b_TT:
+                hilf = a_ZS > b_ZS
+                if a_ZS == b_ZS:
+                    hilf = a_ZM > b_ZM
+                    if a_ZM == b_ZM:
+                        hilf = a_KK > b_KK
+                        if a_KK == b_KK:
+                            hilf = a_EE > b_EE
+                            if a_EE == b_EE:
+                                hilf = a_GG > b_GG
+                                if a_GG == b_GG:
                                     spt = 0
     
     if hilf:
@@ -619,13 +677,13 @@ def add_observation() -> Dict[str, Any]:
             return jsonify({'error': f'Missing field: {f}'}), 400
 
     try:
-        obs = Observation()
-        # Assign fields with defaults for unknowns
+        # Build observation dict from JSON data
+        obs = {}
         for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
-            if field in data and data[field] is not None:
-                setattr(obs, field, int(data[field]))
-        obs.sectors = data.get('sectors', '') or ''
-        obs.remarks = data.get('remarks', '') or ''
+            val = data.get(field)
+            obs[field] = str(val) if val is not None else ''
+        obs['sectors'] = data.get('sectors', '') or ''
+        obs['remarks'] = data.get('remarks', '') or ''
 
         if is_cloud_mode():
             # Cloud Mode: Save to database (Layer 3b)
@@ -689,14 +747,21 @@ def delete_observation() -> Dict[str, Any]:
             # Find observation to delete by matching key fields
             # Match by: KK, O, JJ, MM, TT, EE, GG (unique identifier)
             original_obs = None
+            d_kk = int(data.get('KK', 0))
+            d_o = int(data.get('O', 0))
+            d_jj = int(data.get('JJ', 0))
+            d_mm = int(data.get('MM', 0))
+            d_tt = int(data.get('TT', 0))
+            d_ee = int(data.get('EE', 0))
+            d_gg = int(data.get('GG', 0))
             for i, obs in enumerate(observations):
-                if (obs.KK == data.get('KK') and
-                    obs.O == data.get('O') and
-                    obs.JJ == data.get('JJ') and
-                    obs.MM == data.get('MM') and
-                    obs.TT == data.get('TT') and
-                    obs.EE == data.get('EE') and
-                    obs.GG == data.get('GG')):
+                if (_int(obs, 'KK') == d_kk and
+                    _int(obs, 'O') == d_o and
+                    _int(obs, 'JJ') == d_jj and
+                    _int(obs, 'MM') == d_mm and
+                    _int(obs, 'TT') == d_tt and
+                    _int(obs, 'EE') == d_ee and
+                    _int(obs, 'GG') == d_gg):
                     original_obs = i
                     break
             
@@ -719,15 +784,15 @@ def replace_observations() -> Dict[str, Any]:
     data = request.get_json() or {}
     observations_data = data.get('observations', [])
     
-    # Convert observation dicts to Observation objects
+    # Convert observation dicts to observation dicts with string values
     observations = []
     for obs_dict in observations_data:
-        obs = Observation()
+        obs = {}
         for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
-            if field in obs_dict and obs_dict[field] is not None:
-                setattr(obs, field, obs_dict[field])
-        obs.sectors = obs_dict.get('sectors', '') or ''
-        obs.remarks = obs_dict.get('remarks', '') or ''
+            val = obs_dict.get(field)
+            obs[field] = str(val) if val is not None else ''
+        obs['sectors'] = obs_dict.get('sectors', '') or ''
+        obs['remarks'] = obs_dict.get('remarks', '') or ''
         observations.append(obs)
     
     current_app.config['OBSERVATIONS'] = observations
@@ -753,15 +818,15 @@ def save_observations() -> Dict[str, Any]:
     if not filename.lower().endswith('.csv'):
         filename += '.csv'
     
-    # Convert observation dicts to Observation objects
+    # Convert observation dicts to observation dicts with string values
     observations = []
     for obs_dict in observations_data:
-        obs = Observation()
+        obs = {}
         for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
-            if field in obs_dict and obs_dict[field] is not None:
-                setattr(obs, field, obs_dict[field])
-        obs.sectors = obs_dict.get('sectors', '') or ''
-        obs.remarks = obs_dict.get('remarks', '') or ''
+            val = obs_dict.get(field)
+            obs[field] = str(val) if val is not None else ''
+        obs['sectors'] = obs_dict.get('sectors', '') or ''
+        obs['remarks'] = obs_dict.get('remarks', '') or ''
         observations.append(obs)
     
     # Write to file
@@ -875,20 +940,20 @@ def filter_observations() -> Dict[str, Any]:
             
             if filter_type == 'KK':
                 value = int(params.get('value'))
-                matching_obs = [obs for obs in observations if obs.KK == value]
+                matching_obs = [obs for obs in observations if _int(obs, 'KK') == value]
                 
             elif filter_type == 'MM':
                 month = int(params.get('month'))
                 year = int(params.get('year'))
                 year_2digit = year % 100  # Convert to 2-digit
-                matching_obs = [obs for obs in observations if obs.MM == month and obs.JJ == year_2digit]
+                matching_obs = [obs for obs in observations if _int(obs, 'MM') == month and _int(obs, 'JJ') == year_2digit]
                 
             elif filter_type == 'TT':
                 day = int(params.get('day'))
                 month = int(params.get('month'))
                 year = int(params.get('year'))
                 year_2digit = year % 100  # Convert to 2-digit
-                matching_obs = [obs for obs in observations if obs.TT == day and obs.MM == month and obs.JJ == year_2digit]
+                matching_obs = [obs for obs in observations if _int(obs, 'TT') == day and _int(obs, 'MM') == month and _int(obs, 'JJ') == year_2digit]
                 
             elif filter_type == 'ZZ':
                 from_hour = int(params.get('from_hour'))
@@ -898,8 +963,10 @@ def filter_observations() -> Dict[str, Any]:
                 from_time = from_hour * 60 + from_minute
                 to_time = to_hour * 60 + to_minute
                 for obs in observations:
-                    if obs.ZS is not None and obs.ZS != -1 and obs.ZM is not None and obs.ZM != -1:
-                        obs_time = obs.ZS * 60 + obs.ZM
+                    zs = _int(obs, 'ZS', -1)
+                    zm = _int(obs, 'ZM', -1)
+                    if zs != -1 and zm != -1:
+                        obs_time = zs * 60 + zm
                         if from_time <= obs_time <= to_time:
                             matching_obs.append(obs)
                             
@@ -916,14 +983,14 @@ def filter_observations() -> Dict[str, Any]:
                 # Year - convert 4-digit to 2-digit
                 value = int(params.get('value'))
                 year_2digit = value % 100
-                matching_obs = [obs for obs in observations if obs.JJ == year_2digit]
+                matching_obs = [obs for obs in observations if _int(obs, 'JJ') == year_2digit]
                         
             else:
                 # Simple value match for other parameters (GG, O, EE, DD, N, C, H, F, V)
                 value = int(params.get('value'))
                 attr = filter_type
                 for obs in observations:
-                    obs_value = getattr(obs, attr, None)
+                    obs_value = _int(obs, attr, -1)
                     if obs_value == value:
                         matching_obs.append(obs)
         
@@ -954,16 +1021,23 @@ def filter_observations() -> Dict[str, Any]:
             else:
                 deleted_count = len(observations) - kept_count
         
-        # Convert observations to dicts for JSON response
+        # Observations are already dicts - pass through directly
+        # Use raw dict keys for filter response (SE, Bem are legacy names used by frontend)
         filtered_dicts = []
         for obs in filtered_obs:
             obs_dict = {
-                'KK': obs.KK, 'O': obs.O, 'JJ': obs.JJ, 'MM': obs.MM, 'TT': obs.TT,
-                'g': obs.g, 'ZS': obs.ZS, 'ZM': obs.ZM, 'd': obs.d,
-                'DD': obs.DD, 'N': obs.N, 'C': obs.C, 'c': obs.c,
-                'EE': obs.EE, 'GG': obs.GG, 'H': obs.H, 'F': obs.F, 'V': obs.V,
-                'f': obs.f, 'zz': obs.zz, 'HO': obs.HO, 'HU': obs.HU,
-                'SE': obs.sectors, 'Bem': obs.remarks
+                'KK': _int(obs, 'KK'), 'O': _int(obs, 'O'), 'JJ': _int(obs, 'JJ'),
+                'MM': _int(obs, 'MM'), 'TT': _int(obs, 'TT'),
+                'g': _int(obs, 'g'), 'ZS': _int(obs, 'ZS', -1), 'ZM': _int(obs, 'ZM', -1),
+                'd': _int(obs, 'd', -1),
+                'DD': _int(obs, 'DD', -1), 'N': _int(obs, 'N', -1),
+                'C': _int(obs, 'C', -1), 'c': _int(obs, 'c', -1),
+                'EE': _int(obs, 'EE'), 'GG': _int(obs, 'GG'),
+                'H': _int(obs, 'H', -1), 'F': _int(obs, 'F', -1),
+                'V': _int(obs, 'V', -1),
+                'f': _int(obs, 'f', -1), 'zz': _int(obs, 'zz', -1),
+                'HO': _int(obs, 'HO', -1), 'HU': _int(obs, 'HU', -1),
+                'SE': obs.get('sectors', ''), 'Bem': obs.get('remarks', '')
             }
             filtered_dicts.append(obs_dict)
         
@@ -1166,13 +1240,13 @@ def merge_file() -> Dict[str, Any]:
         # Key format: KK-O-JJ-MM-TT-EE-GG (matches observation unique identifier)
         existing_keys = set()
         for obs in current_observations:
-            key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
+            key = f"{_int(obs, 'KK')}-{_int(obs, 'O')}-{_int(obs, 'JJ'):02d}-{_int(obs, 'MM'):02d}-{_int(obs, 'TT'):02d}-{_int(obs, 'EE'):02d}-{_int(obs, 'GG'):02d}"
             existing_keys.add(key)
         
         # Add observations from new file that don't already exist
         added_count = 0
         for obs in new_observations:
-            key = f"{obs.KK}-{obs.O}-{obs.JJ:02d}-{obs.MM:02d}-{obs.TT:02d}-{obs.EE:02d}-{obs.GG:02d}"
+            key = f"{_int(obs, 'KK')}-{_int(obs, 'O')}-{_int(obs, 'JJ'):02d}-{_int(obs, 'MM'):02d}-{_int(obs, 'TT'):02d}-{_int(obs, 'EE'):02d}-{_int(obs, 'GG'):02d}"
             if key not in existing_keys:
                 current_observations.append(obs)
                 existing_keys.add(key)
@@ -1356,12 +1430,12 @@ def upload_file() -> Dict[str, Any]:
                 filtered_out_count += 1
                 continue
             
-            obs = Observation()
+            obs = {}
             for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
-                if field in obs_dict and obs_dict[field] is not None:
-                    setattr(obs, field, obs_dict[field])
-            obs.sectors = obs_dict.get('sectors', '') or ''
-            obs.remarks = obs_dict.get('remarks', '') or ''
+                val = obs_dict.get(field)
+                obs[field] = str(val) if val is not None else ''
+            obs['sectors'] = obs_dict.get('sectors', '') or ''
+            obs['remarks'] = obs_dict.get('remarks', '') or ''
             new_observations.append(obs)
         
         if not new_observations:
@@ -1375,7 +1449,7 @@ def upload_file() -> Dict[str, Any]:
             # REPLACE MODE: Delete all existing observations of this observer first
             if is_admin:
                 # Admin uploads: Delete ALL KKs present in upload, then insert
-                kks_in_upload = set(str(obs.KK) for obs in new_observations)
+                kks_in_upload = set(obs.get('KK', '') for obs in new_observations)
                 for kk in kks_in_upload:
                     obs_db.delete_all_for_observer(kk)
             else:
@@ -2249,21 +2323,45 @@ def _kurzausgabe(obs) -> str:
     
     Ported from monthly_report.js kurzausgabe() function.
     Special values: -1 = ' ' (not observed), -2 = '/' (not present)
+    Now works with Dict[str, str] observations.
     """
+    KK = _int(obs, 'KK')
+    O = _int(obs, 'O')
+    JJ = _int(obs, 'JJ')
+    MM = _int(obs, 'MM')
+    TT = _int(obs, 'TT')
+    g = _int(obs, 'g')
+    ZS = _int(obs, 'ZS', -1)
+    ZM = _int(obs, 'ZM', -1)
+    d_val = _int(obs, 'd', -1)
+    DD = _int(obs, 'DD', -1)
+    N = _int(obs, 'N', -1)
+    C = _int(obs, 'C', -1)
+    c = _int(obs, 'c', -1)
+    EE = _int(obs, 'EE')
+    H = _int(obs, 'H', -1)
+    F = _int(obs, 'F', -1)
+    V = _int(obs, 'V', -1)
+    f = _int(obs, 'f', -1)
+    zz = _int(obs, 'zz', -1)
+    GG = _int(obs, 'GG')
+    HO = _int(obs, 'HO', -1)
+    HU = _int(obs, 'HU', -1)
+
     first = ''
     
     # KK - observer code
-    if obs.KK < 100:
-        first += str(obs.KK // 10) + str(obs.KK % 10)
+    if KK < 100:
+        first += str(KK // 10) + str(KK % 10)
     else:
-        first += chr((obs.KK // 10) + 55) + str(obs.KK % 10)
+        first += chr((KK // 10) + 55) + str(KK % 10)
     
     # O, JJ, MM, TT, g
-    first += str(obs.O)
-    first += str(obs.JJ // 10) + str(obs.JJ % 10)
-    first += str(obs.MM // 10) + str(obs.MM % 10)
-    first += str(obs.TT // 10) + str(obs.TT % 10)
-    first += str(obs.g)
+    first += str(O)
+    first += str(JJ // 10) + str(JJ % 10)
+    first += str(MM // 10) + str(MM % 10)
+    first += str(TT // 10) + str(TT % 10)
+    first += str(g)
     
     # ZS, ZM - handle -1 (space), 0 is a valid value for sun/moon altitude
     def fmt2(val):
@@ -2282,8 +2380,8 @@ def _kurzausgabe(obs) -> str:
         else:
             return str(val // 10) + str(val % 10)
     
-    first += fmt2(obs.ZS)
-    first += fmt2(obs.ZM)
+    first += fmt2(ZS)
+    first += fmt2(ZM)
     
     # d - single digit field
     def fmt1(val):
@@ -2293,32 +2391,32 @@ def _kurzausgabe(obs) -> str:
         else:
             return str(val)
     
-    first += fmt1(obs.d)
-    first += fmt2(obs.DD)
+    first += fmt1(d_val)
+    first += fmt2(DD)
     
     # N, C, c
-    first += fmt1(obs.N)
-    first += fmt1(obs.C)
-    first += fmt1(obs.c)
+    first += fmt1(N)
+    first += fmt1(C)
+    first += fmt1(c)
     
     # EE
-    first += str(obs.EE // 10) + str(obs.EE % 10)
+    first += str(EE // 10) + str(EE % 10)
     
     # H, F, V
-    first += fmt1(obs.H)
-    first += fmt1(obs.F)
-    first += fmt1(obs.V)
+    first += fmt1(H)
+    first += fmt1(F)
+    first += fmt1(V)
     
     # f, zz, GG
-    first += fmt1(obs.f)
+    first += fmt1(f)
     
     # zz special: 99 means '//', -1 means '  ', -2 means '//'
-    if obs.zz == 99:
+    if zz == 99:
         first += '//'
     else:
-        first += fmt2(obs.zz)
+        first += fmt2(zz)
     
-    gg = obs.GG if obs.GG != -1 else 0
+    gg = GG if GG != -1 else 0
     first += str(gg // 10) + str(gg % 10)
     
     # Add spaces after every 5 characters
@@ -2331,25 +2429,25 @@ def _kurzausgabe(obs) -> str:
                 erg += ' '
     
     # 8HHHH - light pillar (HO=0 or HU=0 formatted as '//')
-    if obs.EE == 8:
-        ho_str = fmt2_ho_hu(obs.HO)
+    if EE == 8:
+        ho_str = fmt2_ho_hu(HO)
         erg += '8' + ho_str + '//'
-    elif obs.EE == 9:
-        hu_str = fmt2_ho_hu(obs.HU)
+    elif EE == 9:
+        hu_str = fmt2_ho_hu(HU)
         erg += '8//' + hu_str
-    elif obs.EE == 10:
-        ho_str = fmt2_ho_hu(obs.HO)
-        hu_str = fmt2_ho_hu(obs.HU)
+    elif EE == 10:
+        ho_str = fmt2_ho_hu(HO)
+        hu_str = fmt2_ho_hu(HU)
         erg += '8' + ho_str + hu_str
     else:
         erg += '/////'
     
     # Add sectors and remarks - total line must be exactly 69 chars + sectors + remarks
     erg += ' '
-    sectors = getattr(obs, 'sectors', '')
+    sectors = obs.get('sectors', '')
     sectors = sectors.replace('\r', ' ').replace('\n', ' ')[:15].ljust(15)
     erg += sectors + ' '
-    remarks = getattr(obs, 'remarks', '')
+    remarks = obs.get('remarks', '')
     remarks = remarks.replace('\r', ' ').replace('\n', ' ').ljust(60)
     erg += remarks
     
@@ -2390,44 +2488,10 @@ def _format_monthly_report_text(data: Dict[str, Any], i18n) -> str:
     last_day = -1
     observations = data.get('observations', [])
     
-    # Convert dict observations to objects if needed
-    obs_objects = []
-    for obs_data in observations:
-        if isinstance(obs_data, dict):
-            # Create Observation object from dict
-            obs = Observation(
-                KK=obs_data['KK'],
-                O=obs_data['O'],
-                JJ=obs_data['JJ'],
-                MM=obs_data['MM'],
-                TT=obs_data['TT'],
-                g=obs_data['g'],
-                ZS=obs_data['ZS'] if obs_data['ZS'] is not None else -1,
-                ZM=obs_data['ZM'] if obs_data['ZM'] is not None else -1,
-                d=obs_data['d'] if obs_data['d'] is not None else -1,
-                DD=obs_data['DD'] if obs_data['DD'] is not None else -1,
-                N=obs_data['N'] if obs_data['N'] is not None else -1,
-                C=obs_data['C'] if obs_data['C'] is not None else -1,
-                c=obs_data['c'] if obs_data['c'] is not None else -1,
-                EE=obs_data['EE'],
-                H=obs_data['H'] if obs_data['H'] is not None else -1,
-                F=obs_data['F'] if obs_data['F'] is not None else -1,
-                V=obs_data['V'] if obs_data['V'] is not None else -1,
-                f=obs_data['f'] if obs_data['f'] is not None else -1,
-                zz=obs_data['zz'] if obs_data['zz'] is not None else -1,
-                GG=obs_data['GG'],
-                HO=obs_data.get('HO', -1) if obs_data.get('HO') is not None else -1,
-                HU=obs_data.get('HU', -1) if obs_data.get('HU') is not None else -1,
-                sectors=obs_data.get('sectors', ''),
-                remarks=obs_data.get('remarks', '')
-            )
-            obs_objects.append(obs)
-        else:
-            obs_objects.append(obs_data)
-    
-    for obs in obs_objects:
+    for obs in observations:
         # Add separator line between different days
-        if last_day != -1 and obs.TT != last_day:
+        obs_tt = _int(obs, 'TT')
+        if last_day != -1 and obs_tt != last_day:
             lines.append('╟────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╢')
         
         try:
@@ -2436,10 +2500,10 @@ def _format_monthly_report_text(data: Dict[str, Any], i18n) -> str:
         except Exception as e:
             lines.append('║ ERROR formatting observation                                                                                           ║')
         
-        last_day = obs.TT
+        last_day = obs_tt
     
     # No observations message
-    if len(obs_objects) == 0:
+    if len(observations) == 0:
         no_obs_msg = i18n.get('messages.no_observations')
         padding = (118 - len(no_obs_msg)) // 2
         lines.append('║' + ' ' * 120 + '║')
@@ -2497,38 +2561,7 @@ def _format_monthly_report_markdown(data: Dict[str, Any], i18n) -> str:
     else:
         md += '```\n'
         
-        # Convert dict observations to objects if needed
-        for obs_data in observations:
-            if isinstance(obs_data, dict):
-                obs = Observation(
-                    KK=obs_data['KK'],
-                    O=obs_data['O'],
-                    JJ=obs_data['JJ'],
-                    MM=obs_data['MM'],
-                    TT=obs_data['TT'],
-                    g=obs_data['g'],
-                    ZS=obs_data['ZS'] if obs_data['ZS'] is not None else -1,
-                    ZM=obs_data['ZM'] if obs_data['ZM'] is not None else -1,
-                    d=obs_data['d'] if obs_data['d'] is not None else -1,
-                    DD=obs_data['DD'] if obs_data['DD'] is not None else -1,
-                    N=obs_data['N'] if obs_data['N'] is not None else -1,
-                    C=obs_data['C'] if obs_data['C'] is not None else -1,
-                    c=obs_data['c'] if obs_data['c'] is not None else -1,
-                    EE=obs_data['EE'],
-                    H=obs_data['H'] if obs_data['H'] is not None else -1,
-                    F=obs_data['F'] if obs_data['F'] is not None else -1,
-                    V=obs_data['V'] if obs_data['V'] is not None else -1,
-                    f=obs_data['f'] if obs_data['f'] is not None else -1,
-                    zz=obs_data['zz'] if obs_data['zz'] is not None else -1,
-                    GG=obs_data['GG'],
-                    HO=obs_data.get('HO', -1) if obs_data.get('HO') is not None else -1,
-                    HU=obs_data.get('HU', -1) if obs_data.get('HU') is not None else -1,
-                    sectors=obs_data.get('sectors', ''),
-                    remarks=obs_data.get('remarks', '')
-                )
-            else:
-                obs = obs_data
-            
+        for obs in observations:
             line = _kurzausgabe(obs)
             md += line + '\n'
         
@@ -2582,10 +2615,10 @@ def get_monthly_report() -> Dict[str, Any]:
             return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
         
         filtered_obs = [obs for obs in observations 
-                        if obs.KK == kk_int and obs.MM == mm_int and obs.JJ == jj_int]
+                        if _int(obs, 'KK') == kk_int and _int(obs, 'MM') == mm_int and _int(obs, 'JJ') == jj_int]
         
         # Local Mode: Sort with Python (Cloud Mode already sorted by SQL ORDER BY)
-        filtered_obs.sort(key=lambda o: (o.TT, o.ZS if o.ZS != -1 else 0, o.ZM if o.ZM != -1 else 0))
+        filtered_obs.sort(key=lambda o: (_int(o, 'TT'), _int(o, 'ZS'), _int(o, 'ZM')))
     
     # Get observer info - find the record valid for this month/year
     if is_cloud_mode():
@@ -2670,35 +2703,7 @@ def get_monthly_report() -> Dict[str, Any]:
         'observer_nbort': observer_nbort,
         'observer_gh': observer_gh,
         'observer_gn': observer_gn,
-        'observations': [
-            {
-                'KK': obs.KK,
-                'O': obs.O,
-                'JJ': obs.JJ,
-                'MM': obs.MM,
-                'TT': obs.TT,
-                'g': obs.g,
-                'ZS': obs.ZS if obs.ZS != -1 else None,
-                'ZM': obs.ZM if obs.ZM != -1 else None,
-                'd': obs.d if obs.d != -1 else None,
-                'DD': obs.DD if obs.DD != -1 else None,
-                'N': obs.N if obs.N != -1 else None,
-                'C': obs.C if obs.C != -1 else None,
-                'c': obs.c if obs.c != -1 else None,
-                'EE': obs.EE,
-                'H': obs.H if obs.H != -1 else None,
-                'F': obs.F if obs.F != -1 else None,
-                'V': obs.V if obs.V != -1 else None,
-                'f': obs.f if obs.f != -1 else None,
-                'zz': obs.zz if obs.zz not in (-1, 99) else (None if obs.zz == -1 else 99),
-                'GG': obs.GG,
-                'HO': obs.HO if obs.HO != -1 else None,
-                'HU': obs.HU if obs.HU != -1 else None,
-                'sectors': getattr(obs, 'sectors', ''),
-                'remarks': getattr(obs, 'remarks', ''),
-            }
-            for obs in filtered_obs
-        ],
+        'observations': [_obs_to_json(obs) for obs in filtered_obs],
         'count': len(filtered_obs)
     }
     
@@ -3176,7 +3181,7 @@ def get_monthly_stats() -> Dict[str, Any]:
             return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
         
         filtered_obs = [obs for obs in observations 
-                        if obs.MM == mm_int and obs.JJ == jj_int]
+                        if _int(obs, 'MM') == mm_int and _int(obs, 'JJ') == jj_int]
         observers = current_app.config.get('OBSERVERS', [])
         active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
     
@@ -3236,10 +3241,10 @@ def get_monthly_stats() -> Dict[str, Any]:
     
     # Process each observation to fill in observation data
     for obs in filtered_obs:
-        kk = str(obs.KK).zfill(2)  # Ensure KK is string with leading zero (e.g., "06")
-        tt = obs.TT
-        o = obs.O  # 1=solar, 2=lunar
-        ee = obs.EE  # Halo type
+        kk = str(_int(obs, 'KK')).zfill(2)  # Ensure KK is string with leading zero (e.g., "06")
+        tt = _int(obs, 'TT')
+        o = _int(obs, 'O')  # 1=solar, 2=lunar
+        ee = _int(obs, 'EE')  # Halo type
         
         # Only process observations from active observers (skip inactive observers' data)
         if kk not in observer_data:
@@ -3286,13 +3291,13 @@ def get_monthly_stats() -> Dict[str, Any]:
         #   g=0: primary site (HbOrt) -> use GH from observer record
         #   g=1: other location -> display as // (region 39)
         #   g=2: secondary site (NbOrt) -> use GN from observer record
-        obs_for_kk = [obs for obs in filtered_obs if str(obs.KK).zfill(2) == kk]
+        obs_for_kk = [obs for obs in filtered_obs if str(_int(obs, 'KK')).zfill(2) == kk]
         
         # Track which days have observations at which site (g value)
         site_days = {0: set(), 1: set(), 2: set()}  # g -> set of days
         for obs in obs_for_kk:
-            g = obs.g if hasattr(obs, 'g') and obs.g in [0, 1, 2] else 0
-            site_days[g].add(obs.TT)
+            g = _int(obs, 'g') if 'g' in obs and _int(obs, 'g') in [0, 1, 2] else 0
+            site_days[g].add(_int(obs, 'TT'))
         
         # Find site (g value) with most observation days
         max_site = max(site_days.items(), key=lambda x: len(x[1]))
@@ -3353,12 +3358,12 @@ def get_monthly_stats() -> Dict[str, Any]:
     ee_overview = {}
     
     for obs in filtered_obs:
-        if obs.O != 1:  # Only solar halos (O=1)
+        if _int(obs, 'O') != 1:  # Only solar halos (O=1)
             continue
         
-        kk = str(obs.KK).zfill(2)
-        tt = obs.TT
-        ee = obs.EE
+        kk = str(_int(obs, 'KK')).zfill(2)
+        tt = _int(obs, 'TT')
+        ee = _int(obs, 'EE')
         
         # Skip if observer not in active list
         if kk not in observer_data:
@@ -3419,23 +3424,23 @@ def get_monthly_stats() -> Dict[str, Any]:
     rare_halos = []
     
     for obs in filtered_obs:
-        if obs.O != 1:  # Only solar halos (O=1)
+        if _int(obs, 'O') != 1:  # Only solar halos (O=1)
             continue
         
-        kk = str(obs.KK).zfill(2)
+        kk = str(_int(obs, 'KK')).zfill(2)
         
         # Skip if observer not in active list
         if kk not in observer_data:
             continue
         
         # Resolve combined halo types to check for rare halos
-        for individual_ee in resolve_halo_type(obs.EE):
+        for individual_ee in resolve_halo_type(_int(obs, 'EE')):
             if individual_ee > 12:
                 # Use GG directly from observation record
-                gg = obs.GG
+                gg = _int(obs, 'GG')
                 
                 rare_halos.append({
-                    'tt': obs.TT,
+                    'tt': _int(obs, 'TT'),
                     'ee': individual_ee,
                     'kk': kk,
                     'gg': str(gg).zfill(2) if gg != 39 else '//'
@@ -4412,7 +4417,7 @@ def get_annual_stats() -> Dict[str, Any]:
         if not observations:
             return jsonify({'error': 'No observations loaded. Please load a file first.'}), 400
         
-        filtered_obs = [obs for obs in observations if obs.JJ == jj_int]
+        filtered_obs = [obs for obs in observations if _int(obs, 'JJ') == jj_int]
         observers = current_app.config.get('OBSERVERS', [])
         active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
     
@@ -4456,10 +4461,10 @@ def get_annual_stats() -> Dict[str, Any]:
     moon_ee_counts = {}  # {ee: count}
     
     for mm in range(1, 13):
-        month_obs = [obs for obs in filtered_obs if obs.MM == mm]
+        month_obs = [obs for obs in filtered_obs if _int(obs, 'MM') == mm]
         
         # Sort observations by day for efficient processing
-        month_obs.sort(key=lambda o: (o.TT, o.KK, o.O, o.EE))
+        month_obs.sort(key=lambda o: (_int(o, 'TT'), _int(o, 'KK'), _int(o, 'O'), _int(o, 'EE')))
         
         # Track which (observer, object, halo_type) combinations have been counted each day
         # Key: (day, observer_KK, object_O, halo_EE) -> prevents double counting
@@ -4474,45 +4479,45 @@ def get_annual_stats() -> Dict[str, Any]:
         
         for obs in month_obs:
             # Reset tracking when day changes
-            if obs.TT != last_day:
-                last_day = obs.TT
+            if _int(obs, 'TT') != last_day:
+                last_day = _int(obs, 'TT')
                 counted_today = set()
             
             # Handle EE=4 (both 22° parhelia) - splits into EE=2 + EE=3
             halos_to_count = []
-            if obs.EE == 4:
+            if _int(obs, 'EE') == 4:
                 # EE=4 splits into EE=2 (left parhelion) and EE=3 (right parhelion)
                 # Check if EE=2 hasn't been counted yet
-                if (obs.TT, obs.KK, obs.O, 2) not in counted_today:
+                if (_int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'), 2) not in counted_today:
                     halos_to_count.append(2)
-                    counted_today.add((obs.TT, obs.KK, obs.O, 2))
+                    counted_today.add((_int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'), 2))
                 # Check if EE=3 hasn't been counted yet
-                if (obs.TT, obs.KK, obs.O, 3) not in counted_today:
+                if (_int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'), 3) not in counted_today:
                     halos_to_count.append(3)
-                    counted_today.add((obs.TT, obs.KK, obs.O, 3))
+                    counted_today.add((_int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'), 3))
             else:
                 # Normal halo type - check if not yet counted for this observer today
-                if (obs.TT, obs.KK, obs.O, obs.EE) not in counted_today:
-                    halos_to_count.append(obs.EE)
-                    counted_today.add((obs.TT, obs.KK, obs.O, obs.EE))
+                if (_int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'), _int(obs, 'EE')) not in counted_today:
+                    halos_to_count.append(_int(obs, 'EE'))
+                    counted_today.add((_int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'), _int(obs, 'EE')))
             
             # Count only if this observation adds new halo types
             if halos_to_count:
                 count_increment = len(halos_to_count)
                 
-                if obs.O == 1:
+                if _int(obs, 'O') == 1:
                     # Sun halos
                     sun_ee_count += count_increment
-                    sun_days_set.add((obs.TT, obs.MM))
-                    total_days_set.add((obs.TT, obs.MM))
+                    sun_days_set.add((_int(obs, 'TT'), _int(obs, 'MM')))
+                    total_days_set.add((_int(obs, 'TT'), _int(obs, 'MM')))
                     # Track individual EE counts
                     for ee in halos_to_count:
                         sun_ee_counts[ee] = sun_ee_counts.get(ee, 0) + 1
-                elif obs.O == 2:
+                elif _int(obs, 'O') == 2:
                     # Moon halos
                     moon_ee_count += count_increment
-                    moon_days_set.add((obs.TT, obs.MM))
-                    total_days_set.add((obs.TT, obs.MM))
+                    moon_days_set.add((_int(obs, 'TT'), _int(obs, 'MM')))
+                    total_days_set.add((_int(obs, 'TT'), _int(obs, 'MM')))
                     # Track individual EE counts
                     for ee in halos_to_count:
                         moon_ee_counts[ee] = moon_ee_counts.get(ee, 0) + 1
@@ -4523,7 +4528,7 @@ def get_annual_stats() -> Dict[str, Any]:
         total_ee_count = sun_ee_count + moon_ee_count
         
         # Get sun observations for activity calculation
-        sun_obs = [obs for obs in month_obs if obs.O == 1]
+        sun_obs = [obs for obs in month_obs if _int(obs, 'O') == 1]
         
         # Calculate activity
         activity_data = calculate_halo_activity(
@@ -4571,33 +4576,33 @@ def get_annual_stats() -> Dict[str, Any]:
     
     # First pass: initialize observer stats and count total days (sun + moon)
     for obs in filtered_obs:
-        kk = obs.KK
+        kk = _int(obs, 'KK')
         if kk not in observer_stats:
             observer_stats[kk] = {
                 'ee01': 0, 'ee02': 0, 'ee03': 0, 'ee567': 0,
                 'total_sun_ee': 0, 'sun_days': set(), 'total_days': set()
             }
         # Track all halo days (sun and moon) for total_days
-        observer_stats[kk]['total_days'].add((obs.MM, obs.TT))
+        observer_stats[kk]['total_days'].add((_int(obs, 'MM'), _int(obs, 'TT')))
     
     # Now count sun halos with deduplication
-    filtered_obs.sort(key=lambda o: (o.MM, o.TT, o.KK, o.O, o.EE))
+    filtered_obs.sort(key=lambda o: (_int(o, 'MM'), _int(o, 'TT'), _int(o, 'KK'), _int(o, 'O'), _int(o, 'EE')))
     counted_per_observer = {}  # {kk: {(day, ee): counted}}
     
     for obs in filtered_obs:
-        if obs.O != 1:  # Only sun halos for EE distribution
+        if _int(obs, 'O') != 1:  # Only sun halos for EE distribution
             continue
         
-        kk = obs.KK
+        kk = _int(obs, 'KK')
         if kk not in counted_per_observer:
             counted_per_observer[kk] = {}
         
         # Track per day for this observer (use month+day to make unique across year)
-        day_key = (obs.MM, obs.TT)
+        day_key = (_int(obs, 'MM'), _int(obs, 'TT'))
         
         # Handle EE=4 splitting
         halos_to_count = []
-        if obs.EE == 4:
+        if _int(obs, 'EE') == 4:
             if (day_key, 2) not in counted_per_observer[kk]:
                 halos_to_count.append(2)
                 counted_per_observer[kk][(day_key, 2)] = True
@@ -4605,9 +4610,9 @@ def get_annual_stats() -> Dict[str, Any]:
                 halos_to_count.append(3)
                 counted_per_observer[kk][(day_key, 3)] = True
         else:
-            if (day_key, obs.EE) not in counted_per_observer[kk]:
-                halos_to_count.append(obs.EE)
-                counted_per_observer[kk][(day_key, obs.EE)] = True
+            if (day_key, _int(obs, 'EE')) not in counted_per_observer[kk]:
+                halos_to_count.append(_int(obs, 'EE'))
+                counted_per_observer[kk][(day_key, _int(obs, 'EE'))] = True
         
         # Count for this observer
         for ee in halos_to_count:
@@ -4624,7 +4629,7 @@ def get_annual_stats() -> Dict[str, Any]:
         
         # Track sun halo days only
         if halos_to_count:
-            observer_stats[kk]['sun_days'].add((obs.MM, obs.TT))
+            observer_stats[kk]['sun_days'].add((_int(obs, 'MM'), _int(obs, 'TT')))
     
     # Convert sets to counts and calculate EE1-7
     observer_distribution = []
@@ -4663,35 +4668,35 @@ def get_annual_stats() -> Dict[str, Any]:
     
     for obs in filtered_obs:
         # Group by (MM, TT, KK, O)
-        key = (obs.MM, obs.TT, obs.KK, obs.O)
+        key = (_int(obs, 'MM'), _int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'))
         if key not in phenomena_dict:
             phenomena_dict[key] = {
-                'mm': obs.MM,
-                'tt': obs.TT,
-                'kk': obs.KK,
-                'gg': obs.GG,
-                'zs': obs.ZS,
-                'zm': obs.ZM,
-                'o': obs.O,
+                'mm': _int(obs, 'MM'),
+                'tt': _int(obs, 'TT'),
+                'kk': _int(obs, 'KK'),
+                'gg': _int(obs, 'GG'),
+                'zs': _int(obs, 'ZS', -1),
+                'zm': _int(obs, 'ZM', -1),
+                'o': _int(obs, 'O'),
                 'ee_types': set(),
                 'ee_count': 0  # Track count of EE types
             }
         
         # Add EE type (split if EE=4) and update count
         ee_before = len(phenomena_dict[key]['ee_types'])
-        if obs.EE == 4:
+        if _int(obs, 'EE') == 4:
             phenomena_dict[key]['ee_types'].add(2)
             phenomena_dict[key]['ee_types'].add(3)
         else:
-            phenomena_dict[key]['ee_types'].add(obs.EE)
+            phenomena_dict[key]['ee_types'].add(_int(obs, 'EE'))
         
         ee_after = len(phenomena_dict[key]['ee_types'])
         phenomena_dict[key]['ee_count'] = ee_after
         
         # Update time only if count < 6 (freeze time after 5th EE type confirmed)
         if ee_after < 6:
-            phenomena_dict[key]['zs'] = obs.ZS
-            phenomena_dict[key]['zm'] = obs.ZM
+            phenomena_dict[key]['zs'] = _int(obs, 'ZS', -1)
+            phenomena_dict[key]['zm'] = _int(obs, 'ZM', -1)
     
     # Filter for only phenomena with 5+ EE types and convert to sorted list
     phenomena_list = []
@@ -5279,9 +5284,9 @@ def update_observer(kk: str) -> Dict[str, Any]:
                 obs_updated_count = 0
                 for obs in observations:
                     # Check if observation belongs to this observer
-                    if getattr(obs, 'KK', None) == kk:
-                        obs.VName = first_updated['VName']
-                        obs.NName = first_updated['NName']
+                    if obs.get('KK') == kk:
+                        obs['VName'] = first_updated['VName']
+                        obs['NName'] = first_updated['NName']
                         obs_updated_count += 1
             
             return jsonify({
@@ -6063,21 +6068,21 @@ def _calculate_observation_solar_altitude(obs, observers_list, sh_type='mean'):
         Solar altitude in degrees (integer), or None if not calculable
     """
     # Only calculate for sun observations
-    if obs.O != 1:
+    if _int(obs, 'O') != 1:
         return None
     
     # Skip if g=1 (observation outside known sites - location unknown)
-    if obs.g == 1:
+    if _int(obs, 'g') == 1:
         return None
     
     # Find observer record valid for this observation date
-    observer_kk = str(obs.KK).zfill(2)
+    observer_kk = str(_int(obs, 'KK')).zfill(2)
     observer_record = None
     
     # Convert observation date to comparable format
     # obs.JJ uses (YEAR_MIN-1900) boundary for 19xx/20xx
-    obs_month = obs.MM
-    obs_year_2digit = obs.JJ
+    obs_month = _int(obs, 'MM')
+    obs_year_2digit = _int(obs, 'JJ')
     obs_year = jj_to_full_year(obs_year_2digit)
     
     # Create sortable seit value for observation: YYYYMM (year*100 + month)
@@ -6112,24 +6117,24 @@ def _calculate_observation_solar_altitude(obs, observers_list, sh_type='mean'):
         return None
     
     # observer_record is already a dict - pass directly to get_observer_coordinates
-    longitude, latitude = get_observer_coordinates(observer_record, obs.g)
+    longitude, latitude = get_observer_coordinates(observer_record, _int(obs, 'g'))
     
     # Calculate solar altitude
     # Convert DD (duration in units of 10 minutes) to actual minutes
     # DD=1 means 10 minutes, DD=2 means 20 minutes, etc.
-    duration_minutes = obs.DD * 10 if obs.DD >= 0 else 0
+    duration_minutes = _int(obs, 'DD') * 10 if _int(obs, 'DD') >= 0 else 0
     
     altitude = calculate_solar_altitude(
-        year=obs.JJ,
-        month=obs.MM,
-        day=obs.TT,
-        hour=obs.ZS,
-        minute=obs.ZM,
+        year=_int(obs, 'JJ'),
+        month=_int(obs, 'MM'),
+        day=_int(obs, 'TT'),
+        hour=_int(obs, 'ZS'),
+        minute=_int(obs, 'ZM'),
         duration=duration_minutes,
         longitude=longitude,
         latitude=latitude,
         altitude_type=sh_type,
-        gg=obs.g
+        gg=_int(obs, 'g')
     )
     
     return altitude
@@ -6160,7 +6165,7 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         # Filter by month and year first
         filtered = []
         for obs in observations:
-            if obs.MM == month and obs.JJ == year:
+            if _int(obs, 'MM') == month and _int(obs, 'JJ') == year:
                 filtered.append(obs)
         
         # Then apply day range if specified
@@ -6175,7 +6180,7 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
                     to_val = int(to_val)
                     result = []
                     for obs in filtered:
-                        if from_val <= obs.TT <= to_val:
+                        if from_val <= _int(obs, 'TT') <= to_val:
                             result.append(obs)
                     return result
                 except (ValueError, TypeError):
@@ -6229,14 +6234,14 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         if from_val > to_val:
             # Range crosses century (e.g., (YEAR_MIN-1900)-1 wrap across 19xx/20xx)
             for obs in observations:
-                val = getattr(obs, param_name, None)
-                if val is not None and (from_val <= val <= 99 or 0 <= val <= to_val):
+                val = _int(obs, param_name, -1)
+                if val != -1 and (from_val <= val <= 99 or 0 <= val <= to_val):
                     result.append(obs)
         else:
             # Normal range within same century
             for obs in observations:
-                val = getattr(obs, param_name, None)
-                if val is not None and from_val <= val <= to_val:
+                val = _int(obs, param_name, -1)
+                if val != -1 and from_val <= val <= to_val:
                     result.append(obs)
         
         return result
@@ -6251,13 +6256,13 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         
         result = []
         for obs in observations:
-            zz = obs.ZS if hasattr(obs, 'ZS') else 0
+            zz = _int(obs, 'ZS')
             
             # If local time requested, convert from CET to observer's local time
             if use_local:
                 # Get observer's region to determine timezone offset
                 # GG contains the geographic region code
-                region_code = obs.GG if hasattr(obs, 'GG') else 0
+                region_code = _int(obs, 'GG')
                 
                 # Calculate timezone offset based on region
                 # This is a simplified approach - in reality, timezones are complex
@@ -6291,7 +6296,7 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         result = []
         for obs in observations:
             # Filter out observations that can't have solar altitude calculated
-            if obs.O != 1 or obs.g == 1:
+            if _int(obs, 'O') != 1 or _int(obs, 'g') == 1:
                 continue
             
             sh_type = all_params.get('sh_type', 'mean')
@@ -6304,19 +6309,19 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         # Pillar height parameter - check both HO and HU values
         result = []
         for obs in observations:
-            ho = getattr(obs, 'HO', None)
-            hu = getattr(obs, 'HU', None)
+            ho = _int(obs, 'HO', -1)
+            hu = _int(obs, 'HU', -1)
             # Include observation if either HO or HU is in range
-            if (ho is not None and from_val <= ho <= to_val) or \
-               (hu is not None and from_val <= hu <= to_val):
+            if (ho != -1 and from_val <= ho <= to_val) or \
+               (hu != -1 and from_val <= hu <= to_val):
                 result.append(obs)
         return result
     else:
         # Numeric range parameters
         result = []
         for obs in observations:
-            val = getattr(obs, param_name, None)
-            if val is not None and from_val <= val <= to_val:
+            val = _int(obs, param_name, -1)
+            if val != -1 and from_val <= val <= to_val:
                 result.append(obs)
         return result
 
@@ -6352,8 +6357,8 @@ def _apply_tt_range_filter(observations, all_params, prefix):
     result = []
     for obs in observations:
         # Only include observations from the specified month and year, within day range
-        if obs.MM == month and obs.JJ == year:
-            if day_from <= obs.TT <= day_to:
+        if _int(obs, 'MM') == month and _int(obs, 'JJ') == year:
+            if day_from <= _int(obs, 'TT') <= day_to:
                 result.append(obs)
     
     return result
@@ -6383,27 +6388,29 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
                 filter_year = filter_year % 100
             
             # Match all three: day, month, year
-            return (obs.TT == filter_day and 
-                    obs.MM == filter_month and 
-                    obs.JJ == filter_year)
+            return (_int(obs, 'TT') == filter_day and 
+                    _int(obs, 'MM') == filter_month and 
+                    _int(obs, 'JJ') == filter_year)
         except (ValueError, TypeError):
             return False
     
     # Get the parameter value from observation
     # Special handling for ZZ (time) - use ZS (hour) field
     if param_name == 'ZZ':
-        obs_value = getattr(obs, 'ZS', None)
+        obs_value = _int(obs, 'ZS', -1)
+        if obs_value == -1:
+            obs_value = None
         # Apply timezone conversion if needed
         if obs_value is not None:
             timezone_key = f'{prefix}_timezone'
             use_local = all_params.get(timezone_key) == 'local'
             if use_local:
-                region_code = getattr(obs, 'GG', None)
+                region_code = _int(obs, 'GG')
                 offset = _get_timezone_offset(region_code)
                 obs_value = (obs_value + offset) % 24
     elif param_name == 'SH':
         # Solar altitude - must be calculated (only for sun observations at known locations)
-        if obs.O != 1 or obs.g == 1:
+        if _int(obs, 'O') != 1 or _int(obs, 'g') == 1:
             obs_value = None
         else:
             observers = current_app.config.get('OBSERVERS', [])
@@ -6411,11 +6418,11 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
             obs_value = _calculate_observation_solar_altitude(obs, observers, sh_type)
     elif param_name == 'SE':
         # Sectors: check if the filter octant letter is present in the sectors string
-        sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
+        sector_letters = _extract_sector_letters(obs.get('sectors', ''))
         # param_value should be a single letter a-h
         return param_value.lower() in sector_letters
     else:
-        obs_value = getattr(obs, param_name, None)
+        obs_value = obs.get(param_name)
     
 
     
@@ -6450,10 +6457,10 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
             return False
         if all_params.get(split_key):
             # When split, compare the full C value
-            return obs.C == param_value
+            return _int(obs, 'C', -1) == param_value
         else:
             # When not split, compare without suffix
-            return str(obs.C).rstrip('+') == str(param_value)
+            return str(_int(obs, 'C', -1)).rstrip('+') == str(param_value)
     
     elif param_name == 'EE':
         # Halo type can have split option
@@ -6463,9 +6470,9 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
         except (ValueError, TypeError):
             return False
         if all_params.get(split_key):
-            return obs.EE == param_value
+            return _int(obs, 'EE', -1) == param_value
         else:
-            return str(obs.EE).rstrip('*') == str(param_value)
+            return str(_int(obs, 'EE', -1)).rstrip('*') == str(param_value)
     
     elif param_name == 'HO_HU':
         # Match if either HO or HU equals the requested height (only valid when >=0)
@@ -6473,10 +6480,10 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
             param_value = int(param_value)
         except (ValueError, TypeError):
             return False
-        ho = getattr(obs, 'HO', None)
-        hu = getattr(obs, 'HU', None)
-        ho_match = ho is not None and ho >= 0 and ho == param_value
-        hu_match = hu is not None and hu >= 0 and hu == param_value
+        ho = _int(obs, 'HO', -1)
+        hu = _int(obs, 'HU', -1)
+        ho_match = ho != -1 and ho >= 0 and ho == param_value
+        hu_match = hu != -1 and hu >= 0 and hu == param_value
         return ho_match or hu_match
 
     elif param_name == 'DD':
@@ -6491,7 +6498,8 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
             return True
         else:
             # Exclude observations with kA or kE
-            return obs.DD is not None and obs.DD not in ['kA', 'kE', '', None]
+            dd_val = obs.get('DD')
+            return dd_val is not None and dd_val not in ['kA', 'kE', '', '-1']
     
     return obs_value == param_value
 
@@ -6515,38 +6523,40 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
         # Special handling for TT (day) - observations are already filtered by month/year in _apply_param_range_filter
         if param_name == 'TT':
             # Just use the day value directly - filtering by month/year already done
-            value = obs.TT
+            value = _int(obs, 'TT')
         # Special handling for ZZ (time) - use ZS (hour) field
         elif param_name == 'ZZ':
-            value = getattr(obs, 'ZS', None)
+            value = _int(obs, 'ZS', -1)
+            if value == -1:
+                value = None
             
             # Apply timezone conversion if needed
             if value is not None and use_local:
-                region_code = obs.GG if hasattr(obs, 'GG') else 0
+                region_code = _int(obs, 'GG')
                 offset = _get_timezone_offset(region_code)
                 value = (value + offset) % 24
         elif param_name == 'SH':
             # Solar altitude - must be calculated (only for sun observations at known locations)
-            if obs.O != 1 or obs.g == 1:
+            if _int(obs, 'O') != 1 or _int(obs, 'g') == 1:
                 value = None
             else:
                 sh_type = all_params.get('sh_type', 'mean')
                 value = _calculate_observation_solar_altitude(obs, observers, sh_type)
         elif param_name == 'HO_HU':
             # Light pillar heights: count both HO and HU if present (>=0)
-            ho = getattr(obs, 'HO', None)
-            hu = getattr(obs, 'HU', None)
+            ho = _int(obs, 'HO', -1)
+            hu = _int(obs, 'HU', -1)
             added = False
-            if ho is not None and ho >= 0:
+            if ho >= 0:
                 groups[str(ho)] += 1
                 added = True
-            if hu is not None and hu >= 0:
+            if hu >= 0:
                 groups[str(hu)] += 1
                 added = True
             value = None if added else None
         elif param_name == 'C':
             # Cirrus type with split option
-            value = getattr(obs, 'C', None)
+            value = obs.get('C')
             split_key = f'{prefix}_c_split'
             if value is not None and all_params.get(split_key):
                 # When split is enabled, expand C4/C5/C6/C7 into components
@@ -6570,7 +6580,7 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
                     value = None  # Don't count again below
         elif param_name == 'EE':
             # Halo type with split option
-            value = getattr(obs, 'EE', None)
+            value = obs.get('EE')
             split_key = f'{prefix}_ee_split'
             if value is not None and all_params.get(split_key):
                 # When split is enabled, expand combined halo types into components
@@ -6585,25 +6595,25 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
             # V=2 (complete halo) + circular halo type: all segments a-h are visible
             # V=1 (incomplete halo) OR non-circular: only explicitly listed segments are visible
             # No segments: "nicht zutreffend" - skip this observation entirely
-            v = getattr(obs, 'V', None)
-            ee = getattr(obs, 'EE', None)
+            v = _int(obs, 'V', -1)
+            ee = _int(obs, 'EE', -1)
             
             # Check if this is a circular halo type
-            is_circular = ee in CIRCULAR_HALOS if ee is not None else False
+            is_circular = ee in CIRCULAR_HALOS if ee != -1 else False
             
             if v == 2 and is_circular:
                 # Complete circular halo: count all segments a-h
                 sector_letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
             else:
                 # Incomplete halo or non-circular: extract explicit sectors
-                sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
+                sector_letters = _extract_sector_letters(obs.get('sectors', ''))
             
             # Only count observations that have sectors (skip "nicht zutreffend")
             for letter in sector_letters:
                 groups[letter] += 1
             continue  # Skip further processing for this observation
         else:
-            value = getattr(obs, param_name, None)
+            value = obs.get(param_name)
         
         # Convert 2-digit years to 4-digit years for JJ parameter
         if param_name == 'JJ' and value is not None:
@@ -6757,12 +6767,12 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         # Get values for both parameters
         # Special handling for ZZ (time) - use ZS (hour) field
         if param1_name == 'ZZ':
-            val1 = getattr(obs, 'ZS', None)
+            val1 = _int(obs, 'ZS', -1)
             # ZS=-1 means time not specified - skip this observation for time analysis
             if val1 == -1:
                 continue
         elif param1_name == 'SH':
-            if obs.O != 1 or obs.g == 1:
+            if _int(obs, 'O') != 1 or _int(obs, 'g') == 1:
                 val1 = None
                 sh_debug['param1_none'] += 1
             else:
@@ -6772,15 +6782,15 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 if val1 is None:
                     sh_debug['param1_none'] += 1
         else:
-            val1 = getattr(obs, param1_name, None)
+            val1 = obs.get(param1_name)
         
         if param2_name == 'ZZ':
-            val2 = getattr(obs, 'ZS', None)
+            val2 = _int(obs, 'ZS', -1)
             # ZS=-1 means time not specified - skip this observation for time analysis
             if val2 == -1:
                 continue
         elif param2_name == 'SH':
-            if obs.O != 1 or obs.g == 1:
+            if _int(obs, 'O') != 1 or _int(obs, 'g') == 1:
                 val2 = None
                 sh_debug['param2_none'] += 1
             else:
@@ -6790,20 +6800,20 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 if val2 is None:
                     sh_debug['param2_none'] += 1
         else:
-            val2 = getattr(obs, param2_name, None)
+            val2 = obs.get(param2_name)
         
         # Apply timezone conversion for time parameters if needed
         if param1_name == 'ZZ' and val1 is not None:
             use_local = all_params.get('param1_timezone') == 'local'
             if use_local:
-                region_code = getattr(obs, 'GG', None)
+                region_code = _int(obs, 'GG')
                 offset = _get_timezone_offset(region_code)
                 val1 = (val1 + offset) % 24
         
         if param2_name == 'ZZ' and val2 is not None:
             use_local = all_params.get('param2_timezone') == 'local'
             if use_local:
-                region_code = getattr(obs, 'GG', None)
+                region_code = _int(obs, 'GG')
                 offset = _get_timezone_offset(region_code)
                 val2 = (val2 + offset) % 24
         
@@ -6818,11 +6828,11 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             # V=2 + circular halo type: all 8 segments a-h are visible
             # V=1 + circular halo type: parse sectors field
             # Non-circular halos: should NOT have sectors (would be error)
-            v = getattr(obs, 'V', None)
-            ee = getattr(obs, 'EE', None)
+            v = _int(obs, 'V', -1)
+            ee = _int(obs, 'EE', -1)
             
             # Check if this is a circular halo type
-            is_circular = ee in CIRCULAR_HALOS if ee is not None else False
+            is_circular = ee in CIRCULAR_HALOS if ee != -1 else False
             
             if is_circular:
                 if v == 2:
@@ -6830,7 +6840,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                     val1_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
                 elif v == 1:
                     # V=1 + circular: parse sectors field
-                    sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
+                    sector_letters = _extract_sector_letters(obs.get('sectors', ''))
                     val1_list = sector_letters if sector_letters else []
                 else:
                     # Other V values: skip
@@ -6839,17 +6849,17 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 # Non-circular halos: no sectors
                 val1_list = []
         elif param1_name == 'HO_HU':
-            ho = getattr(obs, 'HO', None)
-            hu = getattr(obs, 'HU', None)
+            ho = _int(obs, 'HO', -1)
+            hu = _int(obs, 'HU', -1)
             val1_list = []
-            if ho is not None and ho >= 0:
+            if ho >= 0:
                 val1_list.append(str(ho))
-            if hu is not None and hu >= 0:
+            if hu >= 0:
                 val1_list.append(str(hu))
             if not val1_list:
                 val1_list = ['keine Angabe']
             if len(hohu_debug['samples']) < 5:
-                hohu_debug['samples'].append({'obs': obs.__dict__.get('KK', None), 'ho': ho, 'hu': hu, 'val1_list': list(val1_list)})
+                hohu_debug['samples'].append({'obs': obs.get('KK'), 'ho': ho, 'hu': hu, 'val1_list': list(val1_list)})
             hohu_debug['processed'] += 1
         elif param1_name == 'C' and val1 is not None and all_params.get('param1_c_split'):
             c_value = int(val1) if isinstance(val1, (int, str)) else val1
@@ -6880,11 +6890,11 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             # V=2 + circular halo type: all 8 segments a-h are visible
             # V=1 + circular halo type: parse sectors field
             # Non-circular halos: should NOT have sectors (would be error)
-            v = getattr(obs, 'V', None)
-            ee = getattr(obs, 'EE', None)
+            v = _int(obs, 'V', -1)
+            ee = _int(obs, 'EE', -1)
             
             # Check if this is a circular halo type
-            is_circular = ee in CIRCULAR_HALOS if ee is not None else False
+            is_circular = ee in CIRCULAR_HALOS if ee != -1 else False
             
             if is_circular:
                 if v == 2:
@@ -6892,7 +6902,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                     val2_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
                 elif v == 1:
                     # V=1 + circular: parse sectors field
-                    sector_letters = _extract_sector_letters(getattr(obs, 'sectors', ''))
+                    sector_letters = _extract_sector_letters(obs.get('sectors', ''))
                     val2_list = sector_letters if sector_letters else []
                 else:
                     # Other V values: skip
@@ -6901,17 +6911,17 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 # Non-circular halos: no sectors
                 val2_list = []
         elif param2_name == 'HO_HU':
-            ho = getattr(obs, 'HO', None)
-            hu = getattr(obs, 'HU', None)
+            ho = _int(obs, 'HO', -1)
+            hu = _int(obs, 'HU', -1)
             val2_list = []
-            if ho is not None and ho >= 0:
+            if ho >= 0:
                 val2_list.append(str(ho))
-            if hu is not None and hu >= 0:
+            if hu >= 0:
                 val2_list.append(str(hu))
             if not val2_list:
                 val2_list = ['keine Angabe']
             if param1_name != 'HO_HU' and len(hohu_debug['samples']) < 5:
-                hohu_debug['samples'].append({'obs': obs.__dict__.get('KK', None), 'ho': ho, 'hu': hu, 'val2_list': list(val2_list)})
+                hohu_debug['samples'].append({'obs': obs.get('KK'), 'ho': ho, 'hu': hu, 'val2_list': list(val2_list)})
             hohu_debug['processed'] += 1
         elif param2_name == 'C' and val2 is not None and all_params.get('param2_c_split'):
             c_value = int(val2) if isinstance(val2, (int, str)) else val2
@@ -7140,6 +7150,10 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
 def _format_parameter_value(value, param_name, all_params, prefix):
     """Format a parameter value for display."""
     
+    # FIXME: 'keine Angabe' is hardcoded German in 7 places across _group_by_parameter
+    # and _group_by_two_parameters (used as dict grouping key AND display value).
+    # Fix: use a language-neutral internal key (e.g. '__not_observed__') for grouping,
+    # then translate to i18n observations.not_observed only here for display.
     
     if value is None:
         return 'keine Angabe'
