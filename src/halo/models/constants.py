@@ -114,6 +114,17 @@ HALO_BRIGHTNESS_FACTORS = {
     3: 1.4
 }
 
+def _int(obs, key, default=0):
+    """Safely get an integer value from an observation dict."""
+    val = obs.get(key, '')
+    if val is None or val == '' or val == ' ':
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def calculate_halo_activity(observations, observers, mm, jj, active_observers_only=True):
     """
     Calculate halo activity for a month (reusable function).
@@ -150,43 +161,56 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
     observer_not_found_count = 0
     
     for obs in observations:
+        # Extract int values from dict once per observation
+        obs_MM = _int(obs, 'MM')
+        obs_JJ = _int(obs, 'JJ')
+        obs_O = _int(obs, 'O')
+        obs_GG = _int(obs, 'GG')
+        obs_d = _int(obs, 'd')
+        obs_g = _int(obs, 'g')
+        obs_KK = _int(obs, 'KK')
+        obs_EE = _int(obs, 'EE')
+        obs_H = _int(obs, 'H')
+        obs_DD = _int(obs, 'DD')
+        obs_TT = _int(obs, 'TT')
+
         # Filter criteria from Pascal code (lines 823-826)
-        if obs.MM != mm or obs.JJ != jj:
+        if obs_MM != mm or obs_JJ != jj:
             continue
-        if obs.O != 1:  # Only solar halos
+        if obs_O != 1:  # Only solar halos
             continue
-        if obs.GG not in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 21, 26, 27, 29, 32}:  # Germany + neighbors
+        if obs_GG not in {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 21, 26, 27, 29, 32}:  # Germany + neighbors
             continue
-        if obs.d < -1 or obs.d > 2:  # Cirrus condition (d = cirrus density)
+        if obs_d < -1 or obs_d > 2:  # Cirrus condition (d = cirrus density)
             continue
-        if obs.g == 1:  # Exclude "other location"
+        if obs_g == 1:  # Exclude "other location"
             continue
         
         filtered_count += 1
         
         # Check if observer exists in observer data
-        kk = str(obs.KK).zfill(2)
+        kk = str(obs_KK).zfill(2)
         
         # Track active observers for this month
         active_observers.add(kk)
         
         # Log first few KK values to see format
         if filtered_count <= 3:
-            logger.info(f"Processing obs: KK={kk} (from obs.KK={obs.KK}), checking if in observers dict...")
+            logger.info(f"Processing obs: KK={kk} (from obs_KK={obs_KK}), checking if in observers dict...")
         
         # Calculate weight factor (lines 828-834)
-        factor = HALO_TYPE_FACTORS[obs.EE] * HALO_BRIGHTNESS_FACTORS.get(obs.H, 1.0)
+        factor = HALO_TYPE_FACTORS[obs_EE] * HALO_BRIGHTNESS_FACTORS.get(obs_H, 1.0)
         
         # Duration/completeness adjustment
-        if obs.DD > 0:
-            factor = factor * obs.DD / 6.0
-        elif obs.DD == 0:
+        if obs_DD > 0:
+            factor = factor * obs_DD / 6.0
+        elif obs_DD == 0:
             factor = factor / 12.0
         else:  # DD < 0
             factor = factor / 6.0
         
         # Add to real activity
-        real_activity[obs.TT] += factor
+        real_activity[obs_TT] += factor
         
         # Calculate relative activity with daylight factor
         # Determine latitude from observer data
@@ -198,7 +222,7 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
             # Extract latitude from observer record (now always a dict)
             # Primary site (g=0): HBG, HBM, HNS
             # Secondary site (g=2): NBG, NBM, NNS
-            if obs.g == 0:  # Primary site
+            if obs_g == 0:  # Primary site
                 lat_deg_str = observer_record.get('HBG', '')
                 lat_min_str = observer_record.get('HBM', '')
                 lat_ns = observer_record.get('HNS', '')
@@ -218,13 +242,13 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
                 latitude = -latitude
             
             # Daylight factor (matches Pascal SFaktor function)
-            daylight_factor = calculate_daylight_factor(obs.TT, mm, latitude)
+            daylight_factor = calculate_daylight_factor(obs_TT, mm, latitude)
             
-            relative_activity[obs.TT] += factor * daylight_factor
+            relative_activity[obs_TT] += factor * daylight_factor
         else:
             # No observer data, use real activity
             observer_not_found_count += 1
-            relative_activity[obs.TT] += factor
+            relative_activity[obs_TT] += factor
     
     # Normalize by number of active observers
     active_count = len(active_observers)

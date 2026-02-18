@@ -1,8 +1,14 @@
 """
 Core data structures for HALO observations and observers
 Translated from H_TYPES.PAS
+
+DEPRECATED: The Observation dataclass below is no longer used.
+All observation data is now represented as Dict[str, str] throughout
+the codebase (io layer, routes, constants). This file is kept for
+historical reference only. See Phase 1-3 refactoring (Feb 2026).
 """
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -10,8 +16,14 @@ from typing import Optional
 @dataclass
 class Observation:
     """
+    DEPRECATED - Use Dict[str, str] instead.
+    
     Observation record (Beobachtg in Pascal)
     Represents a single halo observation
+    
+    This dataclass is no longer imported or used anywhere in the codebase.
+    All observation handling now uses Dict[str, str] with string values.
+    Kept for historical reference of the original field definitions.
     
     Field sizes maintained for binary compatibility:
     - Byte fields: 0-255
