@@ -664,9 +664,9 @@ def _spaeter(a, b) -> int:
     return spt
 
 
-@api_blueprint.route('/observations/filter', methods=['POST'])
-def filter_observations() -> Dict[str, Any]:
-    """Filter observations server-side using SQL (cloud) or Python (local).
+@api_blueprint.route('/observations/search', methods=['POST'])
+def search_observations() -> Dict[str, Any]:
+    """Search observations server-side using SQL (cloud) or Python (local).
     
     Accepts filter criteria matching the two-stage filter dialog:
     - criterion1: 'observer' or 'region' with value1

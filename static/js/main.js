@@ -3094,7 +3094,7 @@ async function showDeleteSingleObservations(filterState) {
 async function applyFilterToObservations(filterState) {
     // Use server-side filtering for performance (SQL in cloud mode, Python in local mode)
     try {
-        const response = await fetch('/api/observations/filter', {
+        const response = await fetch('/api/observations/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
