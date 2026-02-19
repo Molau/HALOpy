@@ -3092,46 +3092,26 @@ async function showDeleteSingleObservations(filterState) {
 
 // Apply filter criteria to observations
 async function applyFilterToObservations(filterState) {
-    // Fetch all observations from server (supports auto-loaded files)
-    let allObs = [];
+    // Use server-side filtering for performance (SQL in cloud mode, Python in local mode)
     try {
-        const response = await fetch('/api/observations?limit=200000');
+        const response = await fetch('/api/observations/filter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                criterion1: filterState.criterion1 || null,
+                value1: filterState.value1 !== undefined ? filterState.value1 : null,
+                criterion2: filterState.criterion2 || null,
+                value2: filterState.value2 !== undefined ? filterState.value2 : null
+            })
+        });
         if (response.ok) {
             const data = await response.json();
-            allObs = data.observations || [];
+            return data.observations || [];
         }
-    } catch (error) {return [];
+        return [];
+    } catch (error) {
+        return [];
     }
-    
-    return allObs.filter(obs => {
-        // First filter criterion
-        if (filterState.criterion1 === 'region' && filterState.value1 !== null) {}
-        if (filterState.criterion1 === 'observer') {
-            if (filterState.value1 !== null && obs.KK !== filterState.value1) return false;
-        } else if (filterState.criterion1 === 'region') {
-            if (filterState.value1 !== null && obs.GG !== filterState.value1) return false;
-        }
-        
-        // Second filter criterion
-        if (filterState.criterion2 === 'date') {
-            if (filterState.value2) {
-                // Only enforce fields that were selected (null means "any")
-                if (filterState.value2.t !== null && obs.TT !== filterState.value2.t) return false;
-                if (filterState.value2.m !== null && obs.MM !== filterState.value2.m) return false;
-                if (filterState.value2.j !== null && obs.JJ !== filterState.value2.j) return false;
-            }
-        } else if (filterState.criterion2 === 'month') {
-            if (filterState.value2 && (obs.MM !== filterState.value2.m || obs.JJ !== filterState.value2.j)) {
-                return false;
-            }
-        } else if (filterState.criterion2 === 'year') {
-            if (filterState.value2 !== null && obs.JJ !== filterState.value2) return false;
-        } else if (filterState.criterion2 === 'halo-type') {
-            if (filterState.value2 !== null && obs.EE !== filterState.value2) return false;
-        }
-        
-        return true;
-    });
 }
 
 // Format observation for display in confirmation dialog (Men?eingabe format)

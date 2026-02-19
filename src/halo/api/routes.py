@@ -664,6 +664,96 @@ def _spaeter(a, b) -> int:
     return spt
 
 
+@api_blueprint.route('/observations/filter', methods=['POST'])
+def filter_observations() -> Dict[str, Any]:
+    """Filter observations server-side using SQL (cloud) or Python (local).
+    
+    Accepts filter criteria matching the two-stage filter dialog:
+    - criterion1: 'observer' or 'region' with value1
+    - criterion2: 'date', 'month', 'year', or 'halo-type' with value2
+    
+    Returns filtered observations as JSON array.
+    """
+    data = request.get_json() or {}
+    criterion1 = data.get('criterion1')
+    value1 = data.get('value1')
+    criterion2 = data.get('criterion2')
+    value2 = data.get('value2')
+    
+    if is_cloud_mode():
+        # Cloud Mode: Build SQL filters for load_filtered()
+        filters = {}
+        
+        # Fixed observer filter (per-user session)
+        fixed_observer = session.get('observer_kk')
+        if fixed_observer:
+            filters['kk'] = int(fixed_observer)
+        
+        # First criterion
+        if criterion1 == 'observer' and value1 is not None:
+            filters['kk'] = int(value1)
+        elif criterion1 == 'region' and value1 is not None:
+            filters['gg'] = int(value1)
+        
+        # Second criterion
+        if criterion2 == 'date' and value2:
+            if value2.get('t') is not None:
+                filters['tt'] = int(value2['t'])
+            if value2.get('m') is not None:
+                filters['mm'] = int(value2['m'])
+            if value2.get('j') is not None:
+                filters['jj'] = int(value2['j'])
+        elif criterion2 == 'month' and value2:
+            if value2.get('m') is not None:
+                filters['mm'] = int(value2['m'])
+            if value2.get('j') is not None:
+                filters['jj'] = int(value2['j'])
+        elif criterion2 == 'year' and value2 is not None:
+            filters['jj'] = int(value2)
+        elif criterion2 == 'halo-type' and value2 is not None:
+            filters['ee'] = int(value2)
+        
+        observations = obs_db.load_filtered(**filters) if filters else obs_db.load_all()
+    else:
+        # Local Mode: Filter in Python (still faster than sending all to browser)
+        observations = current_app.config.get('OBSERVATIONS') or []
+        
+        def matches(obs):
+            if criterion1 == 'observer' and value1 is not None:
+                if _int(obs, 'KK') != int(value1):
+                    return False
+            elif criterion1 == 'region' and value1 is not None:
+                if _int(obs, 'GG') != int(value1):
+                    return False
+            
+            if criterion2 == 'date' and value2:
+                if value2.get('t') is not None and _int(obs, 'TT') != int(value2['t']):
+                    return False
+                if value2.get('m') is not None and _int(obs, 'MM') != int(value2['m']):
+                    return False
+                if value2.get('j') is not None and _int(obs, 'JJ') != int(value2['j']):
+                    return False
+            elif criterion2 == 'month' and value2:
+                if value2.get('m') is not None and _int(obs, 'MM') != int(value2['m']):
+                    return False
+                if value2.get('j') is not None and _int(obs, 'JJ') != int(value2['j']):
+                    return False
+            elif criterion2 == 'year' and value2 is not None:
+                if _int(obs, 'JJ') != int(value2):
+                    return False
+            elif criterion2 == 'halo-type' and value2 is not None:
+                if _int(obs, 'EE') != int(value2):
+                    return False
+            return True
+        
+        observations = [obs for obs in observations if matches(obs)]
+    
+    return jsonify({
+        'observations': [_obs_to_json(obs) for obs in observations],
+        'count': len(observations)
+    })
+
+
 @api_blueprint.route('/observations', methods=['POST'])
 def add_observation() -> Dict[str, Any]:
     """Add a new observation to the in-memory list or database (Zahleneingabe)."""

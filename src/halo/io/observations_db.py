@@ -64,12 +64,15 @@ def _observation_to_tuple(obs: Dict[str, str]) -> Tuple:
             return None
     
     # Format pillar field: "8HHHH" where HH=HO, HH=HU
+    # Each HH can be digits (01-90) or "//" (not specified)
     ho = obs.get('HO', '')
     hu = obs.get('HU', '')
     ho_int = to_int_or_none(ho)
     hu_int = to_int_or_none(hu)
     if ho_int is not None and ho_int > 0 or hu_int is not None and hu_int > 0:
-        pillar = f"8{(ho_int or 0):02d}{(hu_int or 0):02d}"
+        ho_str = f"{ho_int:02d}" if ho_int is not None and ho_int > 0 else '//'
+        hu_str = f"{hu_int:02d}" if hu_int is not None and hu_int > 0 else '//'
+        pillar = f"8{ho_str}{hu_str}"
     else:
         pillar = ""
     
@@ -120,17 +123,27 @@ def _tuple_to_observation(row: Tuple) -> Dict[str, str]:
         return str(value)
     
     # Parse pillar field: "8HHHH" → HO, HU
+    # Format: "8XXYY" where XX=HO, YY=HU; each can be digits or "//" (not specified)
     # Special values: "//" or NULL = not observed (stored as '' in Dict)
     pillar = row[20] or ""
-    if not pillar or pillar == "//":
+    if not pillar or len(pillar) < 5 or pillar[0] != '8':
         HO = ''
         HU = ''
-    elif len(pillar) >= 3 and pillar[1:3].isdigit():
-        HO = pillar[1:3].lstrip('0') or '0'
-        HU = pillar[3:5].lstrip('0') or '0' if len(pillar) >= 5 and pillar[3:5].isdigit() else '0'
     else:
-        HO = ''
-        HU = ''
+        ho_part = pillar[1:3]
+        hu_part = pillar[3:5]
+        if ho_part == '//':
+            HO = ''
+        elif ho_part.isdigit():
+            HO = ho_part.lstrip('0') or '0'
+        else:
+            HO = ''
+        if hu_part == '//':
+            HU = ''
+        elif hu_part.isdigit():
+            HU = hu_part.lstrip('0') or '0'
+        else:
+            HU = ''
     
     # SQL SELECT order: KK, O, JJ, MM, TT, g, ZS, ZM, d, DD, N, C, c, EE, H, F, V, f, zz, GG, pillar, sectors, remarks
     # Index mapping:    0   1  2   3   4   5  6   7   8  9   10  11 12 13  14 15 16 17 18  19  20      21       22
