@@ -1546,7 +1546,6 @@ class ObservationForm {
         this.fields.gg.value = (obs.GG !== undefined && obs.GG !== null) ? obs.GG : '';
         this.fields.ho.value = obs.HO !== -1 && obs.HO !== 0 && obs.HO !== null ? obs.HO : (obs.HO === 0 ? '0' : '-1');
         this.fields.hu.value = obs.HU !== -1 && obs.HU !== 0 && obs.HU !== null ? obs.HU : (obs.HU === 0 ? '0' : '-1');
-        this.fields.hu.value = obs.HU !== -1 && obs.HU !== 0 && obs.HU !== null ? String(obs.HU).padStart(2, '0') : (obs.HU === 0 ? '00' : '-1');
         this.fields.sectors.value = obs.sectors || '';
         this.fields.remarks.value = obs.remarks || '';
         
