@@ -167,29 +167,46 @@ class ObservationCSV:
         return observations, is_legacy
     
     @staticmethod
+    def _norm(value: str) -> str:
+        """Normalize a numeric CSV field: strip whitespace, convert '/' to
+        empty, and remove leading zeros (e.g. '01' → '1', '0' stays '0')."""
+        v = value.strip()
+        if not v or v in ('/', '//'):
+            return ''
+        try:
+            return str(int(v))
+        except ValueError:
+            return ''
+
+    @staticmethod
     def _parse_observation_parts(parts: List[str]) -> Dict[str, str]:
-        """Parse observation from CSV field parts into a Dict[str, str]."""
+        """Parse observation from CSV field parts into a Dict[str, str].
+        
+        Numeric fields are normalized: '/' → '' (empty), leading zeros
+        stripped.  Text fields (sectors, remarks) are only whitespace-stripped.
+        """
+        _n = ObservationCSV._norm
         obs = {}
-        obs['KK'] = parts[0].strip()
-        obs['O'] = parts[1].strip()
-        obs['JJ'] = parts[2].strip()
-        obs['MM'] = parts[3].strip()
-        obs['TT'] = parts[4].strip()
-        obs['g'] = parts[5].strip()
-        obs['ZS'] = parts[6].strip()
-        obs['ZM'] = parts[7].strip()
-        obs['d'] = parts[8].strip()
-        obs['DD'] = parts[9].strip()
-        obs['N'] = parts[10].strip()
-        obs['C'] = parts[11].strip()
-        obs['c'] = parts[12].strip()
-        obs['EE'] = parts[13].strip()
-        obs['H'] = parts[14].strip()
-        obs['F'] = parts[15].strip()
-        obs['V'] = parts[16].strip()
-        obs['f'] = parts[17].strip()
-        obs['zz'] = parts[18].strip()
-        obs['GG'] = parts[19].strip()
+        obs['KK'] = _n(parts[0])
+        obs['O'] = _n(parts[1])
+        obs['JJ'] = _n(parts[2])
+        obs['MM'] = _n(parts[3])
+        obs['TT'] = _n(parts[4])
+        obs['g'] = _n(parts[5])
+        obs['ZS'] = _n(parts[6])
+        obs['ZM'] = _n(parts[7])
+        obs['d'] = _n(parts[8])
+        obs['DD'] = _n(parts[9])
+        obs['N'] = _n(parts[10])
+        obs['C'] = _n(parts[11])
+        obs['c'] = _n(parts[12])
+        obs['EE'] = _n(parts[13])
+        obs['H'] = _n(parts[14])
+        obs['F'] = _n(parts[15])
+        obs['V'] = _n(parts[16])
+        obs['f'] = _n(parts[17])
+        obs['zz'] = _n(parts[18])
+        obs['GG'] = _n(parts[19])
         
         # Parse 8HHHH field into HO and HU
         ho_hu_field = parts[20].strip() if len(parts) > 20 else '/////'
@@ -200,7 +217,7 @@ class ObservationCSV:
             obs['HO'] = ''
             obs['HU'] = ''
         
-        # Sectors and remarks
+        # Sectors and remarks — text fields, only strip whitespace
         obs['sectors'] = parts[21].strip() if len(parts) > 21 else ''
         # Remarks may contain commas — join all remaining parts back together
         obs['remarks'] = ','.join(parts[22:]).strip() if len(parts) > 22 else ''
