@@ -2020,10 +2020,7 @@ function parseNumericObservation(s) {
     const toInt = (x, allowSlash = false) => {
         if (x === ' ' || x === '') return -1;  // Not observed/unknown
         if (x === '/') {
-            if (!allowSlash) {
-                throw new Error('/ ist nur bei d und 8HHHH erlaubt');
-            }
-            return -2;  // Observed but not present (only for d and 8HHHH)
+            return allowSlash ? -2 : -1;  // -2 = observed but not present (d, 8HHHH), -1 = not specified
         }
         return parseInt(x, 10);
     };
@@ -2031,10 +2028,7 @@ function parseNumericObservation(s) {
     const toInt2 = (x, allowSlash = false) => {
         if (x === '  ' || x === '') return -1;  // Not observed/unknown
         if (x === '//') {
-            if (!allowSlash) {
-                throw new Error('// ist nur bei 8HHHH erlaubt');
-            }
-            return -2;  // Observed but not present (only for 8HHHH)
+            return allowSlash ? -2 : -1;  // -2 = observed but not present (8HHHH), -1 = not specified
         }
         return parseInt(x, 10);
     };
