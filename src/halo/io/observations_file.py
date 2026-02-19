@@ -155,7 +155,7 @@ def new_file(filename: str, base_dir: Optional[Path] = None) -> Path:
     return filepath
 
 
-def open_file(filename: str, base_dir: Optional[Path] = None) -> Tuple[List[Dict[str, str]], Path]:
+def open_file(filename: str, base_dir: Optional[Path] = None) -> Tuple[List[Dict[str, str]], Path, bool]:
     """
     Open observation file and read all observations.
     
@@ -164,13 +164,14 @@ def open_file(filename: str, base_dir: Optional[Path] = None) -> Tuple[List[Dict
         base_dir: Base directory (default: data/)
         
     Returns:
-        Tuple of (observations, filepath)
+        Tuple of (observations, filepath, needs_conversion)
+        needs_conversion=True if file was in legacy format
         
     Raises:
         FileNotFoundError: If file does not exist
         
     Example:
-        >>> observations, path = open_file("observations.csv")
+        >>> observations, path, converted = open_file("observations.csv")
         >>> print(f"Loaded {len(observations)} from {path}")
     """
     filepath = resolve_path(filename, base_dir)
@@ -181,7 +182,7 @@ def open_file(filename: str, base_dir: Optional[Path] = None) -> Tuple[List[Dict
     # Delegate to CSV parser (Layer 4)
     observations, needs_conversion = ObservationCSV.read_observations(str(filepath))
     
-    return observations, filepath
+    return observations, filepath, needs_conversion
 
 
 def save_file(observations: List[Dict[str, str]], filepath: Path) -> None:

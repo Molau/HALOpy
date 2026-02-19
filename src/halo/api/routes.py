@@ -1273,20 +1273,26 @@ def load_file_from_browser() -> Dict[str, Any]:
         try:
             temp_filename = f"upload_{file.filename}"
             shutil.copy(temp_path, obs_file.get_data_path(temp_filename))
-            observations, _ = obs_file.open_file(temp_filename)  # Returns (observations, filepath)
+            observations, _, needs_conversion = obs_file.open_file(temp_filename)
             obs_file.delete_file(temp_filename)  # Clean up after loading
             
             # Store in app config
             current_app.config['LOADED_FILE'] = file.filename
             current_app.config['OBSERVATIONS'] = observations
-            current_app.config['DIRTY'] = False  # File just loaded, no changes yet
+            current_app.config['DIRTY'] = needs_conversion  # Legacy conversion needs saving
+            
+            # Auto-save in modern format if legacy file was converted
+            if needs_conversion:
+                save_path = obs_file.get_data_path(file.filename)
+                obs_file.save_file(observations, save_path)
+                current_app.config['DIRTY'] = False
             
             return jsonify({
                 'success': True,
                 'filename': file.filename,
                 'count': len(observations),
                 'message': f'{len(observations)} Beobachtungen geladen!',
-                'converted': False
+                'converted': needs_conversion
             })
         finally:
             # Clean up temp file
@@ -1380,18 +1386,22 @@ def load_file(filename: str) -> Dict[str, Any]:
             if not filepath.exists():
                 return jsonify({'error': 'File not found'}), 404
             
-            observations = obs_file.open_file(filename)
+            observations, filepath, needs_conversion = obs_file.open_file(filename)
             
             # Store in app config
             current_app.config['LOADED_FILE'] = filename
             current_app.config['OBSERVATIONS'] = observations
             current_app.config['DIRTY'] = False
             
+            # Auto-save in modern format if legacy file was converted
+            if needs_conversion:
+                obs_file.save_file(observations, filepath)
+            
             return jsonify({
                 'success': True,
                 'filename': filename,
                 'count': len(observations),
-                'converted': False  # obs_file.open_file() handles legacy conversion internally
+                'converted': needs_conversion
             })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
