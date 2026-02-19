@@ -606,6 +606,7 @@ class ObservationForm {
                     field.disabled = false;
                 }
             }
+            this.updatePlaceholderText(field);
         };
         
         // Helper: Enable all options
@@ -926,6 +927,7 @@ class ObservationForm {
                 // g=1 (Auswärtsbeobachtung): GG = all available regions (manual entry)
                 enableAllOptions(ggOpts);
                 this.fields.gg.disabled = false;  // Enable field for manual entry
+                this.updatePlaceholderText(this.fields.gg);
                 // Don't overwrite GG if editing
                 if (!this.originalObservation) {
                     this.fields.gg.value = '';
@@ -1421,9 +1423,25 @@ class ObservationForm {
         checkRequired();
     }
     
+    /**
+     * Update the placeholder text of a select field's first option.
+     * Disabled fields show "--", enabled fields show "-- Bitte wählen --" (localized).
+     */
+    updatePlaceholderText(field) {
+        if (!field || field.tagName !== 'SELECT') return;
+        const firstOpt = field.options[0];
+        if (!firstOpt) return;
+        // Only update placeholder options (value is '' or '-1')
+        if (firstOpt.value !== '' && firstOpt.value !== '-1') return;
+        firstOpt.textContent = field.disabled ? '--' : i18nStrings.fields.select;
+    }
+
     disableAllFields() {
         Object.values(this.fields).forEach(field => {
-            if (field) field.disabled = true;
+            if (field) {
+                field.disabled = true;
+                this.updatePlaceholderText(field);
+            }
         });
     }
     
@@ -1469,6 +1487,7 @@ class ObservationForm {
                 if (!this.fixedObserver) {
                     field.disabled = false;
                 }
+                this.updatePlaceholderText(field);
                 return;
             }
             
@@ -1478,6 +1497,7 @@ class ObservationForm {
                 if (g !== 0 && g !== 2) {
                     field.disabled = false;
                 }
+                this.updatePlaceholderText(field);
                 return;
             }
             
@@ -1489,6 +1509,7 @@ class ObservationForm {
                 // Field is not constrained - enable it
                 field.disabled = false;
             }
+            this.updatePlaceholderText(field);
         });
     }
     
