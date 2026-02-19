@@ -202,7 +202,8 @@ class ObservationCSV:
         
         # Sectors and remarks
         obs['sectors'] = parts[21].strip() if len(parts) > 21 else ''
-        obs['remarks'] = parts[22].strip() if len(parts) > 22 else ''
+        # Remarks may contain commas — join all remaining parts back together
+        obs['remarks'] = ','.join(parts[22:]).strip() if len(parts) > 22 else ''
         
         return obs
 
