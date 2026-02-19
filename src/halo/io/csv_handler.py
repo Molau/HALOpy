@@ -78,8 +78,8 @@ class ObservationCSV:
     def _detect_format_and_encoding(filepath: Path) -> Tuple[bool, str]:
         """
         Detect if CSV file is in legacy format and determine encoding.
-        Legacy format has spaces in the sectors field and uses CP850 (DOS).
-        Modern format uses UTF-8.
+        Legacy format has a fixed 15-character sectors field (padded with spaces).
+        Modern format has variable-length sectors (no padding).
         
         Args:
             filepath: Path to CSV file
@@ -87,43 +87,36 @@ class ObservationCSV:
         Returns:
             Tuple of (is_legacy, encoding)
         """
-        # Try UTF-8 first (modern format) - read enough bytes to detect encoding issues
+        def _check_legacy(content: str) -> bool:
+            """Check if content is legacy format by looking for fixed 15-char sectors field."""
+            lines = content.split('\n')
+            for line in lines[:10]:
+                parts = line.rstrip(',').split(',')
+                if len(parts) > 21:
+                    sectors_field = parts[21]
+                    # Legacy format: sectors field is always exactly 15 chars
+                    if len(sectors_field) == 15:
+                        return True
+                    else:
+                        return False
+            return False
+        
+        # Try UTF-8 first (modern format)
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                # Read first 50KB to detect encoding (should cover most files)
                 chunk = f.read(50000)
-                # Now check format in first few lines
-                lines = chunk.split('\n')
-                for line in lines[:10]:
-                    parts = line.rstrip(',').split(',')
-                    if len(parts) > 21:
-                        sectors_field = parts[21]
-                        if len(sectors_field) > len(sectors_field.strip()):
-                            return True, 'utf-8'  # Legacy format with UTF-8
-                        else:
-                            return False, 'utf-8'  # Modern format with UTF-8
-            return False, 'utf-8'  # Default to modern UTF-8
+                is_legacy = _check_legacy(chunk)
+                return is_legacy, 'utf-8'
         except UnicodeDecodeError:
-            # Not UTF-8, try CP850 (DOS encoding)
             pass
         
         # Try CP850 (DOS encoding for legacy files)
         try:
             with open(filepath, 'r', encoding='cp850') as f:
-                # Check format in first few lines
-                for i, line in enumerate(f):
-                    if i >= 10:
-                        break
-                    parts = line.rstrip(',\n').split(',')
-                    if len(parts) > 21:
-                        sectors_field = parts[21]
-                        if len(sectors_field) > len(sectors_field.strip()):
-                            return True, 'cp850'  # Legacy format with DOS encoding
-                        else:
-                            return False, 'cp850'  # Modern format but CP850 encoding
-            return True, 'cp850'  # Default to legacy CP850
+                chunk = f.read(50000)
+                is_legacy = _check_legacy(chunk)
+                return is_legacy, 'cp850'
         except Exception:
-            # Fallback to latin-1 for other encodings
             return False, 'latin-1'
     
     @staticmethod

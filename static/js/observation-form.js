@@ -1274,6 +1274,16 @@ class ObservationForm {
                     this.isEditingMode = true;
                     this.enableAllFields();
                     
+                    // Apply field constraints based on current values
+                    // (same triggers as 'add' mode but for existing data)
+                    this.manageFieldDependencies('o');
+                    this.manageFieldDependencies('d');
+                    this.manageFieldDependencies('n');
+                    this.manageFieldDependencies('kk');
+                    this.manageFieldDependencies('mm');
+                    this.manageFieldDependencies('ee');
+                    this.manageFieldDependencies('v');
+                    
                     // Hide Yes button and Previous/Next buttons
                     yesBtn.style.display = 'none';
                     const noBtn = document.getElementById('btn-obs-form-no');
