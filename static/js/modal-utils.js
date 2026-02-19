@@ -198,7 +198,7 @@ window.showSuccessModal = function(title, message) {
         const { modalEl } = showSimpleModal({
             title: title,
             body: `<p>${message}</p>`,
-            okType: 'success'
+            okType: 'primary'
         });
         modalEl.addEventListener('hidden.bs.modal', () => resolve(), { once: true });
     });
