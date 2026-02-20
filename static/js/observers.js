@@ -260,6 +260,8 @@ async function loadObservers(filterType, filterValue, latestOnly) {
         filteredObservers = data.observers;
         currentPage = 1;  // Reset to first page
         displayObservers();
+        // Show exit button after observers are loaded
+        document.getElementById('btn-exit-observers').style.display = '';
     } catch (error) {
         console.error('Error loading observers:', error);
         showWarning(i18nStrings.observers.loading_error);
