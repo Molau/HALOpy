@@ -3362,8 +3362,8 @@ async function showDisplayObservationsDialog() {
             }
         }
         
-        // Initialize filter dialog
-        const filterDialog = new FilterDialog();
+        // Initialize filter dialog (allowObserverChange: Cloud Mode users can select different observer)
+        const filterDialog = new FilterDialog({ allowObserverChange: true });
         await filterDialog.initialize();
         
         // Hide and immediately remove spinner (don't wait for hidden.bs.modal event)
