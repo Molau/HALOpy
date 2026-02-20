@@ -7425,7 +7425,7 @@ function showVersionDialog() {
            <p class="mb-2"><strong>${v.date_label}:</strong> ${versionDate}</p>
            <p class="mb-3"><strong>${v.author_label}:</strong> ${v.contact_name}</p>
            <hr class="my-3">
-           <p class="mb-2">${v.description}</p>
+           <p class="mb-2">${i18nStrings.app.description}</p>
            <p class="mb-3">${v.workgroup}</p>
            <hr class="my-3">
            <p class="mb-1">Sirko Molau</p>
