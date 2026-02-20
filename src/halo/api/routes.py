@@ -67,6 +67,40 @@ api_blueprint = Blueprint('api', __name__, url_prefix='/api')
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
+def _check_cloud_write_auth(target_kk) -> tuple:
+    """Check authorization for write operations in Cloud Mode.
+    
+    In Cloud Mode, mutating operations (create, update, delete) on observations
+    or observers are only allowed if:
+    - The user is admin (is_admin=True), OR
+    - The user's session KK matches the target KK
+    
+    In Local Mode, no check is performed (returns None).
+    
+    Args:
+        target_kk: The KK of the record being modified (str or int)
+    
+    Returns:
+        tuple: (error_response, status_code) if unauthorized, or None if authorized
+    """
+    if not is_cloud_mode():
+        return None  # Local Mode: no restriction
+    
+    if not session.get('authenticated', False):
+        return jsonify({'error': 'not_authenticated'}), 401
+    
+    if session.get('is_admin', False):
+        return None  # Admin can modify any KK
+    
+    authenticated_kk = session.get('observer_kk')  # KK from session (str)
+    if str(authenticated_kk) == str(target_kk):
+        return None  # User modifying their own data
+    
+    return jsonify({'error': 'unauthorized_kk', 'message': 'You can only modify your own data'}), 403
+
+
+# ============================================================================
 # Authentication API (Cloud Mode)
 # ============================================================================
 
@@ -427,7 +461,7 @@ def health_check() -> Dict[str, Any]:
     """
     status = {
         'status': 'ok',
-        'version': current_app.config.get('VERSION', '3.0.2'),
+        'version': current_app.config.get('VERSION', '3.0.12'),
         'service': 'HALO API',
         'mode': 'cloud' if is_cloud_mode() else 'local'
     }
@@ -766,6 +800,11 @@ def add_observation() -> Dict[str, Any]:
         if f not in data:
             return jsonify({'error': f'Missing field: {f}'}), 400
 
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(data.get('KK'))
+    if auth_error:
+        return auth_error
+
     try:
         # Build observation dict from JSON data
         obs = {}
@@ -813,6 +852,11 @@ def add_observation() -> Dict[str, Any]:
 def delete_observation() -> Dict[str, Any]:
     """Delete an observation by matching its field values."""
     data = request.get_json() or {}
+
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(data.get('KK'))
+    if auth_error:
+        return auth_error
 
     try:
         if is_cloud_mode():
@@ -5191,6 +5235,11 @@ def add_observer() -> Dict[str, Any]:
         if field not in data or data[field] == '':
             return jsonify({'error': 'missing_required_field', 'field': field}), 400
     
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(data.get('KK'))
+    if auth_error:
+        return auth_error
+    
     # Validate KK format (must be 2-digit string between 01 and 99)
     kk = str(data['KK']).zfill(2)
     try:
@@ -5285,6 +5334,11 @@ def update_observer(kk: str) -> Dict[str, Any]:
     
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
+    
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
     
     # Validate required fields (only VName and NName are editable in base data)
     required_fields = ['VName', 'NName']
@@ -5546,6 +5600,11 @@ def add_observer_site(kk):
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
     
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
+    
     # Validate required fields
     required_fields = ['seit_month', 'seit_year', 'active', 'HbOrt', 'HBG', 'HBM', 
                        'HNS', 'HLG', 'HLM', 'HOW', 'GH']
@@ -5649,6 +5708,11 @@ def update_observer_site(kk):
     """Update an observation site entry for an observer"""
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
+    
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
     
     data = request.get_json()
     if not data:
@@ -5778,6 +5842,11 @@ def delete_observer_site(kk):
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
     
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
+    
     # Get seit from request body
     data = request.get_json()
     if not data:
@@ -5843,6 +5912,11 @@ def delete_observer():
     
     # Normalize KK to 2 digits
     kk = str(kk).zfill(2)
+    
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
     
     # Get observers based on deployment mode
     if is_cloud_mode():

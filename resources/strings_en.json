@@ -134,6 +134,7 @@
     "halobeo_csv_not_found": "File halobeo.csv not found",
     "observer_kk_required": "Observer ID required",
     "not_authenticated": "Not authenticated. Please login again.",
+    "unauthorized_kk": "Not authorized. You can only modify your own data.",
     "invalid_admin_credentials": "Invalid admin credentials",
     "invalid_credentials": "Invalid credentials",
     "no_observations_to_upload": "No observations to upload",
