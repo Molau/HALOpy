@@ -1,4 +1,4 @@
-# HALO Documentation (Version 3.0)
+# HALO Documentation (Version 3.1)
 
 ## 1. About the Program
 
@@ -9,6 +9,13 @@ Due to its various configuration options, the program can easily be adapted to t
 The program HALOpy is public domain software that is regularly updated and improved. It may be freely copied and is available to you at no cost from the author at any time. The copyrights mentioned under section 6 must be observed.
 
 At this point, we thank those who developed the halo key and thus created the prerequisites for digital recording and the analyses that are now possible.
+
+As of version 3.1, HALOpy supports two operating modes:
+
+  * **Local Mode**: The program works file-based with CSV files in the local file system, as before. All File menu functions are available. The application is started locally with `python halo.py` and is then accessible in the browser at http://localhost:5000.
+  * **Cloud Mode**: The program works database-based as a multi-user system. Access is via https://halopy.online. Login (username and password) is required at startup. Each user has write access only to their own observations and observer data; administrators can edit all data. The file operations in the 'File' menu are not available, as data management is handled entirely through the database.
+
+In both modes, upload and download of observations and observer data are available (see 4.3 and 4.4).
 
 ## 2. Installation of the Program
 
@@ -58,13 +65,17 @@ Dialogs (e.g., warnings, load/save) appear as modal overlays with a darkened bac
 
 ### 3.3 Program Start
 
-Start the server:
+**Local Mode:** Start the server:
 * Windows: `python halo.py`
 * Linux/macOS: `python3 halo.py`
 
-After startup, open HALOpy in your browser (default: http://localhost:5000). Depending on the configuration, a defined observation file may be loaded automatically on startup; otherwise, select the file (CSV) via the web interface and work with it in server memory. Crash recovery is active: if a recovery file with the extension `$$$` was created during a session, HALOpy will offer to use it on the next startup to avoid losing changes. Unsaved changes are additionally queried when switching files or exiting.
+After startup, open HALOpy in your browser (default: http://localhost:5000).
 
-There is no separate exit menu in the web version. End your session by closing the browser tab or returning to the home page. If there are unsaved changes, you will be warned before loading another file.
+Depending on the configuration, a defined observation file may be loaded automatically on startup; otherwise, select the file (CSV) via the web interface and work with it in server memory. Crash recovery is active: if a recovery file with the extension `$$$` was created during a session, HALOpy will offer to use it on the next startup to avoid losing changes. Unsaved changes are additionally queried when switching files or exiting.
+
+**Cloud Mode:** Open https://halopy.online in your browser. The login page appears first. After successful authentication with username and password, the main workspace is loaded directly. Observation and observer data are retrieved from the database. A logout button in the navigation bar allows ending the session.
+
+There is no separate exit menu in the web version. In local mode, end your session by closing the browser tab; if there are unsaved changes, you will be warned. In cloud mode, use the logout button.
 
 ## 4. The Functions of Individual Program Items
 
@@ -77,7 +88,7 @@ The version menu in the header shows build information and the change summary of
 
 ### 4.2 The File Menu
 
-The File menu controls loading, saving, and exporting of observation files (CSV) in the browser. All operations work on server storage; changes are written back to the file when saved.
+**Local Mode:** The File menu controls loading, saving, and exporting of observation files (CSV) in the browser. All operations work on server storage; changes are written back to the file when saved.
 
   * 'New File': Creates an empty observation file in HALO key format (CSV) and loads it immediately for editing.
   * 'Open': Selects and loads an existing CSV file; after loading, the file name and number of observations are displayed.
@@ -89,6 +100,13 @@ The File menu controls loading, saving, and exporting of observation files (CSV)
 Legacy .HAL files must be exported to CSV in the original DOS version; then they can be loaded, selected, or merged. Direct HAL conversion in the browser is not provided.
 
 Directory switching is not needed in the browser; file selection is done via the operating system's file dialog.
+
+**Cloud Mode:** The 'File' menu is not available in cloud mode. Data management is handled through the database; loading, saving, and file management are not required. Write access is limited to the logged-in user's own observations and observers. Administrators have access to all data.
+
+**Both Modes:** The following functions are available in both operating modes:
+
+  * 'Upload Observations': Uploads observations in CSV format to the server. In local mode, prior authentication is required. The user can choose whether existing observations should be replaced or supplemented.
+  * 'Download Observations': Downloads observations in CSV format from the server. In local mode, prior authentication is required. The user can choose whether to download only their own or all observations.
 
 ### 4.3 The Observations Menu
 
@@ -114,6 +132,11 @@ Here you manage observer data (ID number, name, observation sites with validity,
   * 'Add': Creates a new observer with ID, name, primary/secondary observation site (including coordinates/area) and start of validity; active status is set.
   * 'Change': Modifies master fields (ID, name) or location-related entries with validity/coordinates/activity; existing location entries can be supplemented or deleted (at least one remains).
   * 'Delete': Removes an observer including all location entries after a safety query, permanently.
+
+Additionally, the following functions are available in both operating modes:
+
+  * 'Upload': Uploads observer data in CSV format to the server. In local mode, prior authentication is required.
+  * 'Download': Downloads observer data in CSV format from the server. In local mode, prior authentication is required.
 
 ### 4.5 The Analysis Menu
 
@@ -154,10 +177,15 @@ This menu provides the current settings. All changes are saved immediately and t
   * 'Date': Choose default for date prompts: none, current month, previous month, or constant month (with month/year selection).
   * 'Input Mode': Preset menu entries (guided forms) or numeric entries (key line) for observation dialogs.
   * 'Output Mode': Choose text format for monthly report/statistics, annual statistics, and analysis: HTML tables, pseudographics, or Markdown (CSV/TXT/MD accordingly).
+  * 'Change Password' (cloud mode only): Allows the logged-in user to change their password.
 
 ### 4.8 The Help Menu
 
 The Help menu displays this help text directly in the browser; navigation is via scrolling or internal links. The language follows the current session setting.
+
+### 4.9 'Logout' (cloud mode only)
+
+In cloud mode, a 'Logout' button is available in the navigation bar. It ends the current session and returns to the login page.
 
 ## 5. Notes
 

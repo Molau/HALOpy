@@ -1,3 +1,14 @@
+**Changes and New Features in Program Version 3.1**
+
+Version 3.1 introduces the online version of HALOpy. The program now supports two operating modes:
+
+- Cloud Mode (online version): HALOpy can be operated as a database-based multi-user system. Users authenticate at startup with username and password. Each user has write access only to their own observations and observer data; administrators can edit all data. A logout button in the navigation bar ends the session. The 'File' menu is not available, as data management is handled through the database.
+- Upload/Download of observations: In both operating modes, observations can be uploaded to or downloaded from the server. In local mode, prior authentication is required.
+- Upload/Download of observer data: Analogous to observations, observer data can be uploaded and downloaded. In local mode, prior authentication is required.
+- Change password: In cloud mode, the user's own password can be changed via the 'Settings' menu.
+
+Local mode (file-based operation) remains fully available and works as before. The only additions in local mode are the new upload and download functions.
+
 **Changes and New Features in Program Version 3.0**
 
 Version 3.0 is a complete reprogramming of the original DOS program. We have adhered as closely as possible to the proven original program and made changes only where technically necessary (e.g., replacing DOS-dependent functions with web equivalents).

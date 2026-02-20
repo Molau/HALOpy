@@ -1,4 +1,4 @@
-# Dokumentation zum Haloerfassungsprogramm 'Halo' (Version 3.0)
+# Dokumentation zum Haloerfassungsprogramm 'Halo' (Version 3.1)
 
 ## 1. Über das Programm selbst
 
@@ -6,6 +6,13 @@ HALOpy ist eine Web‑Anwendung zur Eingabe, Anzeige und Auswertung von Halobeob
 Durch seine unterschiedliche Konfigurierbarkeit läßt sich das Programm problemlos an die speziellen Erfordernisse des jeweiligen Nutzers anpassen und ist auch als zentrales Erfassungsprogramm in der Meldestellegut geeignet. Es hält sich streng an die seit Januar 1978 in der Sektion Halobeobachtung verwendeten Verschlüsselungsvorschrift in der jeweils aktuellen Form.
 Das Programm 'Halo' ist Public-Domain-Software, daß regelmäßig aktualisiert und verbessert wird. Es darf frei kopiert werden und ist vom Autor jederzeit kostenlos erhältlich. Die unter 6. genannten Copyrights sind zu beachten.
 An dieser Stelle sei denjenigen gedankt, die sich den Haloschlüssel sehr zeitig ausdachten und somit die Voraussetzungen für die digitale Erfassung und die damit möglichen Auswertungen schufen.
+
+Ab Version 3.1 unterstützt HALOpy zwei Betriebsmodi:
+
+  * **Lokaler Modus** (Local Mode): Das Programm arbeitet wie bisher dateibasiert mit CSV-Dateien im lokalen Dateisystem. Alle Funktionen des Dateimenüs stehen zur Verfügung. Die Applikation wird lokal mit `python halo.py` gestartet und ist anschließend im Browser unter http://localhost:5000 erreichbar.
+  * **Cloud-Modus** (Cloud Mode): Das Programm arbeitet datenbankbasiert als Mehrbenutzersystem. Der Zugriff erfolgt über https://halopy.online. Beim Start ist eine Anmeldung (Benutzername und Passwort) erforderlich. Jeder Benutzer hat Schreibzugriff nur auf die eigenen Beobachtungen und Beobachterdaten; Administratoren können alle Daten bearbeiten. Die Dateioperationen des Menüs 'Datei' entfallen, da die Datenhaltung vollständig über die Datenbank erfolgt.
+
+In beiden Modi stehen Upload und Download von Beobachtungen und Beobachterdaten zur Verfügung (siehe 4.3 und 4.4).
 
 ## 2. Installation des Programms
 
@@ -55,13 +62,17 @@ Dialoge (z.B. Warnungen, Laden/Speichern) erscheinen als modale Overlays mit abg
 
 ### 3.3 Programmstart
 
-Starten Sie den Server:
+**Lokaler Modus:** Starten Sie den Server:
 * Windows: `python halo.py`
 * Linux/macOS: `python3 halo.py`
 
-Nach dem Start öffnen Sie HALOpy im Browser (Standard: http://localhost:5000). Je nach Konfiguration kann beim Einstieg automatisch eine definierte Beobachtungsdatei geladen werden; andernfalls wählen Sie die Datei (CSV) über die Web-Oberfläche und arbeiten damit im Serverspeicher. Crash-Recovery ist aktiv: Falls während einer Sitzung eine Wiederherstellungsdatei mit der Endung `$$$` angelegt wurde, bietet HALOpy beim nächsten Start an, diese zu übernehmen, um Änderungen nicht zu verlieren. Nicht gespeicherte Änderungen werden zusätzlich beim Dateiwechsel oder Beenden abgefragt.
+Nach dem Start öffnen Sie HALOpy im Browser (Standard: http://localhost:5000).
 
-Ein eigenes Endemenü existiert in der Web-Version nicht. Beenden Sie die Sitzung, indem Sie den Browser-Tab schließen oder zur Startseite zurückkehren. Bei offenen, nicht gespeicherten Änderungen werden Sie vor dem Laden einer anderen Datei gewarnt.
+Je nach Konfiguration kann beim Einstieg automatisch eine definierte Beobachtungsdatei geladen werden; andernfalls wählen Sie die Datei (CSV) über die Web-Oberfläche und arbeiten damit im Serverspeicher. Crash-Recovery ist aktiv: Falls während einer Sitzung eine Wiederherstellungsdatei mit der Endung `$$$` angelegt wurde, bietet HALOpy beim nächsten Start an, diese zu übernehmen, um Änderungen nicht zu verlieren. Nicht gespeicherte Änderungen werden zusätzlich beim Dateiwechsel oder Beenden abgefragt.
+
+**Cloud-Modus:** Öffnen Sie https://halopy.online im Browser. Es erscheint zunächst die Anmeldeseite. Nach erfolgreicher Authentifizierung mit Benutzername und Passwort wird direkt die Arbeitsoberfläche geladen. Beobachtungs- und Beobachterdaten werden aus der Datenbank bezogen. Ein Abmelde-Button in der Navigationsleiste ermöglicht das Beenden der Sitzung.
+
+Ein eigenes Endemenü existiert in der Web-Version nicht. Im lokalen Modus beenden Sie die Sitzung durch Schließen des Browser-Tabs; bei offenen, nicht gespeicherten Änderungen werden Sie gewarnt. Im Cloud-Modus verwenden Sie den Abmelde-Button.
 
 ## 4. Die Funktionen der einzelnen Programmpunkte
 
@@ -74,7 +85,7 @@ Das Versionsmenü im Kopfbereich zeigt Build-Informationen und die Änderungsüb
 
 ### 4.2 Das Menü 'Datei'
 
-Das Dateimenü steuert Laden, Speichern und Export der Beobachtungsdateien (CSV) im Browser. Alle Operationen arbeiten auf dem Serverspeicher; Änderungen werden beim Speichern zurück auf die Datei geschrieben.
+**Lokaler Modus:** Das Dateimenü steuert Laden, Speichern und Export der Beobachtungsdateien (CSV) im Browser. Alle Operationen arbeiten auf dem Serverspeicher; Änderungen werden beim Speichern zurück auf die Datei geschrieben.
 
   * 'Neue Datei': Legt eine leere Beobachtungsdatei im HALO-Schlüsselformat (CSV) an und lädt sie sofort zum Bearbeiten.
   * 'Laden': Wählt und lädt eine vorhandene CSV-Datei; nach dem Laden werden Dateiname und Anzahl der Beobachtungen angezeigt.
@@ -86,6 +97,13 @@ Das Dateimenü steuert Laden, Speichern und Export der Beobachtungsdateien (CSV)
 Legacy .HAL-Dateien müssen in der DOS-Originalversion nach CSV exportiert werden; danach können sie geladen, selektiert oder verbunden werden. Eine direkte HAL-Konvertierung im Browser ist nicht vorgesehen.
 
 Ein Verzeichniswechsel entfällt im Browser; die Dateiauswahl erfolgt über den Dateidialog des Betriebssystems.
+
+**Cloud-Modus:** Das Menü 'Datei' entfällt im Cloud-Modus vollständig. Die Datenhaltung erfolgt über die Datenbank; Laden, Speichern und Dateiverwaltung sind nicht erforderlich. Der Schreibzugriff ist auf die eigenen Beobachtungen und Beobachter des angemeldeten Benutzers beschränkt. Administratoren haben Zugriff auf alle Daten.
+
+**Beide Modi:** Folgende Funktionen stehen in beiden Betriebsmodi zur Verfügung:
+
+  * 'Upload Beobachtungen': Lädt Beobachtungen im CSV-Format auf den Server hoch. Im lokalen Modus ist dazu eine vorherige Authentifizierung erforderlich. Dabei kann gewählt werden, ob bestehende Beobachtungen ersetzt oder ergänzt werden sollen.
+  * 'Download Beobachtungen': Lädt Beobachtungen im CSV-Format vom Server herunter. Im lokalen Modus ist dazu eine vorherige Authentifizierung erforderlich. Es kann gewählt werden, ob nur eigene oder alle Beobachtungen heruntergeladen werden.
 
 ### 4.3 Das Menü 'Beobachtungen'
 
@@ -111,6 +129,8 @@ Hier verwalten Sie Beobachterdaten (Kennzahl, Name, Beobachtungsorte mit Gültig
   * 'Hinzufügen': Legt einen neuen Beobachter mit Kennzahl, Name, Haupt-/Nebenbeobachtungsort (inkl. Koordinaten/Gebiet) und Gültigkeitsbeginn an; Aktiv-Status wird gesetzt.
   * 'Verändern': Ändert Stammfelder (Kennzahl, Name) oder ortsbezogene Einträge mit Gültigkeit/Koordinaten/Aktivität; bestehende Ortseinträge können ergänzt oder gelöscht (mindestens einer bleibt) werden.
   * 'Löschen': Entfernt einen Beobachter einschließlich seiner Ortseinträge nach Sicherheitsabfrage endgültig.
+  * 'Upload Beobachter': Lädt Beobachterdaten im CSV-Format auf den Server hoch. Im lokalen Modus ist dazu eine vorherige Authentifizierung erforderlich.
+  * 'Download Beobachter': Lädt Beobachterdaten im CSV-Format vom Server herunter. Im lokalen Modus ist dazu eine vorherige Authentifizierung erforderlich.
 
 ### 4.5 Das Menü 'Auswertung'
 
@@ -151,10 +171,15 @@ Dieses Menü stellt die aktuellen Voreinstellungen bereit. Alle Änderungen werd
   * 'Datum': Voreinstellung für Datumsprompts wählen: keine, aktueller Monat, Vormonat oder konstanter Monat (mit Monat/Jahr-Auswahl).
   * 'Eingabeart': Menüeingaben (geführte Formulare) oder Zahleneingaben (Schlüsselzeile) für Beobachtungsdialoge voreinstellen.
   * 'Ausgabeart': Textformat für Monatsmeldung/‑statistik/Jahresstatistik und Analyse wählen: HTML-Tabellen, Pseudografik oder Markdown (entsprechend werden CSV/TXT/MD erzeugt).
+  * 'Passwort ändern' (nur Cloud-Modus): Ermöglicht dem angemeldeten Benutzer, sein Passwort zu ändern.
 
 ### 4.8 Das Menü 'Hilfe'
 
 Das Menü Hilfe zeigt diesen Hilfetext direkt im Browser; Navigation erfolgt per Scrollen oder über interne Links. Die Sprache folgt der aktuellen Sitzungseinstellung.
+
+### 4.9 'Abmelden' (nur Cloud-Modus)
+
+Im Cloud-Modus steht in der Navigationsleiste der Button 'Abmelden' zur Verfügung. Er beendet die aktuelle Sitzung und kehrt zur Anmeldeseite zurück.
 
 ## 5. Zur Beachtung
 

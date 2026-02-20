@@ -1,3 +1,14 @@
+**Ergänzungen und Änderungen in der Version 3.1**
+
+Version 3.1 führt die Online-Version von HALOpy ein. Das Programm unterstützt nun zwei Betriebsmodi:
+
+- Cloud-Modus (Online-Version): HALOpy kann als datenbankbasiertes Mehrbenutzersystem betrieben werden. Benutzer authentifizieren sich beim Start mit Benutzername und Passwort. Jeder Benutzer hat Schreibzugriff nur auf die eigenen Beobachtungen und Beobachterdaten; Administratoren können alle Daten bearbeiten. Ein Abmelde-Button in der Navigationsleiste beendet die Sitzung. Das Menü 'Datei' entfällt fast vollständig, da die Datenhaltung über die Datenbank erfolgt.
+- Upload/Download von Beobachtungen: In beiden Betriebsmodi können Beobachtungen auf den Server hochgeladen oder vom Server heruntergeladen werden. Im lokalen Modus ist dazu eine vorherige Authentifizierung erforderlich.
+- Upload/Download von Beobachterdaten: Analog zu Beobachtungen können Beobachterdaten hoch- und heruntergeladen werden. Im lokalen Modus ist dazu eine vorherige Authentifizierung erforderlich.
+- Passwort ändern: Im Cloud-Modus kann das eigene Passwort über das Menü 'Einstellungen' geändert werden.
+
+Der lokale Modus (dateibasierter Betrieb) bleibt vollständig erhalten und funktioniert wie gewohnt. Einzige Ergänzungen im lokalen Modus sind die neuen Upload- und Download-Funktionen.
+
 **Ergänzungen und Änderungen in der Version 3.0**
 
 Version 3.0 ist eine komplette Neuprogrammierung des ursprünglichen DOS-Programms. Es wurde sich dabei so eng wie möglich das bewährte Original-Programm gehalten und Änderungen nur dort vorgenommen, wo sie technisch zwingend erforderlich waren (z.B. DOS-abhängige Funktionen durch Web-Äquivalente ersetzen).
