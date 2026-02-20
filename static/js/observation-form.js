@@ -848,17 +848,11 @@ class ObservationForm {
                                 const gg = parseInt(data.observer.GH);  // Parse to int to remove leading zero
                                 // GG constrained to single value (HBOrt)
                                 setOptionStates(this.fields.gg, ggOpts, [gg.toString()]);
-                                // Don't overwrite GG if editing and value already populated
-                                if (!this.originalObservation || this.fields.gg.value === '') {
-                                    this.fields.gg.value = gg;
-                                }
+                                this.fields.gg.value = gg;
                                 this.fieldConstraints.GG = [gg.toString()];
                             } else {
                                 setOptionStates(this.fields.gg, ggOpts, ['']);
-                                // Don't overwrite GG if editing and value already populated
-                                if (!this.originalObservation || this.fields.gg.value === '') {
-                                    this.fields.gg.value = '';
-                                }
+                                this.fields.gg.value = '';
                                 this.fieldConstraints.GG = [''];
                             }
                         }
@@ -898,17 +892,11 @@ class ObservationForm {
                                 const gg = parseInt(data.observer.GN);  // Parse to int to remove leading zero
                                 // GG constrained to single value (NBOrt)
                                 setOptionStates(this.fields.gg, ggOpts, [gg.toString()]);
-                                // Don't overwrite GG if editing and value already populated
-                                if (!this.originalObservation || this.fields.gg.value === '') {
-                                    this.fields.gg.value = gg;
-                                }
+                                this.fields.gg.value = gg;
                                 this.fieldConstraints.GG = [gg.toString()];
                             } else {
                                 setOptionStates(this.fields.gg, ggOpts, ['']);
-                                // Don't overwrite GG if editing and value already populated
-                                if (!this.originalObservation || this.fields.gg.value === '') {
-                                    this.fields.gg.value = '';
-                                }
+                                this.fields.gg.value = '';
                                 this.fieldConstraints.GG = [''];
                             }
                         }
