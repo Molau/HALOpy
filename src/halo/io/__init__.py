@@ -53,7 +53,7 @@ from .observations_file import (
 )
 
 # Observation field definitions (Layer 4 - CSV handler)
-from .csv_handler import OBSERVATION_FIELDS, OBSERVATION_CSV_FIELDS
+from .csv_handler import OBSERVATION_FIELDS, OBSERVATION_CSV_FIELDS, OBSERVATION_CSV_HEADER
 
 # Layer 3b (Database Storage) - import entire modules
 from . import observations_db
@@ -73,6 +73,7 @@ __all__ = [
     # Observation field definitions
     'OBSERVATION_FIELDS',
     'OBSERVATION_CSV_FIELDS',
+    'OBSERVATION_CSV_HEADER',
     'get_observers_path',
     'get_observers_backup_path',
     'observer_file_exists',

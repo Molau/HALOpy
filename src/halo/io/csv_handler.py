@@ -18,6 +18,9 @@ OBSERVATION_CSV_FIELDS = [
     '8HHHH', 'sectors', 'remarks'
 ]
 
+# CSV header line for observation files
+OBSERVATION_CSV_HEADER = ','.join(OBSERVATION_CSV_FIELDS)
+
 # Canonical field names for observation dicts (internal representation).
 # Same as CSV but 8HHHH is split into HO and HU.
 OBSERVATION_FIELDS = [
@@ -138,9 +141,14 @@ class ObservationCSV:
             # Remove NULL characters that can cause PostgreSQL import issues
             content = f.read().replace('\x00', '')
             
+            lines = content.splitlines()
+            
             if is_legacy:
                 # Legacy format: simple comma split (spaces between fields)
-                for line in content.splitlines():
+                for line in lines:
+                    # Skip header line if present
+                    if line.startswith('KK,'):
+                        continue
                     parts = line.rstrip(',').split(',')
                     if len(parts) < 20:
                         continue
@@ -149,8 +157,11 @@ class ObservationCSV:
                         observations.append(obs)
             else:
                 # Modern format: proper CSV with quoted remarks
-                reader = csv.reader(content.splitlines())
+                reader = csv.reader(lines)
                 for parts in reader:
+                    # Skip header line if present
+                    if parts and parts[0] == 'KK':
+                        continue
                     if len(parts) < 20:
                         continue
                     obs = ObservationCSV._parse_observation_parts(parts)
@@ -225,6 +236,9 @@ class ObservationCSV:
         """
         observations = []
         for line in stream:
+            # Skip header line if present
+            if line.startswith('KK,'):
+                continue
             parts = line.rstrip(',\n').split(',')
             if len(parts) < 20:
                 continue
@@ -251,6 +265,7 @@ class ObservationCSV:
         """
         with open(filepath, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(OBSERVATION_CSV_FIELDS)
             
             for obs in observations:
                 # Build 8HHHH field from HO and HU
@@ -314,6 +329,7 @@ class ObservationCSV:
             buffer: StringIO buffer to write to
         """
         writer = csv.writer(buffer, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(OBSERVATION_CSV_FIELDS)
         
         for obs in observations:
             # Build 8HHHH field from HO and HU
