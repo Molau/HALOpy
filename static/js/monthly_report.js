@@ -141,8 +141,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             const fixedKK = parseInt(fixedObserver);
             if (observerMap.has(fixedKK)) {
                 observerSelect.value = fixedKK;
-                // Disable dropdown when fixed observer is set
-                observerSelect.disabled = true;
+                // In Cloud Mode: pre-select but allow changing observer
+                // In Local Mode: disable dropdown when fixed observer is set
+                observerSelect.disabled = !window.isCloudMode;
             }
         }
     }

@@ -74,15 +74,16 @@ class FilterDialog {
         if (fixedObserver) {
             const filter1Criterion = document.getElementById('filter-criterion-1');
             filter1Criterion.value = 'observer';
-            filter1Criterion.disabled = true;
+            // In Cloud Mode: pre-select but allow changing observer
+            filter1Criterion.disabled = !window.isCloudMode;
             
             // Trigger change to show observer dropdown
             this.handleFilter1Change();
             
-            // Set and disable observer dropdown
+            // Set observer dropdown (disable only in Local Mode)
             const filter1Select = document.getElementById('filter-1-select');
             filter1Select.value = fixedObserver;
-            filter1Select.disabled = true;
+            filter1Select.disabled = !window.isCloudMode;
         }
         
         this.modal = new bootstrap.Modal(this.modalElement, { backdrop: 'static' });

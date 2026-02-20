@@ -135,18 +135,19 @@ async function showFilterDialog() {
     const kkSelect = document.getElementById('filter-select-kk');
     const applyFilterBtn = document.getElementById('apply-filter');
     
-    // If fixed observer is set, pre-select and disable
+    // If fixed observer is set, pre-select and disable (in Cloud Mode: allow changing)
     if (fixedObserver) {
         // Set filter type to KK
         filterTypeSelect.value = 'kk';
-        filterTypeSelect.disabled = true;
+        // In Cloud Mode: pre-select but allow changing observer
+        filterTypeSelect.disabled = !window.isCloudMode;
         
         // Show KK dropdown
         handleFilterTypeChange();
         
-        // Set observer value
+        // Set observer value (disable only in Local Mode)
         kkSelect.value = fixedObserver;
-        kkSelect.disabled = true;
+        kkSelect.disabled = !window.isCloudMode;
     } else {
         // Reset filter
         filterTypeSelect.value = 'none';
