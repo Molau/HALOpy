@@ -27,7 +27,6 @@
     "manual_restart": "Update complete. Please exit the application and restart it manually."
   },
   "login": {
-    "title": "HALO",
     "username_label": "Username (KK)",
     "username_placeholder": "e.g. 44",
     "password_label": "Password",

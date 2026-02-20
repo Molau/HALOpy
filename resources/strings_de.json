@@ -27,7 +27,6 @@
     "manual_restart": "Aktualisierung abgeschlossen. Bitte beenden Sie die Anwendung und starten Sie sie manuell neu."
   },
   "login": {
-    "title": "HALO",
     "username_label": "Benutzername (KK)",
     "username_placeholder": "z.B. 44",
     "password_label": "Passwort",
