@@ -5,6 +5,7 @@ Licensed under MIT License - see LICENSE file for details.
 """
 
 # Standard library imports
+import os
 import time
 from pathlib import Path
 
@@ -266,14 +267,24 @@ def create_app(config=None):
 
 def main():
     """Run development server."""
+    import os as _os
+    import threading
+    import webbrowser
+
     app = create_app()
     print("=" * 60)
     print("HALO Web Application")
     print("=" * 60)
     print("Starting development server...")
-    print("Open your browser at: http://localhost:5000")
+    print("http://localhost:5000")
     print("Press Ctrl+C to stop")
     print("=" * 60)
+
+    # Open default browser after a short delay (server needs time to start)
+    # Only on first run (debug=True spawns a reloader child process)
+    if _os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000')).start()
+
     app.run(host='0.0.0.0', port=5000, debug=True)
 
 

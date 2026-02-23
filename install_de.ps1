@@ -392,24 +392,16 @@ if ($createShortcut -eq "" -or $createShortcut -eq "J" -or $createShortcut -eq "
         $WshShell = New-Object -ComObject WScript.Shell
         $desktopPath = [Environment]::GetFolderPath("Desktop")
         
-        # Verknuepfung 1: HALOpy Server starten
-        $serverShortcutPath = Join-Path $desktopPath "HALOpy Server.lnk"
+        # Verknuepfung: HALOpy starten (Server + Browser oeffnet automatisch)
+        $serverShortcutPath = Join-Path $desktopPath "HALOpy.lnk"
         $serverShortcut = $WshShell.CreateShortcut($serverShortcutPath)
         $serverShortcut.TargetPath = $batPath
         $serverShortcut.WorkingDirectory = $INSTALL_DIR
-        $serverShortcut.Description = "HALOpy Server starten"
+        $serverShortcut.Description = "HALOpy starten"
         $serverShortcut.Save()
         
-        # Verknuepfung 2: HALOpy im Browser oeffnen
-        $clientShortcutPath = Join-Path $desktopPath "HALOpy Client.lnk"
-        $clientShortcut = $WshShell.CreateShortcut($clientShortcutPath)
-        $clientShortcut.TargetPath = "http://localhost:5000"
-        $clientShortcut.Description = "HALOpy im Browser oeffnen"
-        $clientShortcut.Save()
-        
-        Write-Success "Desktop-Verknuepfungen erstellt:"
-        Write-Host "  - HALOpy Server.lnk (startet den Server)"
-        Write-Host "  - HALOpy Client.lnk (oeffnet Browser zu http://localhost:5000)"
+        Write-Success "Desktop-Verknuepfung erstellt:"
+        Write-Host "  - HALOpy.lnk (startet Server und oeffnet Browser automatisch)"
     }
     catch {
         Write-Error-Message "Konnte Desktop-Verknuepfungen nicht erstellen: $_"
@@ -439,11 +431,10 @@ Write-Host ""
 Write-ColorOutput Cyan "Um HALOpy zu starten:"
 Write-Host "  1. Doppelklicken Sie auf: $batPath"
 Write-Host "  2. Oder fuehren Sie aus der Eingabeaufforderung aus: cd `"$INSTALL_DIR`" ; .\halo.bat"
+Write-Host "  Der Browser oeffnet sich automatisch."
 Write-Host ""
 Write-ColorOutput Yellow "Erstes Mal einrichten:"
 Write-Host "  - Legen Sie Ihre Beobachtungsdateien (.HAL, .CSV) in: $dataDir"
-Write-Host "  - Oeffnen Sie Ihren Webbrowser unter: http://localhost:5000"
-Write-Host "  - Das Programm fuehrt einen lokalen Webserver aus"
 Write-Host ""
 
 $startNow = Read-Host "HALOpy jetzt starten? (J/N) [N]"
@@ -451,8 +442,7 @@ if ($startNow -eq "J" -or $startNow -eq "j") {
     Write-Host ""
     Write-Step "HALOpy wird gestartet..."
     Start-Process -FilePath $batPath -WorkingDirectory $INSTALL_DIR
-    Write-Host "HALOpy wird gestartet. Ihr Webbrowser sollte automatisch oeffnen."
-    Write-Host "Falls nicht, oeffnen Sie Ihren Browser und gehen Sie zu: http://localhost:5000"
+    Write-Host "HALOpy wird gestartet. Der Browser oeffnet sich automatisch."
 }
 
 Write-Host ""

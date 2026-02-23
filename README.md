@@ -94,14 +94,14 @@ Both should show Python 3.10+ and pip version.
 ```powershell
 pip install -r requirements.txt
 python halo.py
-# Opens browser at http://localhost:5000
+# Browser opens automatically at http://localhost:5000
 ```
 
 **Linux/macOS:**
 ```bash
 pip install -r requirements.txt
 python halo.py
-# Opens browser at http://localhost:5000
+# Browser opens automatically at http://localhost:5000
 ```
 
 ### Local Server
