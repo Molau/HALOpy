@@ -461,7 +461,7 @@ def health_check() -> Dict[str, Any]:
     """
     status = {
         'status': 'ok',
-        'version': current_app.config.get('VERSION', '3.0.12'),
+        'version': current_app.config.get('VERSION', '3.1.2'),
         'service': 'HALO API',
         'mode': 'cloud' if is_cloud_mode() else 'local'
     }
