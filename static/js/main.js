@@ -663,7 +663,7 @@ async function showAddObservationDialogNumeric() {
         const configResponse = await fetch('/api/config/fixed_observer');
         const config = await configResponse.json();
         console.log('[DEBUG Kurzeingabe] /api/config/fixed_observer response:', JSON.stringify(config));
-        fixedObserver = config.observer;
+        fixedObserver = config.observer || '';
         console.log('[DEBUG Kurzeingabe] fixedObserver =', JSON.stringify(fixedObserver), 'type:', typeof fixedObserver);
     } catch (e) {
         console.error('[DEBUG Kurzeingabe] Error fetching fixed_observer:', e);
