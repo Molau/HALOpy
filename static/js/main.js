@@ -662,12 +662,8 @@ async function showAddObservationDialogNumeric() {
     try {
         const configResponse = await fetch('/api/config/fixed_observer');
         const config = await configResponse.json();
-        console.log('[DEBUG Kurzeingabe] /api/config/fixed_observer response:', JSON.stringify(config));
         fixedObserver = config.observer || '';
-        console.log('[DEBUG Kurzeingabe] fixedObserver =', JSON.stringify(fixedObserver), 'type:', typeof fixedObserver);
-    } catch (e) {
-        console.error('[DEBUG Kurzeingabe] Error fetching fixed_observer:', e);
-    }
+    } catch (e) {}
 
     // Get date default setting
     let dateDefault = null;
@@ -715,20 +711,16 @@ async function showAddObservationDialogNumeric() {
     const input = document.getElementById('obs-code-input');
     const errEl = document.getElementById('obs-code-error');
     let eing = fixedObserver;  // Pre-fill with fixed observer KK
-    console.log('[DEBUG Kurzeingabe] Initial eing =', JSON.stringify(eing), 'length:', eing.length);
     
     // If date default is available, append MM and JJ after KK and O (positions 2-3)
     if (dateDefault && eing.length >= 4) {
         // Keep KK (2 chars) + O (1 char) + JJ (2 chars) + MM (2 chars)
         eing = eing.substring(0, 3) + dateDefault.jj + dateDefault.mm + eing.substring(5);
     }
-    console.log('[DEBUG Kurzeingabe] After dateDefault check: eing =', JSON.stringify(eing), 'dateDefault =', JSON.stringify(dateDefault));
 
     const ensureNumericInputFocus = () => {
-        console.log('[DEBUG Kurzeingabe] ensureNumericInputFocus: input in DOM=', document.body.contains(input), 'activeElement=', document.activeElement?.id || document.activeElement?.tagName, 'input.disabled=', input.disabled);
         if (document.body.contains(input) && document.activeElement !== input) {
             input.focus();
-            console.log('[DEBUG Kurzeingabe] After focus() call: activeElement=', document.activeElement?.id || document.activeElement?.tagName);
         }
     };
 
@@ -740,20 +732,13 @@ async function showAddObservationDialogNumeric() {
 
     // Focus input as soon as modal is shown
     modalEl.addEventListener('shown.bs.modal', () => {
-        console.log('[DEBUG Kurzeingabe] shown.bs.modal fired');
-        console.log('[DEBUG Kurzeingabe] input element:', input, 'exists in DOM:', document.body.contains(input));
-        console.log('[DEBUG Kurzeingabe] activeElement before focus:', document.activeElement?.id || document.activeElement?.tagName);
         ensureNumericInputFocus();
-        console.log('[DEBUG Kurzeingabe] activeElement after focus:', document.activeElement?.id || document.activeElement?.tagName);
         // Set initial value and render
         input.value = eing;
-        console.log('[DEBUG Kurzeingabe] Calling renderNumericGuide with eing =', JSON.stringify(eing));
         renderNumericGuide(eing);
         // Check rendered elements
         const caretEl = document.getElementById('obs-guide-caret');
         const enteredEl = document.getElementById('obs-guide-entered');
-        console.log('[DEBUG Kurzeingabe] After render: caret text =', JSON.stringify(caretEl?.textContent), 'entered text =', JSON.stringify(enteredEl?.textContent));
-        console.log('[DEBUG Kurzeingabe] caret display:', caretEl?.style.display, 'caret offsetHeight:', caretEl?.offsetHeight);
     });
 
     // Restore focus when returning to the tab/window or clicking inside the modal
@@ -793,11 +778,9 @@ async function showAddObservationDialogNumeric() {
     });
 
     function renderNumericGuide(s) {
-        console.log('[DEBUG Kurzeingabe] renderNumericGuide called, s =', JSON.stringify(s), 'length:', s.length);
         const enteredEl = document.getElementById('obs-guide-entered');
         const remarksEl = document.getElementById('obs-guide-remarks');
         const caretEl = document.getElementById('obs-guide-caret');
-        console.log('[DEBUG Kurzeingabe] Elements found: entered=', !!enteredEl, 'remarks=', !!remarksEl, 'caret=', !!caretEl);
         
         // Split into main part (up to position 100) and overflow remarks (from position 100)
         // First 50 chars = HALO key fields, next 50 chars = first part of remarks (same line)
@@ -838,7 +821,6 @@ async function showAddObservationDialogNumeric() {
             if (L > 49) spacesBefore += 1; // separator after sectors
             const caretPos = L + spacesBefore;
             caretEl.textContent = ' '.repeat(Math.max(caretPos, 0)) + '^';
-            console.log('[DEBUG Kurzeingabe] Caret: L=', L, 'spacesBefore=', spacesBefore, 'caretPos=', caretPos, 'caretText=', JSON.stringify(caretEl.textContent));
         } else {
             // Caret in overflow line - position relative to start of overflow (position 100), plus indent
             const overflowPos = L - 100;
@@ -874,7 +856,6 @@ async function showAddObservationDialogNumeric() {
 
     // Queue-based keydown handler to prevent race conditions
     input.addEventListener('keydown', (ev) => {
-        console.log('[DEBUG Kurzeingabe] input keydown: key=', ev.key, 'activeElement=', document.activeElement?.id);
         // On mobile virtual keyboards, keydown often has key='Unidentified' or 'Process'
         // In that case, skip keydown and let the 'input' event handler below process it
         if (ev.key === 'Unidentified' || ev.key === 'Process') {
@@ -934,7 +915,6 @@ async function showAddObservationDialogNumeric() {
     
     // Main keydown event handler (now called sequentially from queue)
     async function handleKeydownEvent(ev) {
-        console.log('[DEBUG Kurzeingabe] handleKeydownEvent: key=', ev.key, 'eing=', JSON.stringify(eing), 'eing.length=', eing.length);
         // Allow navigation keys
         const navKeys = ['ArrowLeft','ArrowRight','Home','End','Tab'];
         if (navKeys.includes(ev.key)) return;
@@ -4650,14 +4630,8 @@ async function showSelectDialog() {
             }
             
             const filterResult = await filterResponse.json();
-            const filteredObs = filterResult.filtered_observations || [];
             const keptCount = filterResult.kept_count || 0;
             const deletedCount = filterResult.deleted_count || 0;
-            
-
-
-
-
             
             // Check if result is empty
             if (keptCount === 0) {
@@ -4669,26 +4643,10 @@ async function showSelectDialog() {
                 return;
             }
             
-            // Load filtered observations into server memory
-            const replaceResponse = await fetch('/api/observations/replace', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({observations: filteredObs})
-            });
-            
             bsLoadingModal.hide();
             
-            if (!replaceResponse.ok) {
-                const error = await replaceResponse.json();
-                showWarningModal(error.error || 'Failed to load filtered observations');
-                modal.hide();
-                return;
-            }
-            
-            // Update local data
-            window.haloData.observations = filteredObs;
+            // Mark as dirty (Local Mode only)
             if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-            saveHaloDataToSession();
             
             // Trigger autosave
             await triggerAutosave();

@@ -987,6 +987,9 @@ def save_observations() -> Dict[str, Any]:
 def filter_observations() -> Dict[str, Any]:
     """
     Filter observations server-side for Datei -> Selektieren.
+    Applies the filter directly in backend storage (memory or database).
+    No observation data is sent to or from the frontend.
+    
     Handles ALL filter types: KK, MM, TT, ZZ, SH, GG, O, EE, DD, N, C, H, F, V.
     
     Request body:
@@ -1000,7 +1003,7 @@ def filter_observations() -> Dict[str, Any]:
     
     Returns:
         JSON object with:
-        - filtered_observations: List of filtered observation objects
+        - success: True if filter was applied
         - kept_count: Number of observations kept
         - deleted_count: Number of observations deleted
     """
@@ -1030,46 +1033,31 @@ def filter_observations() -> Dict[str, Any]:
             elif filter_type in ['GG', 'O', 'EE', 'DD', 'N', 'C', 'H', 'F', 'V']:
                 sql_filters[filter_type.lower()] = int(params.get('value'))
             elif filter_type == 'ZZ':
-                # Time range - convert to minutes
-                from_hour = int(params.get('from_hour'))
-                from_minute = int(params.get('from_minute'))
-                to_hour = int(params.get('to_hour'))
-                to_minute = int(params.get('to_minute'))
-                from_time = from_hour * 60 + from_minute
-                to_time = to_hour * 60 + to_minute
-                # Note: ZZ requires special handling - we'll filter in Python for this case
-                sql_filters = None  # Fall back to load_all() for complex filters
+                sql_filters = None  # Fall back to Python filtering
             elif filter_type == 'SH':
-                # Solar altitude requires calculation - must filter in Python
-                sql_filters = None  # Fall back to load_all() for complex filters
+                sql_filters = None  # Fall back to Python filtering
             
-            # Use SQL filtering when possible, fall back to load_all() for complex filters
+            # Use SQL filtering when possible
             if sql_filters:
                 matching_obs = obs_db.load_filtered(**sql_filters)
-                # Database already returns sorted observations (ORDER BY in SQL)
-                # For Cloud-Mode with SQL filtering, we already have filtered results
-                # No need to filter again in Python
-                all_obs = None  # Not needed
+                all_obs = None
             else:
-                # Complex filters (ZZ, SH) need Python filtering
                 observations = obs_db.load_all()
-                # Database already returns sorted observations (ORDER BY in SQL)
                 all_obs = observations
-                matching_obs = []  # Will be populated below
+                matching_obs = []
         else:
             # Local Mode: Read from in-memory cache
             observations = current_app.config.get('OBSERVATIONS', [])
             if not observations:
                 return jsonify({'error': 'no_observations_loaded'}), 400
             all_obs = observations
-            matching_obs = []  # Will be populated below
+            matching_obs = []
         
-        # Load observers for SH filtering (needed for both modes when SH is used)
+        # Load observers for SH filtering
         observers_list = current_app.config.get('OBSERVERS', [])
         
         # Python-side filtering (only for Local Mode or complex Cloud-Mode filters)
         if not (is_cloud_mode() and sql_filters):
-            # Need to apply Python filtering
             observations = all_obs
             
             if filter_type == 'KK':
@@ -1079,14 +1067,14 @@ def filter_observations() -> Dict[str, Any]:
             elif filter_type == 'MM':
                 month = int(params.get('month'))
                 year = int(params.get('year'))
-                year_2digit = year % 100  # Convert to 2-digit
+                year_2digit = year % 100
                 matching_obs = [obs for obs in observations if _int(obs, 'MM') == month and _int(obs, 'JJ') == year_2digit]
                 
             elif filter_type == 'TT':
                 day = int(params.get('day'))
                 month = int(params.get('month'))
                 year = int(params.get('year'))
-                year_2digit = year % 100  # Convert to 2-digit
+                year_2digit = year % 100
                 matching_obs = [obs for obs in observations if _int(obs, 'TT') == day and _int(obs, 'MM') == month and _int(obs, 'JJ') == year_2digit]
                 
             elif filter_type == 'ZZ':
@@ -1114,13 +1102,12 @@ def filter_observations() -> Dict[str, Any]:
                         matching_obs.append(obs)
             
             elif filter_type == 'JJ':
-                # Year - convert 4-digit to 2-digit
                 value = int(params.get('value'))
                 year_2digit = value % 100
                 matching_obs = [obs for obs in observations if _int(obs, 'JJ') == year_2digit]
                         
             else:
-                # Simple value match for other parameters (GG, O, EE, DD, N, C, H, F, V)
+                # Simple value match (GG, O, EE, DD, N, C, H, F, V)
                 value = int(params.get('value'))
                 attr = filter_type
                 for obs in observations:
@@ -1128,56 +1115,40 @@ def filter_observations() -> Dict[str, Any]:
                     if obs_value == value:
                         matching_obs.append(obs)
         
-        # Apply action (keep or delete)
-        # For Cloud-Mode with SQL filtering, we need to get total count for delete action
+        # Apply action (keep or delete) and calculate counts
         if is_cloud_mode() and sql_filters and action == 'delete':
-            # Need total count for delete calculation
             total_count = obs_db.count()
-            kept_count = total_count - len(matching_obs)
-            deleted_count = len(matching_obs)
-            # For delete action with SQL filter, we need to get all OTHER observations
-            # This is complex - for now, fall back to loading all
-            # TODO: Optimize delete action with NOT IN query
             all_observations = obs_db.load_all()
-            filtered_obs = [obs for obs in all_observations if obs not in matching_obs]
+            matching_set = {id(o) for o in matching_obs}
+            filtered_obs = [obs for obs in all_observations if id(obs) not in matching_set]
+            kept_count = len(filtered_obs)
+            deleted_count = total_count - kept_count
         elif action == 'keep':
             filtered_obs = matching_obs
-        else:  # action == 'delete' (Local-Mode or Python-filtered)
-            filtered_obs = [obs for obs in observations if obs not in matching_obs]
-        
-        # Calculate counts
-        if not (is_cloud_mode() and sql_filters and action == 'delete'):
-            # Normal case: calculate from filtered results
-            kept_count = len(filtered_obs)
             if is_cloud_mode() and sql_filters:
-                # For Cloud-Mode SQL filtering with keep action, need total for deleted count
+                kept_count = len(filtered_obs)
                 deleted_count = obs_db.count() - kept_count
             else:
-                deleted_count = len(observations) - kept_count
+                kept_count = len(filtered_obs)
+                deleted_count = len(all_obs) - kept_count
+        else:  # action == 'delete' (Local-Mode or Python-filtered)
+            matching_set = {id(o) for o in matching_obs}
+            filtered_obs = [obs for obs in all_obs if id(obs) not in matching_set]
+            kept_count = len(filtered_obs)
+            deleted_count = len(all_obs) - kept_count
         
-        # Observations are already dicts - pass through directly
-        # Use raw dict keys for filter response (SE, Bem are legacy names used by frontend)
-        filtered_dicts = []
-        for obs in filtered_obs:
-            obs_dict = {
-                'KK': _int(obs, 'KK'), 'O': _int(obs, 'O'), 'JJ': _int(obs, 'JJ'),
-                'MM': _int(obs, 'MM'), 'TT': _int(obs, 'TT'),
-                'g': _int(obs, 'g'), 'ZS': _int(obs, 'ZS', -1), 'ZM': _int(obs, 'ZM', -1),
-                'd': _int(obs, 'd', -1),
-                'DD': _int(obs, 'DD', -1), 'N': _int(obs, 'N', -1),
-                'C': _int(obs, 'C', -1), 'c': _int(obs, 'c', -1),
-                'EE': _int(obs, 'EE'), 'GG': _int(obs, 'GG'),
-                'H': _int(obs, 'H', -1), 'F': _int(obs, 'F', -1),
-                'V': _int(obs, 'V', -1),
-                'f': _int(obs, 'f', -1), 'zz': _int(obs, 'zz', -1),
-                'HO': _int(obs, 'HO', -1), 'HU': _int(obs, 'HU', -1),
-                'SE': obs.get('sectors', ''), 'Bem': obs.get('remarks', '')
-            }
-            filtered_dicts.append(obs_dict)
+        # Apply filtered result directly in backend storage
+        if is_cloud_mode():
+            # Cloud Mode: Replace all observations in database
+            obs_db.delete_all()
+            for obs in filtered_obs:
+                obs_db.insert(obs)
+        else:
+            # Local Mode: Replace in-memory observations
+            current_app.config['OBSERVATIONS'] = filtered_obs
         
         return jsonify({
             'success': True,
-            'filtered_observations': filtered_dicts,
             'kept_count': kept_count,
             'deleted_count': deleted_count
         })
