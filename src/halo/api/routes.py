@@ -878,24 +878,11 @@ def delete_observation() -> Dict[str, Any]:
             # Local Mode: Delete from in-memory list
             observations = current_app.config.get('OBSERVATIONS') or []
             
-            # Find observation to delete by matching key fields
-            # Match by: KK, O, JJ, MM, TT, EE, GG (unique identifier)
+            # Find observation to delete using canonical key function
+            target_key = obs_logic.make_observation_key(data)
             original_obs = None
-            d_kk = int(data.get('KK', 0))
-            d_o = int(data.get('O', 0))
-            d_jj = int(data.get('JJ', 0))
-            d_mm = int(data.get('MM', 0))
-            d_tt = int(data.get('TT', 0))
-            d_ee = int(data.get('EE', 0))
-            d_gg = int(data.get('GG', 0))
             for i, obs in enumerate(observations):
-                if (_int(obs, 'KK') == d_kk and
-                    _int(obs, 'O') == d_o and
-                    _int(obs, 'JJ') == d_jj and
-                    _int(obs, 'MM') == d_mm and
-                    _int(obs, 'TT') == d_tt and
-                    _int(obs, 'EE') == d_ee and
-                    _int(obs, 'GG') == d_gg):
+                if obs_logic.make_observation_key(obs) == target_key:
                     original_obs = i
                     break
             
@@ -1347,21 +1334,22 @@ def merge_file() -> Dict[str, Any]:
         # Get currently loaded observations
         current_observations = current_app.config.get('OBSERVATIONS', [])
         
-        # Create a set of existing observation keys for duplicate detection
-        # Key format: KK-O-JJ-MM-TT-EE-GG (matches observation unique identifier)
+        # Deduplicate using make_observation_key() - the single source of truth
         existing_keys = set()
         for obs in current_observations:
-            key = f"{_int(obs, 'KK')}-{_int(obs, 'O')}-{_int(obs, 'JJ'):02d}-{_int(obs, 'MM'):02d}-{_int(obs, 'TT'):02d}-{_int(obs, 'EE'):02d}-{_int(obs, 'GG'):02d}"
-            existing_keys.add(key)
+            existing_keys.add(obs_logic.make_observation_key(obs))
         
         # Add observations from new file that don't already exist
         added_count = 0
+        skipped_count = 0
         for obs in new_observations:
-            key = f"{_int(obs, 'KK')}-{_int(obs, 'O')}-{_int(obs, 'JJ'):02d}-{_int(obs, 'MM'):02d}-{_int(obs, 'TT'):02d}-{_int(obs, 'EE'):02d}-{_int(obs, 'GG'):02d}"
+            key = obs_logic.make_observation_key(obs)
             if key not in existing_keys:
                 current_observations.append(obs)
                 existing_keys.add(key)
                 added_count += 1
+            else:
+                skipped_count += 1
         
         # Sort observations using spaeter() equivalent
         current_observations = sorted(current_observations, key=cmp_to_key(_spaeter))
@@ -1373,7 +1361,9 @@ def merge_file() -> Dict[str, Any]:
         return jsonify({
             'success': True,
             'added_count': added_count,
-            'total_count': len(current_observations)
+            'skipped_count': skipped_count,
+            'total_count': len(current_observations),
+            'duplicate_count': skipped_count
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

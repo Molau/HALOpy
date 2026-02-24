@@ -119,13 +119,13 @@ def test_key_management():
     key = make_observation_key(obs)
     
     print(f"✓ make_observation_key() -> {key}")
-    assert key == (44, 1, 25, 1, 15, 22, 10), f"Expected (44, 1, 25, 1, 15, 22, 10), got {key}"
+    assert key == (44, 1, 25, 1, 15, 12, 30, 22, 10), f"Expected (44, 1, 25, 1, 15, 12, 30, 22, 10), got {key}"
     
     assert observation_matches_key(obs, key) == True
     print(f"✓ observation_matches_key() -> True")
     
     # Test with wrong key
-    wrong_key = (99, 1, 25, 1, 15, 22, 10)
+    wrong_key = (99, 1, 25, 1, 15, 12, 30, 22, 10)
     assert observation_matches_key(obs, wrong_key) == False
     print(f"✓ observation_matches_key() with wrong key -> False")
 
@@ -154,7 +154,7 @@ def test_find_operations():
     print(f"✓ find_observation_index() -> {idx}")
     
     # Test not found
-    not_found_key = (99, 1, 25, 1, 15, 22, 10)
+    not_found_key = (99, 1, 25, 1, 15, 12, 30, 22, 10)
     not_found = find_observation(collection, not_found_key)
     assert not_found is None, "find_observation() should return None for non-existent key"
     print(f"✓ find_observation() not found -> None")
@@ -220,7 +220,7 @@ def test_update_observation():
     print(f"✓ update_observation() success -> remarks='{collection[0]['remarks']}'")
     
     # Try to update non-existent observation
-    wrong_key = (99, 1, 25, 1, 15, 22, 10)
+    wrong_key = (99, 1, 25, 1, 15, 12, 30, 22, 10)
     success, collection = update_observation(wrong_key, updated, collection)
     
     assert success == False, "update_observation() should fail for non-existent key"
@@ -248,7 +248,7 @@ def test_delete_observation():
     print(f"✓ delete_observation() success -> {len(collection)} observations remaining")
     
     # Try to delete non-existent observation
-    wrong_key = (99, 1, 25, 1, 15, 22, 10)
+    wrong_key = (99, 1, 25, 1, 15, 12, 30, 22, 10)
     success, collection = delete_observation(wrong_key, collection)
     
     assert success == False, "delete_observation() should fail for non-existent key"
