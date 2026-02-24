@@ -53,16 +53,17 @@ def check_dependencies():
     
     if missing:
         print(f"Fehlende Pakete erkannt: {', '.join(missing)}")
-        print("Installiere Abhängigkeiten aus requirements.txt ...")
+        print("Installiere fehlende Pakete ...")
         try:
+            # Install only the missing packages (not the full requirements.txt,
+            # which may contain platform-specific packages like uwsgi)
             subprocess.check_call([
-                sys.executable, '-m', 'pip', 'install', '-r', str(requirements_path)
-            ])
+                sys.executable, '-m', 'pip', 'install'] + missing)
             print("Abhängigkeiten erfolgreich installiert.")
             print()
         except subprocess.CalledProcessError as e:
             print(f"WARNUNG: pip install fehlgeschlagen (Exit-Code {e.returncode}).")
-            print("Bitte manuell ausführen: pip install -r requirements.txt")
+            print(f"Bitte manuell ausführen: pip install {' '.join(missing)}")
             print()
 
 
