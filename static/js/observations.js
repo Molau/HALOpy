@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     let currentPage = 1;
     const pageSize = 50;  // Pascal shows 50 rows at a time (zeile variable)
-    let allObservations = [];
-    let filteredObservations = [];
+    let totalFiltered = 0;      // Total matching observations (from server)
+    let currentPageData = [];   // Observations for current page only (from server)
     let displayMode = 'kurz';  // Default to compact mode (Eingabeart = 'Z')
     let currentDetailIndex = 0;
     
@@ -96,23 +96,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function initialize() {
         await loadObserversData();  // Load observers early for dropdown
         
-        // Check if data is already loaded on the server
+        // Check if data is already loaded on the server (no bulk fetch)
         try {
-            const response = await fetch('/api/observations?limit=1');
+            const response = await fetch('/api/file/status');
             if (response.ok) {
-                const data = await response.json();
-                if (data.total > 0 && data.file) {
-                    // Data is loaded on server, fetch all observations
-                    const fullResponse = await fetch('/api/observations?limit=200000');
-                    if (fullResponse.ok) {
-                        const fullData = await fullResponse.json();
-                        if (!window.haloData) {
-                            window.haloData = { observations: [], fileName: null, isLoaded: false, isDirty: false };
-                        }
-                        window.haloData.observations = fullData.observations;
-                        window.haloData.fileName = fullData.file;
-                        window.haloData.isLoaded = true;
+                const status = await response.json();
+                if (status.count > 0) {
+                    if (!window.haloData) {
+                        window.haloData = { count: 0, fileName: null, isLoaded: false, isDirty: false };
                     }
+                    window.haloData.count = status.count;
+                    window.haloData.fileName = status.filename;
+                    window.haloData.isLoaded = true;
                 }
             }
         } catch (error) {}
@@ -136,12 +131,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
     
     // Pagination event listeners
-    btnFirstPage.addEventListener('click', () => goToPage(1));
-    btnPrevPage.addEventListener('click', () => goToPage(currentPage - 1));
-    btnNextPage.addEventListener('click', () => goToPage(currentPage + 1));
-    btnLastPage.addEventListener('click', () => {
-        const maxPage = Math.ceil(filteredObservations.length / pageSize);
-        goToPage(maxPage);
+    btnFirstPage.addEventListener('click', async () => await goToPage(1));
+    btnPrevPage.addEventListener('click', async () => await goToPage(currentPage - 1));
+    btnNextPage.addEventListener('click', async () => await goToPage(currentPage + 1));
+    btnLastPage.addEventListener('click', async () => {
+        const maxPage = Math.ceil(totalFiltered / pageSize);
+        await goToPage(maxPage);
     });
     
     // ESC key handler - exit observations display
@@ -233,15 +228,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         // Update page info text if observations are displayed
-        if (filteredObservations.length > 0) {
+        if (totalFiltered > 0) {
             const startIndex = (currentPage - 1) * pageSize;
-            const endIndex = Math.min(startIndex + pageSize, filteredObservations.length);
-            pageInfo.textContent = `${i18nStrings.common.row} ${startIndex + 1}-${endIndex} ${i18nStrings.common.of} ${filteredObservations.length}`;
+            const endIndex = Math.min(startIndex + pageSize, totalFiltered);
+            pageInfo.textContent = `${i18nStrings.common.row} ${startIndex + 1}-${endIndex} ${i18nStrings.common.of} ${totalFiltered}`;
         }
         
         // Update record count if displayed
-        if (recordCount && filteredObservations.length > 0) {
-            recordCount.textContent = `${filteredObservations.length} ${i18nStrings.common.observations}`;
+        if (recordCount && totalFiltered > 0) {
+            recordCount.textContent = `${totalFiltered} ${i18nStrings.common.observations}`;
         }
         
         // Update exit button text
@@ -251,41 +246,38 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
     
-    async function loadObservations() {
-        try {
-            compactTbody.textContent = i18nStrings.messages.loading_short;
-            
-            // Load observations
-            const obsResponse = await fetch('/api/observations?limit=200000');
-            if (!obsResponse.ok) throw new Error('Failed to load observations');
-            
-            const obsData = await obsResponse.json();
-            allObservations = obsData.observations;
-            
-            // Load observers
-            try {
-                const obsrResponse = await fetch('/api/observers');
-                if (obsrResponse.ok) {
-                    const obsrData = await obsrResponse.json();
-                    if (window.haloData) {
-                        window.haloData.observers = obsrData.observers || [];
-                    }
-                }
-            } catch (err) {
-                console.warn('Could not load observers:', err);
-            }
-            
-            // Sync with global data store
-            if (window.haloData) {
-                window.haloData.observations = allObservations;
-                window.haloData.fileName = obsData.file;
-                window.haloData.isLoaded = true;
-            }
-            
-            applyFiltersInternal();
-            updateFileInfo(obsData.file, allObservations.length);
-        } catch (error) {compactTbody.textContent = i18nStrings.messages.error_loading_data;
+    // Fetch a page of filtered observations from the server
+    async function fetchPage(page) {
+        currentPage = page;
+        const searchParams = {
+            criterion1: filterCriterion1 !== 'none' ? filterCriterion1 : null,
+            value1: filterValue1,
+            criterion2: filterCriterion2 !== 'none' ? filterCriterion2 : null,
+            value2: filterValue2,
+            limit: pageSize,
+            offset: (page - 1) * pageSize
+        };
+        
+        const response = await fetch('/api/observations/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(searchParams)
+        });
+        if (!response.ok) throw new Error('Search failed');
+        
+        const result = await response.json();
+        currentPageData = result.observations;
+        totalFiltered = result.total;
+        
+        // Update file info
+        if (window.haloData && window.haloData.fileName) {
+            updateFileInfo(window.haloData.fileName, window.haloData.count);
         }
+        
+        // Update filtered record count
+        recordCount.textContent = `${totalFiltered} ${i18nStrings.common.observations}`;
+        
+        await displayPage();
     }
     
     function updateFileInfo(fileName, count) {
@@ -303,9 +295,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Expose function globally so it can be called when language switches
     window.updateFileInfoLanguage = function() {
-        if (allObservations.length > 0) {
+        if (window.haloData && window.haloData.count > 0) {
             const fileName = document.getElementById('file-name').textContent;
-            updateFileInfo(fileName, allObservations.length);
+            updateFileInfo(fileName, window.haloData.count);
         }
     };
     
@@ -400,9 +392,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                 NName: obs.NName || ''
             })).sort((a,b) => a.KK - b.KK);
         } else {
-            // Fallback: extract from observations
-            const uniqueK = [...new Set(allObservations.map(o => o.k))];
-            observers = uniqueK.sort((a,b) => a-b).map(k => ({ KK: k, VName: '', NName: '' }));
+            // No observers loaded - empty list
+            observers = [];
         }
         
         observers.forEach(obs => {
@@ -543,22 +534,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // Process filters after modal is fully hidden - add delay for backdrop cleanup
                 setTimeout(async () => {
                     try {
-
-
-                        
-                        if (window.haloData && window.haloData.isLoaded) {
-
-                            allObservations = window.haloData.observations;
-                            await applyFiltersInternal();
-                            updateFileInfo(window.haloData.fileName, allObservations.length);
-                        } else if (allObservations.length === 0) {
-
-                            await loadObservations();
-                        } else {
-
-                            await applyFiltersInternal();
-                        }
-
+                        await fetchPage(1);
                     } catch (error) {} finally {
                         applySpinner.style.display = 'none';
                         applyBtn.disabled = false;
@@ -576,15 +552,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             setTimeout(async () => {
                 try {
-                    if (window.haloData && window.haloData.isLoaded) {
-                        allObservations = window.haloData.observations;
-                        await applyFiltersInternal();
-                        updateFileInfo(window.haloData.fileName, allObservations.length);
-                    } else if (allObservations.length === 0) {
-                        await loadObservations();
-                    } else {
-                        await applyFiltersInternal();
-                    }
+                    await fetchPage(1);
                 } catch (error) {} finally {
                     applySpinner.style.display = 'none';
                     applyBtn.disabled = false;
@@ -592,40 +560,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
             }, 50);
         }
-    }
-    
-    // checkelem() function from H_BEOBNG.PAS - checks if observation matches filters
-    function checkelem(obs) {
-        // DEBUG: Log filter check
-        if (filterCriterion1 === 'region' && filterValue1 !== null) {}
-        // First filter (auswahl)
-        if (filterCriterion1 === 'observer') {
-            if (filterValue1 !== null && obs.KK !== filterValue1) return false;
-        } else if (filterCriterion1 === 'region') {
-            if (filterValue1 !== null && obs.GG !== filterValue1) return false;
-        }
-        
-        // Second filter (auswahl2)
-        if (filterCriterion2 === 'date') {
-            if (filterValue2) {
-                // Check each field that was specified (null means "any")
-                if (filterValue2.t !== null && obs.TT !== filterValue2.t) return false;
-                if (filterValue2.m !== null && obs.MM !== filterValue2.m) return false;
-                if (filterValue2.j !== null && obs.JJ !== filterValue2.j) return false;
-            }
-        } else if (filterCriterion2 === 'halo-type') {
-            if (filterValue2 !== null && obs.EE !== filterValue2) return false;
-        }
-        
-        return true;
-    }
-    
-    async function applyFiltersInternal() {
-        filteredObservations = allObservations.filter(checkelem);
-        recordCount.textContent = `${filteredObservations.length} ${i18nStrings.common.observations}`;
-        currentPage = 1;
-        
-        await displayPage();
     }
     
     async function displayPage() {
@@ -843,11 +777,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         btnExitObservations.style.display = 'block';
         
         const startIndex = (currentPage - 1) * pageSize;
-        const endIndex = Math.min(startIndex + pageSize, filteredObservations.length);
-        const pageData = filteredObservations.slice(startIndex, endIndex);
-        const maxPage = Math.ceil(filteredObservations.length / pageSize);
+        const endIndex = startIndex + currentPageData.length;
+        const maxPage = Math.ceil(totalFiltered / pageSize);
         
-        if (pageData.length === 0) {
+        if (currentPageData.length === 0) {
             // Hide overlay BEFORE showing modal to prevent backdrop interference
             if (window.currentOverlay) {
                 hideLoadingOverlay(window.currentOverlay);
@@ -860,7 +793,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         // Build compact display using kurzausgabe() format
-        const lines = pageData.map(obs => kurzausgabe(obs));
+        const lines = currentPageData.map(obs => kurzausgabe(obs));
         compactTbody.textContent = lines.join('\n');
         
         // Update pagination info
@@ -871,11 +804,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Update button states
         btnFirstPage.disabled = currentPage === 1;
         btnPrevPage.disabled = currentPage === 1;
-        btnNextPage.disabled = currentPage === maxPage;
-        btnLastPage.disabled = currentPage === maxPage;
+        btnNextPage.disabled = currentPage >= maxPage;
+        btnLastPage.disabled = currentPage >= maxPage;
         
         // Update record count at bottom
-        pageInfo.textContent = `${i18nStrings.common.row} ${startIndex + 1}-${endIndex} ${ofText} ${filteredObservations.length}`;
+        pageInfo.textContent = `${i18nStrings.common.row} ${startIndex + 1}-${endIndex} ${ofText} ${totalFiltered}`;
     }
     
     async function displayDetailView() {
@@ -884,7 +817,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         detailView.style.display = 'none';
         btnExitObservations.style.display = 'none';
         
-        if (filteredObservations.length === 0) {
+        if (totalFiltered === 0) {
             // Hide overlay BEFORE showing modal to prevent backdrop interference
             if (window.currentOverlay) {
                 hideLoadingOverlay(window.currentOverlay);
@@ -897,47 +830,69 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         currentDetailIndex = (currentPage - 1) * pageSize;
-        showDetailRecord();
+        await showDetailRecord();
     }
     
-    function showDetailRecord() {
-        if (currentDetailIndex < 0 || currentDetailIndex >= filteredObservations.length) return;
+    async function showDetailRecord() {
+        if (currentDetailIndex < 0 || currentDetailIndex >= totalFiltered) return;
         
-        const obs = filteredObservations[currentDetailIndex];
-        showObservationFormForView(obs, currentDetailIndex + 1, filteredObservations.length, 
-            () => {
-                // Next button
-                if (currentDetailIndex < filteredObservations.length - 1) {
-                    currentDetailIndex++;
-                    showDetailRecord();
+        // Fetch single observation from server at the current offset
+        const searchParams = {
+            criterion1: filterCriterion1 !== 'none' ? filterCriterion1 : null,
+            value1: filterValue1,
+            criterion2: filterCriterion2 !== 'none' ? filterCriterion2 : null,
+            value2: filterValue2,
+            limit: 1,
+            offset: currentDetailIndex
+        };
+        
+        try {
+            const response = await fetch('/api/observations/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(searchParams)
+            });
+            if (!response.ok) return;
+            const result = await response.json();
+            if (result.observations.length === 0) return;
+            
+            const obs = result.observations[0];
+            showObservationFormForView(obs, currentDetailIndex + 1, totalFiltered, 
+                async () => {
+                    // Next button
+                    if (currentDetailIndex < totalFiltered - 1) {
+                        currentDetailIndex++;
+                        await showDetailRecord();
+                    }
+                }, 
+                async () => {
+                    // Previous button
+                    if (currentDetailIndex > 0) {
+                        currentDetailIndex--;
+                        await showDetailRecord();
+                    }
+                }, 
+                () => {
+                    // Close button - return to main
+                    window.navigateInternal('/');
                 }
-            }, 
-            () => {
-                // Previous button
-                if (currentDetailIndex > 0) {
-                    currentDetailIndex--;
-                    showDetailRecord();
-                }
-            }, 
-            () => {
-                // Close button - return to main
-                window.navigateInternal('/');
-            }
-        );
+            );
+        } catch (error) {
+            console.error('Error fetching detail record:', error);
+        }
     }
     
-    function navigateDetail(direction) {
+    async function navigateDetail(direction) {
         currentDetailIndex += direction;
         if (currentDetailIndex < 0) currentDetailIndex = 0;
-        if (currentDetailIndex >= filteredObservations.length) currentDetailIndex = filteredObservations.length - 1;
-        showDetailRecord();
+        if (currentDetailIndex >= totalFiltered) currentDetailIndex = totalFiltered - 1;
+        await showDetailRecord();
     }
         
     async function goToPage(page) {
-        const maxPage = Math.ceil(filteredObservations.length / pageSize);
+        const maxPage = Math.ceil(totalFiltered / pageSize);
         if (page >= 1 && page <= maxPage) {
-            currentPage = page;
-            await displayPage();
+            await fetchPage(page);
         }
     }
 });

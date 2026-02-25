@@ -28,6 +28,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from flask import Blueprint, jsonify, request, current_app, Response, session, g, send_file, make_response
 
+from halo import __version__
+
 # Project imports
 from halo.config import is_cloud_mode, get_cloud_server_url
 from halo.io.csv_handler import ObservationCSV
@@ -461,7 +463,7 @@ def health_check() -> Dict[str, Any]:
     """
     status = {
         'status': 'ok',
-        'version': current_app.config.get('VERSION', '3.1.2'),
+        'version': __version__,
         'service': 'HALO API',
         'mode': 'cloud' if is_cloud_mode() else 'local'
     }
@@ -705,14 +707,20 @@ def search_observations() -> Dict[str, Any]:
     Accepts filter criteria matching the two-stage filter dialog:
     - criterion1: 'observer' or 'region' with value1
     - criterion2: 'date', 'month', 'year', or 'halo-type' with value2
+    - limit: Maximum number of results to return (default: all)
+    - offset: Number of results to skip (default: 0)
     
-    Returns filtered observations as JSON array.
+    Returns filtered observations as JSON with pagination support.
+    Response includes 'total' (total matching count) so client can paginate
+    without loading all data.
     """
     data = request.get_json() or {}
     criterion1 = data.get('criterion1')
     value1 = data.get('value1')
     criterion2 = data.get('criterion2')
     value2 = data.get('value2')
+    limit = data.get('limit')  # None = return all
+    offset = data.get('offset', 0) or 0
     
     if is_cloud_mode():
         # Cloud Mode: Build SQL filters for load_filtered()
@@ -782,9 +790,23 @@ def search_observations() -> Dict[str, Any]:
         
         observations = [obs for obs in observations if matches(obs)]
     
+    # Total count before pagination (for client-side pagination controls)
+    total = len(observations)
+    
+    # Apply pagination if limit is specified
+    if limit is not None:
+        limit = int(limit)
+        offset = int(offset)
+        paginated = observations[offset:offset + limit]
+    else:
+        paginated = observations
+    
     return jsonify({
-        'observations': [_obs_to_json(obs) for obs in observations],
-        'count': len(observations)
+        'observations': [_obs_to_json(obs) for obs in paginated],
+        'total': total,
+        'count': len(paginated),
+        'offset': offset,
+        'limit': limit
     })
 
 
@@ -842,6 +864,7 @@ def add_observation() -> Dict[str, Any]:
             
             observations.insert(insert_pos, obs)
             current_app.config['OBSERVATIONS'] = observations
+            current_app.config['DIRTY'] = True
 
             return jsonify({'success': True, 'count': len(observations)})
     except Exception as e:
@@ -889,6 +912,7 @@ def delete_observation() -> Dict[str, Any]:
             if original_obs is not None:
                 observations.pop(original_obs)
                 current_app.config['OBSERVATIONS'] = observations
+                current_app.config['DIRTY'] = True
                 return jsonify({'success': True, 'deleted': True, 'count': len(observations)})
             else:
                 return jsonify({'success': False, 'deleted': False, 'count': len(observations)})
@@ -917,6 +941,7 @@ def replace_observations() -> Dict[str, Any]:
         observations.append(obs)
     
     current_app.config['OBSERVATIONS'] = observations
+    current_app.config['DIRTY'] = True
     
     return jsonify({'success': True, 'count': len(observations)})
 
@@ -1133,6 +1158,7 @@ def filter_observations() -> Dict[str, Any]:
         else:
             # Local Mode: Replace in-memory observations
             current_app.config['OBSERVATIONS'] = filtered_obs
+            current_app.config['DIRTY'] = True
         
         return jsonify({
             'success': True,
@@ -1283,12 +1309,6 @@ def load_file_from_browser() -> Dict[str, Any]:
             current_app.config['OBSERVATIONS'] = observations
             current_app.config['DIRTY'] = needs_conversion  # Legacy conversion needs saving
             
-            # Auto-save in modern format if legacy file was converted
-            if needs_conversion:
-                save_path = obs_file.get_data_path(file.filename)
-                obs_file.save_file(observations, save_path)
-                current_app.config['DIRTY'] = False
-            
             return jsonify({
                 'success': True,
                 'filename': file.filename,
@@ -1357,6 +1377,8 @@ def merge_file() -> Dict[str, Any]:
         # Update app config
         current_app.config['OBSERVATIONS'] = current_observations
         # Mark as dirty only if at least one observation was added
+        if added_count > 0:
+            current_app.config['DIRTY'] = True
         
         return jsonify({
             'success': True,

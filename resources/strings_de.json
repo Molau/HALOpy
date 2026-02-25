@@ -1,9 +1,9 @@
 {
   "app": {
     "title": "Haloerfassungsprogramm",
-    "window_title": "HALO 3.1",
-    "version": "3.1.2",
-    "version_date": "2026-02-24",
+    "window_title": "_injected_from___init__.py",
+    "version": "_injected_from___init__.py",
+    "version_date": "_injected_from___init__.py",
     "copyright_years": "1992-2026",
     "welcome_title": "Willkommen beim HALO Auswerteprogramm",
     "description": "Programm zur Erfassung und Auswertung von Halobeobachtungen",
@@ -221,6 +221,7 @@
       "upload_progress": "Lade hoch...",
       "upload_title": "Upload",
       "duplicates_skipped": "Duplikate übersprungen",
+      "all_duplicates": "Alle {0} Beobachtungen sind bereits auf dem Server vorhanden.",
       "replaced": "ersetzt",
       "added": "hinzugefügt",
       "download_progress": "Lade herunter...",

@@ -272,18 +272,14 @@ class ObservationCSV:
                 ho = obs.get('HO', '')
                 hu = obs.get('HU', '')
                 
-                # Format HO: empty→'  ', '//'→'//', else→zero-padded 2 digits
-                if not ho:
-                    ho_str = '  '
-                elif ho == '//':
+                # Format HO: empty→'//', '//'→'//', else→zero-padded 2 digits
+                if not ho or ho == '//':
                     ho_str = '//'
                 else:
                     ho_str = ho.zfill(2)
                 
-                # Format HU: empty→'  ', '//'→'//', else→zero-padded 2 digits
-                if not hu:
-                    hu_str = '  '
-                elif hu == '//':
+                # Format HU: empty→'//', '//'→'//', else→zero-padded 2 digits
+                if not hu or hu == '//':
                     hu_str = '//'
                 else:
                     hu_str = hu.zfill(2)
@@ -336,18 +332,14 @@ class ObservationCSV:
             ho = obs.get('HO', '')
             hu = obs.get('HU', '')
             
-            # Format HO: empty→'  ', '//'→'//', else→zero-padded 2 digits
-            if not ho:
-                ho_str = '  '
-            elif ho == '//':
+            # Format HO: empty→'//', '//'→'//', else→zero-padded 2 digits
+            if not ho or ho == '//':
                 ho_str = '//'
             else:
                 ho_str = ho.zfill(2)
             
-            # Format HU: empty→'  ', '//'→'//', else→zero-padded 2 digits
-            if not hu:
-                hu_str = '  '
-            elif hu == '//':
+            # Format HU: empty→'//', '//'→'//', else→zero-padded 2 digits
+            if not hu or hu == '//':
                 hu_str = '//'
             else:
                 hu_str = hu.zfill(2)

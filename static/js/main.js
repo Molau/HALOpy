@@ -70,13 +70,37 @@ window.waitForI18n = function() {
     });
 };
 
-// Global data store for loaded observations
+// Global data store - metadata only, NO observation data
+// All observation data stays on the server (in-memory for local mode, DB for cloud mode).
+// Only the count is tracked client-side for display purposes.
+// isDirty is a cached mirror of the server's DIRTY flag — only set by refreshFileStatus().
 window.haloData = {
-    observations: [],
+    count: 0,
     fileName: null,
     isLoaded: false,
     isDirty: false
 };
+
+/**
+ * Fetch current file status from server and sync client state.
+ * This is the ONLY place that sets isDirty — server is the single source of truth.
+ */
+async function refreshFileStatus() {
+    try {
+        const resp = await fetch('/api/file/status');
+        if (!resp.ok) return;
+        const status = await resp.json();
+        window.haloData.count = status.count || 0;
+        window.haloData.isDirty = status.dirty || false;
+        if (status.filename) window.haloData.fileName = status.filename;
+        if (status.count > 0) window.haloData.isLoaded = true;
+        saveHaloDataToSession();
+        updateFileInfoDisplay(window.haloData.fileName, window.haloData.count);
+    } catch (e) {
+        console.error('refreshFileStatus failed:', e);
+    }
+}
+window.refreshFileStatus = refreshFileStatus;
 
 // Global config (loaded once at startup)
 window.haloConfig = {
@@ -84,18 +108,14 @@ window.haloConfig = {
 };
 
 // Helper function to save haloData metadata to sessionStorage
-// Note: We only save metadata (fileName, isLoaded, isDirty, count), NOT the observations array
-// For large files (200k+ observations), storing all data exceeds browser storage limits
-// Server keeps all observations in memory, so we fetch them via API when needed
 function saveHaloDataToSession() {
     if (window.haloData && window.haloData.isLoaded) {
         try {
-            // Store only metadata, not the full observations array
             const metadata = {
                 fileName: window.haloData.fileName,
                 isLoaded: window.haloData.isLoaded,
                 isDirty: window.haloData.isDirty,
-                count: window.haloData.observations.length || 0
+                count: window.haloData.count || 0
             };
             sessionStorage.setItem('haloData', JSON.stringify(metadata));
         } catch (e) {sessionStorage.removeItem('haloData');
@@ -148,36 +168,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Restore file state metadata from sessionStorage if available
-    // Note: We only restore metadata, not observations array
-    // Observations are always fetched from server when needed
+    // No observation data is fetched - only metadata (count comes from server status)
     const savedHaloData = sessionStorage.getItem('haloData');
     if (savedHaloData) {
         try {
             const metadata = JSON.parse(savedHaloData);
-            // Restore metadata only
             window.haloData.fileName = metadata.fileName;
             window.haloData.isLoaded = metadata.isLoaded;
-            window.haloData.isDirty = metadata.isDirty;
-            // Don't restore observations array - it will be fetched from server when needed
-            window.haloData.observations = [];
+            window.haloData.count = metadata.count || 0;
             
-            // If file was loaded before, fetch observations from server
+            // Verify with server and get current count + dirty state
             if (metadata.isLoaded && metadata.fileName) {
-                try {
-                    const resp = await fetch(`/api/observations`);
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        // API returns { observations: [...], total: n, limit: n, offset: n }
-                        window.haloData.observations = data.observations || [];
-                        if (window.haloData.observations.length > 0) {
-                            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
-                        }
-                    }
-                } catch (e) {
-                    console.error('Failed to restore observations from server:', e);
-                    // Keep observations empty on error
-                    window.haloData.observations = [];
-                }
+                await refreshFileStatus();
             }
         } catch (e) {
             sessionStorage.removeItem('haloData');
@@ -1528,13 +1530,10 @@ async function showAddObservationDialogNumeric() {
             
             if (!resp.ok) throw new Error(i18nStrings.observations.error_adding);
             
-            const addedObs = await resp.json();
+            const result = await resp.json();
             
-            // Add to observations array and set dirty flag (Local Mode only)
-            window.haloData.observations.push(addedObs);
-            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-            saveHaloDataToSession();  // Sync to sessionStorage
-            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+            // Sync state from server (count, dirty flag, display)
+            await refreshFileStatus();
             
             // Trigger autosave
             await triggerAutosave();
@@ -1608,13 +1607,10 @@ async function showAddObservationDialogMenu() {
                 throw new Error(i18nStrings.observations.error_adding);
             }
             
-            const addedObs = await resp.json();
+            const result = await resp.json();
             
-            // Add to observations array and set dirty flag (Local Mode only)
-            window.haloData.observations.push(addedObs);
-            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-            saveHaloDataToSession();
-            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+            // Sync state from server (count, dirty flag, display)
+            await refreshFileStatus();
             
             // Trigger autosave
             await triggerAutosave();
@@ -2494,21 +2490,9 @@ async function showModifySingleObservations(filterState) {
         currentIndex = index;
         const obs = filteredObs[currentIndex];
         
-        // Find the index of this observation in the full observations array
-        const obsIndex = window.haloData.observations ? window.haloData.observations.indexOf(obs) : -1;
-        
-        // Show observation form directly with populated fields (reuse form instance)
-        // Store the original observation index for deletion
-        let originalIndex = obsIndex;
-        
         form.show('edit', obs, async (modifiedObs) => {
             // Delete the old observation and insert the modified one
             try {
-                // Remove old observation from array using the stored index
-                if (originalIndex >= 0 && originalIndex < window.haloData.observations.length) {
-                    window.haloData.observations.splice(originalIndex, 1);
-                }
-                
                 // First, delete the old observation from server
                 const deleteResp = await fetch('/api/observations/delete', {
                     method: 'POST',
@@ -2529,18 +2513,10 @@ async function showModifySingleObservations(filterState) {
                 
                 if (!resp.ok) throw new Error('Failed to save modified observation');
                 
-                const addedObs = await resp.json();
+                const result = await resp.json();
                 
-                // Reload observations from server to get correct sorted order
-                const obsResponse = await fetch('/api/observations?limit=200000');
-                if (obsResponse.ok) {
-                    const data = await obsResponse.json();
-                    window.haloData.observations = data.observations;
-                }
-                
-                // Set dirty flag (Local Mode only)
-                if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-                updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+                // Sync state from server (count, dirty flag, display)
+                await refreshFileStatus();
                 
                 // Trigger autosave
                 await triggerAutosave();
@@ -2955,15 +2931,8 @@ async function processBulkUpdate(filteredObs, updates) {
         }
         
 
-        // Reload observations from server to get correct sorted order
-        const obsResponse = await fetch('/api/observations?limit=200000');
-        if (obsResponse.ok) {
-            const data = await obsResponse.json();
-            window.haloData.observations = data.observations;
-            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-
-            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
-        } else {}
+        // Sync state from server (count, dirty flag, display)
+        await refreshFileStatus();
         
 
         sessionStorage.setItem('pendingNotification', JSON.stringify({
@@ -3035,16 +3004,10 @@ async function showDeleteSingleObservations(filterState) {
         }
 
         const obs = filteredObs[currentIndex];
-        const obsIndex = window.haloData.observations ? window.haloData.observations.indexOf(obs) : -1;
 
         form.show('delete', obs, null, null, currentIndex + 1, filteredObs.length, i18nStrings.observations.delete_question, async () => {
             // Yes -> delete
             try {
-                // Remove from client array first if present
-                if (obsIndex >= 0) {
-                    window.haloData.observations.splice(obsIndex, 1);
-                }
-
                 // Delete on server
                 const resp = await fetch('/api/observations/delete', {
                     method: 'POST',
@@ -3056,13 +3019,10 @@ async function showDeleteSingleObservations(filterState) {
                     throw new Error('Delete endpoint responded ' + resp.status);
                 }
 
-                if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-                updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations ? window.haloData.observations.length : 0);
+                const result = await resp.json();
                 
-                // Save to sessionStorage to persist dirty flag
-                if (window.saveHaloDataToSession) {
-                    window.saveHaloDataToSession();
-                }
+                // Sync state from server (count, dirty flag, display)
+                await refreshFileStatus();
                 
                 await triggerAutosave();
 
@@ -3227,28 +3187,10 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
     const form = new ObservationForm();
     await form.initialize('edit');
     
-    // Store the original observation index for deletion
-    let originalIndex = obsIndex;
-    if (originalIndex === null) {
-        // Find index if not provided
-        originalIndex = window.haloData.observations.indexOf(obs);
-    }
-    
     form.show('edit', obs, async (modifiedObs) => {
         // Delete the old observation and insert the modified one
         try {
             const logs = [];
-            
-            
-            // Remove old observation from array using the stored index
-            if (originalIndex >= 0 && originalIndex < window.haloData.observations.length) {
-                const deleted = window.haloData.observations.splice(originalIndex, 1);
-
-            } else {
-                console.warn(...logs);
-            }
-            
-            // Add modified observation to server (which will insert at correct position)
             
             // First, delete the old observation from server by passing original values
             const deleteResp = await fetch('/api/observations/delete', {
@@ -3275,22 +3217,13 @@ async function showObservationFormForEdit(obs, currentNum, totalNum, onModified,
             
             if (!resp.ok) throw new Error('Failed to save modified observation');
             
-            const addedObs = await resp.json();
-            
-            // Reload observations from server to get correct sorted order
-            const obsResponse = await fetch('/api/observations?limit=200000');
-            if (obsResponse.ok) {
-                const data = await obsResponse.json();
-                window.haloData.observations = data.observations;
-            }
+            const result = await resp.json();
             
             // Save logs to sessionStorage for later viewing
             sessionStorage.setItem('lastEditLogs', logs.join('\n'));
-
             
-            // Set dirty flag (Local Mode only)
-            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
-            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+            // Sync state from server (count, dirty flag, display)
+            await refreshFileStatus();
             
             // Trigger autosave
             await triggerAutosave();
@@ -4523,10 +4456,10 @@ async function showSelectDialog() {
         }
         
         // Check if current file has unsaved changes
-        checkDirtyAndProceed(() => performSelection(filterType, action, modal));
+        checkDirtyAndProceed(() => performSelection(filterType, action, modal), modal);
     });
     
-    async function checkDirtyAndProceed(callback) {
+    async function checkDirtyAndProceed(callback, modal) {
         try {
             const response = await fetch('/api/file/status');
             if (response.ok) {
@@ -4546,8 +4479,8 @@ async function showSelectDialog() {
                             }
                         },
                         () => {
-                            // User chose not to save - still proceed
-                            callback();
+                            // Cancel: close the select dialog too
+                            if (modal) modal.hide();
                         }
                     );
                     return;
@@ -4645,14 +4578,11 @@ async function showSelectDialog() {
             
             bsLoadingModal.hide();
             
-            // Mark as dirty (Local Mode only)
-            if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;
+            // Sync state from server (count, dirty flag, display)
+            await refreshFileStatus();
             
             // Trigger autosave
             await triggerAutosave();
-            
-            // Update UI
-            updateFileInfoDisplay(window.haloData.fileName, keptCount);
             
             // Close modal
             modal.hide();
@@ -4702,20 +4632,31 @@ async function showNewFileDialog() {
         // Get chosen filename from fileHandle
         const filename = fileHandle.name;
         
-        // Create empty file (no header, no content)
-        const writable = await fileHandle.createWritable();
-        await writable.write('');
-        await writable.close();
+        // Tell server to create the new file (writes CSV header, sets up state)
+        const resp = await fetch('/api/file/new', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename })
+        });
+        
+        if (!resp.ok) {
+            const err = await resp.json();
+            showErrorDialog(i18nStrings.common.error + ': ' + (err.error || 'Unknown error'));
+            return;
+        }
+        
+        // Get the server-created file content (header only) and write to local file
+        const saveResp = await fetch('/api/file/save', { method: 'POST' });
+        if (saveResp.ok) {
+            const blob = await saveResp.blob();
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+        }
         
         // Update application state (empty observations list)
-        window.haloData.observations = [];
-        window.haloData.fileName = filename;
-        window.haloData.isLoaded = true;
-        window.haloData.isDirty = false;
-        saveHaloDataToSession();
-        
-        // Update file info in header
-        updateFileInfoDisplay(filename, 0);
+        // Sync state from server (count=0, dirty=false)
+        await refreshFileStatus();
         
         showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', filename)}`, 'success');
     } catch (err) {
@@ -4762,9 +4703,9 @@ async function saveFile() {
                 await writable.write(blob);
                 await writable.close();
                 
-                window.haloData.isDirty = false;
+                // Sync state from server (dirty=false after save)
+                await refreshFileStatus();
                 window.haloData.fileName = newFilename;
-                updateFileInfoDisplay(newFilename, status.count);
                 
                 // Clean up autosave file
                 await fetch('/api/file/cleanup_autosave', {
@@ -5286,13 +5227,20 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 const result = await response.json();
                 
                 // Build success message with details
-                let message = `✓ ${result.count || 0} ${i18nStrings.common.observations} `;
-                message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;
-                if (result.duplicates && result.duplicates > 0) {
-                    message += ` (${result.duplicates} ${i18nStrings.upload_download.duplicates_skipped})`;
+                let message;
+                if (result.count === 0 && result.duplicates > 0) {
+                    // All observations already exist on server
+                    message = i18nStrings.upload_download.all_duplicates
+                        .replace('{0}', result.duplicates);
+                    showNotification(message, 'info', 5000);
+                } else {
+                    message = `✓ ${result.count || 0} ${i18nStrings.common.observations} `;
+                    message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;
+                    if (result.duplicates && result.duplicates > 0) {
+                        message += ` (${result.duplicates} ${i18nStrings.upload_download.duplicates_skipped})`;
+                    }
+                    showNotification(message, 'success', 5000);
                 }
-                
-                showNotification(message, 'success', 5000);
                 
                 // In Cloud Mode: No reload needed, data is already in database
                 // In Local Mode: Not applicable (upload goes to cloud server, not local storage)
@@ -6356,8 +6304,8 @@ async function checkAutosaveRecovery() {
     }
     
     try {
-        // Skip autosave recovery if we already have observations loaded in memory
-        if (window.haloData.isLoaded && window.haloData.observations.length > 0) {
+        // Skip autosave recovery if we already have data loaded
+        if (window.haloData.isLoaded && window.haloData.count > 0) {
             return;
         }
         
@@ -6428,14 +6376,8 @@ async function checkAutosaveRecovery() {
                 
                 const result = await restoreResp.json();
                 
-                // Update local state
-                window.haloData.observations = result.observations || [];
-                window.haloData.fileName = result.filename;
-                window.haloData.isLoaded = true;
-                if (!window.haloConfig.cloud_mode) window.haloData.isDirty = true;  // Mark as dirty since restored from temp (Local Mode only)
-                saveHaloDataToSession();  // Sync to sessionStorage
-                
-                updateFileInfoDisplay(result.filename, result.count);
+                // Sync state from server (count, dirty flag, display)
+                await refreshFileStatus();
                 
                 modal.hide();
                 
@@ -6528,6 +6470,21 @@ async function continueLoadFile() {
         document.body.appendChild(loadingModal);
         const bsModal = new bootstrap.Modal(loadingModal, { backdrop: 'static', keyboard: false });
 
+        // Track when modal is fully shown (needed to safely call hide())
+        let modalFullyShown = false;
+        const modalShownPromise = new Promise(resolve => {
+            loadingModal.addEventListener('shown.bs.modal', () => {
+                modalFullyShown = true;
+                resolve();
+            }, { once: true });
+        });
+
+        // Register hidden.bs.modal listener BEFORE setupModalCleanup,
+        // so our resolve fires before cleanup removes the element from DOM.
+        const modalHiddenPromise = new Promise(resolve => {
+            loadingModal.addEventListener('hidden.bs.modal', resolve, { once: true });
+        });
+
         // Decision #033: setupModalCleanup for DOM cleanup
         setupModalCleanup(loadingModal);
 
@@ -6535,7 +6492,7 @@ async function continueLoadFile() {
         
         try {
             // Clear previous data before loading new file
-            window.haloData.observations = [];
+            window.haloData.count = 0;
             window.haloData.fileName = null;
             window.haloData.isLoaded = false;
             window.haloData.isDirty = false;
@@ -6554,21 +6511,17 @@ async function continueLoadFile() {
             // Get response data to check conversion flag
             const uploadResult = await uploadResponse.json();
             
-            // Load observations into global store
-            const obsResponse = await fetch('/api/observations?limit=200000');
-            if (!obsResponse.ok) throw new Error('Failed to load observations');
+            // Sync state from server (count, dirty flag, display)
+            await refreshFileStatus();
+            window.haloData.fileName = file.name;  // Use client filename (may differ from server)
             
-            const data = await obsResponse.json();
-            window.haloData.observations = data.observations;
-            window.haloData.fileName = file.name;
-            window.haloData.isLoaded = true;
-            saveHaloDataToSession();  // Sync to sessionStorage
-            
-            // Update file info in header
-            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
-            
-            // Hide loading modal (setupModalCleanup handles DOM removal)
+            // Hide loading modal and wait for animation to complete
+            // before showing any new modal (prevents Bootstrap stacking issues).
+            // Must wait for show animation to finish first, otherwise hide() is
+            // ignored by Bootstrap and hidden.bs.modal never fires (race condition).
+            if (!modalFullyShown) await modalShownPromise;
             bsModal.hide();
+            await modalHiddenPromise;
             
             // Show conversion modal if legacy format was converted
             if (uploadResult.converted) {
@@ -6579,7 +6532,7 @@ async function continueLoadFile() {
             }
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${window.haloData.observations.length} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
+            showNotification(`<strong>✓</strong> ${window.haloData.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
         } catch (error) {
             bsModal.hide();
             showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
@@ -6679,21 +6632,10 @@ async function continueMergeFile() {
             
             const result = await mergeResponse.json();
             
-            // Reload observations into global store
-            const obsResponse = await fetch('/api/observations?limit=200000');
-            if (!obsResponse.ok) throw new Error('Failed to load observations');
-            
-            const data = await obsResponse.json();
-            window.haloData.observations = data.observations;
-            // Mark as dirty only if at least one observation was added (Local Mode only)
             const addedCount = result.added_count || 0;
-            if (addedCount > 0 && !window.haloConfig.cloud_mode) {
-                window.haloData.isDirty = true;
-            }
-            saveHaloDataToSession();
             
-            // Update file info in header
-            updateFileInfoDisplay(window.haloData.fileName, window.haloData.observations.length);
+            // Sync state from server (count, dirty flag, display)
+            await refreshFileStatus();
             
             // Hide loading modal (setupModalCleanup handles DOM removal)
             bsModal.hide();
@@ -6742,7 +6684,7 @@ function clearFileInfoDisplay() {
     }
     // Clear global data
     window.haloData = {
-        observations: [],
+        count: 0,
         fileName: null,
         isLoaded: false,
         isDirty: false
@@ -6761,15 +6703,15 @@ async function checkAndDisplayFileInfo() {
             if (window.haloConfig && window.haloConfig.cloud_mode) {
                 // Cloud Mode: always show database count (no filename needed)
                 window.haloData.isLoaded = true;
+                window.haloData.count = status.count || 0;
                 updateFileInfoDisplay(null, status.count);
             } else if (status.count > 0 && status.filename) {
-                // Local Mode: data is loaded, update display and global state
-                if (window.haloData.observations.length === 0) {
-                    window.haloData.isLoaded = true;
-                    window.haloData.fileName = status.filename;
-                    window.haloData.observations = [];
-                    saveHaloDataToSession();
-                }
+                // Local Mode: data is loaded, sync all state from server
+                window.haloData.isLoaded = true;
+                window.haloData.fileName = status.filename;
+                window.haloData.count = status.count;
+                window.haloData.isDirty = status.dirty || false;
+                saveHaloDataToSession();
                 updateFileInfoDisplay(status.filename, status.count);
                 
                 // Show notification if file was auto-loaded

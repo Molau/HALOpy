@@ -149,8 +149,9 @@ def new_file(filename: str, base_dir: Optional[Path] = None) -> Path:
     # Create parent directory if needed
     filepath.parent.mkdir(parents=True, exist_ok=True)
     
-    # Create empty file
-    filepath.write_text("", encoding="utf-8")
+    # Create file with CSV header
+    from halo.io.csv_handler import OBSERVATION_CSV_HEADER
+    filepath.write_text(OBSERVATION_CSV_HEADER + "\n", encoding="utf-8")
     
     return filepath
 

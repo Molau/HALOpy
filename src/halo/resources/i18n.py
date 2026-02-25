@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from halo import __version__, __version_date__
+
 
 class I18n:
     """
@@ -52,6 +54,12 @@ class I18n:
         
         with open(language_file, 'r', encoding='utf-8') as f:
             self.strings = json.load(f)
+        
+        # Inject version info from single source of truth (halo/__init__.py)
+        if 'app' in self.strings:
+            self.strings['app']['version'] = __version__
+            self.strings['app']['version_date'] = __version_date__
+            self.strings['app']['window_title'] = f"HALO {'.'.join(__version__.split('.')[:2])}"
         
         self.language = language
     
