@@ -116,9 +116,6 @@ This menu bundles the display, entry, modification, and deletion of observations
   * 'Add': Opens the input mask according to the HALO key. Entries are immediately checked against the validation rules; invalid combinations are rejected. Fixed values (e.g., fixed observer/date) are adopted, required fields are marked.
   * 'Change': Searches for observations according to criteria and allows modification of individual fields. Changes are validated immediately; sorting is retained after saving.
   * 'Delete': Searches for observations according to criteria and removes selected entries from the loaded file.
-
-Input modes:
-
   * Menu entries: Guided forms with selection fields; suitable when the observation is not yet coded.
   * Numeric entries: Key entry as a numeric column according to the HALO key; faster for already coded observations.
 
@@ -132,9 +129,6 @@ Here you manage observer data (ID number, name, observation sites with validity,
   * 'Add': Creates a new observer with ID, name, primary/secondary observation site (including coordinates/area) and start of validity; active status is set.
   * 'Change': Modifies master fields (ID, name) or location-related entries with validity/coordinates/activity; existing location entries can be supplemented or deleted (at least one remains).
   * 'Delete': Removes an observer including all location entries after a safety query, permanently.
-
-Additionally, the following functions are available in both operating modes:
-
   * 'Upload': Uploads observer data in CSV format to the server. In local mode, prior authentication is required.
   * 'Download': Downloads observer data in CSV format from the server. In local mode, prior authentication is required.
 

@@ -392,24 +392,16 @@ if ($createShortcut -eq "" -or $createShortcut -eq "Y" -or $createShortcut -eq "
         $WshShell = New-Object -ComObject WScript.Shell
         $desktopPath = [Environment]::GetFolderPath("Desktop")
         
-        # Shortcut 1: Start HALOpy Server
-        $serverShortcutPath = Join-Path $desktopPath "HALOpy Server.lnk"
+        # Shortcut: Start HALOpy (server + browser opens automatically)
+        $serverShortcutPath = Join-Path $desktopPath "HALOpy.lnk"
         $serverShortcut = $WshShell.CreateShortcut($serverShortcutPath)
         $serverShortcut.TargetPath = $batPath
         $serverShortcut.WorkingDirectory = $INSTALL_DIR
-        $serverShortcut.Description = "Start HALOpy Server"
+        $serverShortcut.Description = "Start HALOpy"
         $serverShortcut.Save()
         
-        # Shortcut 2: Open HALOpy in Browser
-        $clientShortcutPath = Join-Path $desktopPath "HALOpy Client.lnk"
-        $clientShortcut = $WshShell.CreateShortcut($clientShortcutPath)
-        $clientShortcut.TargetPath = "http://localhost:5000"
-        $clientShortcut.Description = "Open HALOpy in Browser"
-        $clientShortcut.Save()
-        
-        Write-Success "Desktop shortcuts created:"
-        Write-Host "  - HALOpy Server.lnk (starts the server)"
-        Write-Host "  - HALOpy Client.lnk (opens browser to http://localhost:5000)"
+        Write-Success "Desktop shortcut created:"
+        Write-Host "  - HALOpy.lnk (starts server and opens browser automatically)"
     }
     catch {
         Write-Error-Message "Could not create desktop shortcuts: $_"
@@ -439,11 +431,10 @@ Write-Host ""
 Write-ColorOutput Cyan "To start HALOpy:"
 Write-Host "  1. Double-click on: $batPath"
 Write-Host "  2. Or run from command prompt: cd `"$INSTALL_DIR`" ; .\halo.bat"
+Write-Host "  The browser opens automatically."
 Write-Host ""
 Write-ColorOutput Yellow "First-time setup:"
 Write-Host "  - Place your observation files (.HAL, .CSV) in: $dataDir"
-Write-Host "  - Open your web browser to: http://localhost:5000"
-Write-Host "  - The program runs a local web server"
 Write-Host ""
 
 $startNow = Read-Host "Start HALOpy now? (Y/N) [N]"
@@ -451,8 +442,7 @@ if ($startNow -eq "Y" -or $startNow -eq "y") {
     Write-Host ""
     Write-Step "Starting HALOpy..."
     Start-Process -FilePath $batPath -WorkingDirectory $INSTALL_DIR
-    Write-Host "HALOpy is starting. Your web browser should open automatically."
-    Write-Host "If not, open your browser and go to: http://localhost:5000"
+    Write-Host "HALOpy is starting. The browser opens automatically."
 }
 
 Write-Host ""

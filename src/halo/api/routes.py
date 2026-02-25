@@ -3292,7 +3292,11 @@ def get_monthly_stats() -> Dict[str, Any]:
     
     # Get all active observers at the end of this month/year (SEIT <= MMJJ)
     # Build SEIT value for comparison using same formula as _parse_seit: mm + 13 * jj
-    month_year_value = mm_int + 13 * jj_int
+    # Handle century boundary: years 00-79 are 2000-2079, must add 100 (same as _parse_seit)
+    jj_adjusted = jj_int
+    if jj_int < (YEAR_MIN - 1900):
+        jj_adjusted = jj_int + 100
+    month_year_value = mm_int + 13 * jj_adjusted
     
     # Get unique active observers up to this month/year
     active_observers = {}
@@ -4528,7 +4532,11 @@ def get_annual_stats() -> Dict[str, Any]:
     
     # Get all active observers up to end of year
     # Use December of the year as reference (month 12)
-    month_year_value = 12 + 13 * jj_int
+    # Handle century boundary: years 00-79 are 2000-2079, must add 100 (same as _parse_seit)
+    jj_adjusted = jj_int
+    if jj_int < (YEAR_MIN - 1900):
+        jj_adjusted = jj_int + 100
+    month_year_value = 12 + 13 * jj_adjusted
     
     # Get unique active observers up to this year
     active_observers = {}
@@ -4767,11 +4775,17 @@ def get_annual_stats() -> Dict[str, Any]:
             'total_days': len(stats['total_days'])
         })
     
-    # Calculate phenomena (observations with 5+ EE types visible simultaneously)
-    # Group by unique (MM, TT, KK, O) combination
+    # Detect halo phenomena: observations marked with '*' in remarks field
+    # (Pascal: sonder:=sonder OR (elem.bemerkung[lauf]='*'))
+    # Group by unique (MM, TT, KK, O) combination, collect EE types
     phenomena_dict = {}  # Key: (MM, TT, KK, O), Value: phenomenon data
     
     for obs in filtered_obs:
+        # Only consider observations with '*' in remarks
+        remarks = obs.get('remarks', '') or ''
+        if '*' not in remarks:
+            continue
+        
         # Group by (MM, TT, KK, O)
         key = (_int(obs, 'MM'), _int(obs, 'TT'), _int(obs, 'KK'), _int(obs, 'O'))
         if key not in phenomena_dict:
@@ -4787,29 +4801,25 @@ def get_annual_stats() -> Dict[str, Any]:
                 'ee_count': 0  # Track count of EE types
             }
         
-        # Add EE type (split if EE=4) and update count
-        ee_before = len(phenomena_dict[key]['ee_types'])
-        if _int(obs, 'EE') == 4:
-            phenomena_dict[key]['ee_types'].add(2)
-            phenomena_dict[key]['ee_types'].add(3)
-        else:
-            phenomena_dict[key]['ee_types'].add(_int(obs, 'EE'))
+        # Add EE type - resolve combined types (Pascal: ZusHaloart)
+        for individual_ee in resolve_halo_type(_int(obs, 'EE')):
+            phenomena_dict[key]['ee_types'].add(individual_ee)
         
-        ee_after = len(phenomena_dict[key]['ee_types'])
-        phenomena_dict[key]['ee_count'] = ee_after
+        ee_count = len(phenomena_dict[key]['ee_types'])
+        phenomena_dict[key]['ee_count'] = ee_count
         
         # Update time only if count < 6 (freeze time after 5th EE type confirmed)
-        if ee_after < 6:
+        # Pascal: IF ph[lauf,0]<6 THEN BEGIN ph[lauf,5]:=elem.ZS; ph[lauf,6]:=elem.ZM; END
+        if ee_count < 6:
             phenomena_dict[key]['zs'] = _int(obs, 'ZS', -1)
             phenomena_dict[key]['zm'] = _int(obs, 'ZM', -1)
     
-    # Filter for only phenomena with 5+ EE types and convert to sorted list
+    # All '*'-marked observation groups are phenomena - convert to sorted list
     phenomena_list = []
     for key in sorted(phenomena_dict.keys()):
         phenom = phenomena_dict[key]
-        if phenom['ee_count'] >= 5:  # Only include if 5 or more EE types
-            phenom['ee_types'] = sorted(list(phenom['ee_types']))
-            phenomena_list.append(phenom)
+        phenom['ee_types'] = sorted(list(phenom['ee_types']))
+        phenomena_list.append(phenom)
     
     # Sort by (MM, TT, KK, time)
     phenomena_list.sort(key=lambda p: (p['mm'], p['tt'], p['kk'], p['zs'], p['zm']))

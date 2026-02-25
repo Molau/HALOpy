@@ -569,11 +569,11 @@
     "success_password_set": "Passwort für {user} erfolgreich gesetzt"
   },
   "object_types": {
-    "1": "Sonnenhalo",
-    "2": "Mondhalo",
-    "3": "Planetenhalo",
-    "4": "Sternhalo",
-    "5": "Halo um eine irdische Lichtquelle"
+    "1": "Sonne",
+    "2": "Mond",
+    "3": "Planet",
+    "4": "Stern",
+    "5": "Irdische Lichtquelle"
   },
   "months": {
     "1": "Januar",
@@ -649,8 +649,8 @@
     "2": "Stratocumulus (Sc)",
     "3": "St + Sc",
     "4": "Nimbostratus (m/o Stratus)",
-    "5": "Cumulus",
-    "6": "Cumulonimbus",
+    "5": "Cumulus (Cu)",
+    "6": "Cumulonimbus (Cb)",
     "7": "Altostratus (As)",
     "8": "Altocumulus (Ac)",
     "9": "As + Ac"
