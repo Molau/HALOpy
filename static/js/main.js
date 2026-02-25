@@ -5172,30 +5172,32 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             
             // Parse CSV to extract observations
             const lines = text.split('\n').filter(line => line.trim());
+            // Helper: parseInt that preserves 0 (|| -1 would convert 0 to -1 since 0 is falsy)
+            const csvInt = (val) => { const n = parseInt(val); return isNaN(n) ? -1 : n; };
             const observations = lines.slice(1).map(line => {
                 const parts = line.split(',');
                 // Parse CSV fields into observation object
                 return {
-                    KK: parseInt(parts[0]) || -1,
-                    O: parseInt(parts[1]) || -1,
-                    JJ: parseInt(parts[2]) || -1,
-                    MM: parseInt(parts[3]) || -1,
-                    TT: parseInt(parts[4]) || -1,
-                    g: parseInt(parts[5]) || -1,
-                    ZS: parseInt(parts[6]) || -1,
-                    ZM: parseInt(parts[7]) || -1,
-                    d: parseInt(parts[8]) || -1,
-                    DD: parseInt(parts[9]) || -1,
-                    N: parseInt(parts[10]) || -1,
-                    C: parseInt(parts[11]) || -1,
-                    c: parseInt(parts[12]) || -1,
-                    EE: parseInt(parts[13]) || -1,
-                    H: parseInt(parts[14]) || -1,
-                    F: parseInt(parts[15]) || -1,
-                    V: parseInt(parts[16]) || -1,
-                    f: parseInt(parts[17]) || -1,
-                    zz: parseInt(parts[18]) || -1,
-                    GG: parseInt(parts[19]) || -1,
+                    KK: csvInt(parts[0]),
+                    O: csvInt(parts[1]),
+                    JJ: csvInt(parts[2]),
+                    MM: csvInt(parts[3]),
+                    TT: csvInt(parts[4]),
+                    g: csvInt(parts[5]),
+                    ZS: csvInt(parts[6]),
+                    ZM: csvInt(parts[7]),
+                    d: csvInt(parts[8]),
+                    DD: csvInt(parts[9]),
+                    N: csvInt(parts[10]),
+                    C: csvInt(parts[11]),
+                    c: csvInt(parts[12]),
+                    EE: csvInt(parts[13]),
+                    H: csvInt(parts[14]),
+                    F: csvInt(parts[15]),
+                    V: csvInt(parts[16]),
+                    f: csvInt(parts[17]),
+                    zz: csvInt(parts[18]),
+                    GG: csvInt(parts[19]),
                     sectors: parts[20] || '',
                     remarks: parts[21] || ''
                 };
@@ -5232,7 +5234,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                     // All observations already exist on server
                     message = i18nStrings.upload_download.all_duplicates
                         .replace('{0}', result.duplicates);
-                    showNotification(message, 'info', 5000);
+                    showNotification(message, 'success', 5000);
                 } else {
                     message = `✓ ${result.count || 0} ${i18nStrings.common.observations} `;
                     message += result.mode === 'replace' ? i18nStrings.upload_download.replaced : i18nStrings.upload_download.added;

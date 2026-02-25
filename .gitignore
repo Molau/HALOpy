@@ -63,3 +63,6 @@ docs/DEPLOYMENT_EC2.md
 # Temporary test files
 temp/
 *.$$$
+
+# User-specific config (contains passwords)
+resources/[Hh][Aa][Ll][Oo].[Cc][Ff][Gg]
