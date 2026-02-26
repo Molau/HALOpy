@@ -4925,34 +4925,7 @@ function continueUpload(isCloudMode, cloudServerUrl, username) {
 
 // Upload: Combined dialog with auth fields (Local Mode only) + file selection + mode
 async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
-    // Check if there are unsaved changes
-    try {
-        const statusResponse = await fetch('/api/file/status');
-        if (statusResponse.ok) {
-            const status = await statusResponse.json();
-            if (status.dirty) {
-                // Ask user if they want to save first
-                const save = await new Promise(resolve => {
-                    showConfirmDialog(
-                        i18nStrings.messages.unsaved_changes_title,
-                        i18nStrings.messages.upload_warning_unsaved_changes,
-                        (confirmed) => resolve(confirmed)
-                    );
-                });
-                
-                if (save === undefined) {
-                    // User cancelled
-                    return;
-                } else if (save) {
-                    // Save file first
-                    await saveFile();
-                }
-                // If user said "No", continue without saving
-            }
-        }
-    } catch (error) {
-        console.error('Error checking file status:', error);
-    }
+    // Dirty check already handled in showUploadDialog() - no need to check again here
     
     // Load data for Local Mode auth fields
     let observers = [];

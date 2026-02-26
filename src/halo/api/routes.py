@@ -940,8 +940,11 @@ def replace_observations() -> Dict[str, Any]:
         obs['remarks'] = obs_dict.get('remarks', '') or ''
         observations.append(obs)
     
+    previous_count = len(current_app.config.get('OBSERVATIONS', []))
     current_app.config['OBSERVATIONS'] = observations
-    current_app.config['DIRTY'] = True
+    # Only mark dirty if the number of observations actually changed
+    if len(observations) != previous_count:
+        current_app.config['DIRTY'] = True
     
     return jsonify({'success': True, 'count': len(observations)})
 
@@ -1158,7 +1161,9 @@ def filter_observations() -> Dict[str, Any]:
         else:
             # Local Mode: Replace in-memory observations
             current_app.config['OBSERVATIONS'] = filtered_obs
-            current_app.config['DIRTY'] = True
+            # Only mark dirty if observations were actually removed
+            if deleted_count > 0:
+                current_app.config['DIRTY'] = True
         
         return jsonify({
             'success': True,

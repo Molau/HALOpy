@@ -107,7 +107,7 @@
     "selection_result": "{kept} observations kept, {deleted} deleted",
     "unsaved_changes_title": "Unsaved Changes",
     "unsaved_changes_message": "You have unsaved changes. Do you really want to continue?",
-    "upload_warning_unsaved_changes": "You have unsaved changes. Would you like to save first? Otherwise you may upload an old file version.",
+    "upload_warning_unsaved_changes": "You have unsaved changes. You may upload an old file version. Continue?",
     "autosave_recovery_title": "Autosave Recovery",
     "autosave_recovery_message": "An unsaved file was found:",
     "autosave_recovery_prompt": "Do you want to restore it?",

@@ -107,7 +107,7 @@
     "selection_result": "{kept} Beobachtungen behalten, {deleted} gelöscht",
     "unsaved_changes_title": "Ungespeicherte Änderungen",
     "unsaved_changes_message": "Sie haben ungespeicherte Änderungen. Möchten Sie wirklich fortfahren?",
-    "upload_warning_unsaved_changes": "Sie haben ungespeicherte Änderungen. Möchten Sie erst speichern? Sonst laden Sie ggf. eine alte Dateiversion hoch.",
+    "upload_warning_unsaved_changes": "Sie haben ungespeicherte Änderungen. Ggf. laden Sie eine alte Dateiversion hoch. Fortfahren?",
     "autosave_recovery_title": "Automatische Wiederherstellung",
     "autosave_recovery_message": "Es wurde eine ungesicherte Datei gefunden:",
     "autosave_recovery_prompt": "Möchten Sie diese wiederherstellen?",
