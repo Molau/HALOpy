@@ -1593,7 +1593,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             
             const result = await response.json();
-
             
             // Display the result
             displayAnalysisResult(result, selectedParams);

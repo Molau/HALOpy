@@ -3452,14 +3452,14 @@ async function showDisplayCompactList(filterState) {
         document.getElementById('btn-last').disabled = currentPage === maxPage;
     };
     
-    // Navigation handlers
-    document.getElementById('btn-first').onclick = () => { currentPage = 1; displayPage(); };
-    document.getElementById('btn-prev').onclick = () => { if (currentPage > 1) { currentPage--; displayPage(); } };
-    document.getElementById('btn-next').onclick = () => { if (currentPage < maxPage) { currentPage++; displayPage(); } };
-    document.getElementById('btn-last').onclick = () => { currentPage = maxPage; displayPage(); };
-    
-    // Close button
-    const btnClose = modalEl.querySelector('[data-bs-dismiss="modal"]');
+    // Close button (OK)
+    const btnClose = modalEl.querySelector('.modal-footer [data-bs-dismiss="modal"]');
+
+    // Navigation handlers - refocus OK button after page change so ESC keeps working
+    document.getElementById('btn-first').onclick = () => { currentPage = 1; displayPage(); btnClose.focus(); };
+    document.getElementById('btn-prev').onclick = () => { if (currentPage > 1) { currentPage--; displayPage(); btnClose.focus(); } };
+    document.getElementById('btn-next').onclick = () => { if (currentPage < maxPage) { currentPage++; displayPage(); btnClose.focus(); } };
+    document.getElementById('btn-last').onclick = () => { currentPage = maxPage; displayPage(); btnClose.focus(); };
     
     // Decision #033: Use setupModalKeyboard for Enter key ? OK button (closes modal)
     setupModalKeyboard(modalEl, btnClose);

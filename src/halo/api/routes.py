@@ -6115,12 +6115,11 @@ def analyze_observations() -> Dict[str, Any]:
             # Local Mode: Load observations and use Python filtering
             observations = current_app.config.get('OBSERVATIONS', [])
             if not observations:
-                csv_handler = ObservationCSV()
-                data_path = obs_file.get_data_path('ALLE.CSV')
-                observations, needs_conversion = csv_handler.read_observations(str(data_path))
-                # Auto-convert legacy format
-                if needs_conversion:
-                    csv_handler.write_observations(data_path, observations)
+                return jsonify({
+                    'success': True,
+                    'data': [],
+                    'total': 0
+                })
             
             # Apply filters first
             filtered_obs = observations
@@ -6596,8 +6595,6 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
     else:
         obs_value = obs.get(param_name)
     
-
-    
     if obs_value is None:
         return False
     
@@ -6605,9 +6602,14 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
     try:
         if param_name in ['MM', 'JJ', 'ZZ', 'SH', 'KK', 'GG', 'O', 'f', 'd', 'EE', 'DD', 'H', 'F', 'V', 'zz']:
             # Most parameters are integers (note: TT handled above)
+            # obs_value from obs.get() is a string - convert to int for comparison
+            obs_int = _int(obs, param_name, -1)
+            if obs_int == -1:
+                return False
             if param_name == 'ZZ':
                 # Time can be float
                 param_value = float(param_value)
+                return obs_int == param_value
             elif param_name == 'JJ':
                 # Year - convert 4-digit to 2-digit (1988 -> 88)
                 param_value = int(param_value)
@@ -6615,7 +6617,7 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
                     param_value = param_value % 100
             else:
                 param_value = int(param_value)
-            return obs_value == param_value
+            return obs_int == param_value
     except (ValueError, TypeError):
         return False
     
