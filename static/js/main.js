@@ -5171,11 +5171,26 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             }
             
             // Parse CSV to extract observations
+            // CSV column order (23 cols): KK,O,JJ,MM,TT,g,ZS,ZM,d,DD,N,C,c,EE,H,F,V,f,zz,GG,8HHHH,sectors,remarks
             const lines = text.split('\n').filter(line => line.trim());
             // Helper: parseInt that preserves 0 (|| -1 would convert 0 to -1 since 0 is falsy)
             const csvInt = (val) => { const n = parseInt(val); return isNaN(n) ? -1 : n; };
             const observations = lines.slice(1).map(line => {
                 const parts = line.split(',');
+                // Parse 8HHHH field (index 20) into HO and HU for the server
+                // Format: "8HHHH" where first HH=HO (upper), second HH=HU (lower)
+                // e.g. "80102" → HO=1, HU=2; "8////" → HO=-1, HU=-1
+                const lp8Raw = (parts[20] || '').trim();
+                let HO = -1, HU = -1;
+                if (lp8Raw.length >= 5 && lp8Raw.charAt(0) === '8') {
+                    HO = csvInt(lp8Raw.substring(1, 3));
+                    HU = csvInt(lp8Raw.substring(3, 5));
+                }
+                // Remarks may contain commas (CSV-quoted); join remaining parts
+                let remarks = parts.slice(22).join(',');
+                if (remarks.startsWith('"') && remarks.endsWith('"')) {
+                    remarks = remarks.substring(1, remarks.length - 1).replace(/""/g, '"');
+                }
                 // Parse CSV fields into observation object
                 return {
                     KK: csvInt(parts[0]),
@@ -5198,8 +5213,10 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                     f: csvInt(parts[17]),
                     zz: csvInt(parts[18]),
                     GG: csvInt(parts[19]),
-                    sectors: parts[20] || '',
-                    remarks: parts[21] || ''
+                    HO: HO,
+                    HU: HU,
+                    sectors: parts[21] || '',
+                    remarks: remarks
                 };
             });
             
