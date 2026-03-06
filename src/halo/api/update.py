@@ -16,6 +16,7 @@ from urllib.request import urlopen
 
 # Third-party imports
 from flask import Blueprint, jsonify, request, current_app
+from halo.web.extensions import csrf
 
 update_blueprint = Blueprint('update', __name__, url_prefix='/api')
 
@@ -97,6 +98,7 @@ def restart_server(root_path: Path) -> None:
 
 
 @update_blueprint.route('/update', methods=['POST'])
+@csrf.exempt
 def perform_update():
     data = request.get_json(silent=True) or {}
     repo = data.get('repo') or current_app.config.get('UPDATE_REPO', '')
@@ -109,6 +111,7 @@ def perform_update():
 
 
 @update_blueprint.route('/restart', methods=['POST'])
+@csrf.exempt
 def restart():
     root_path = Path(__file__).parent.parent.parent.parent
     # Spawn new process and exit current

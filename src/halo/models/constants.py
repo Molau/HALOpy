@@ -11,6 +11,10 @@ import sys
 # API Configuration
 DEFAULT_OBSERVATION_LIMIT = 200000  # Default maximum observations returned by API
 
+# Password policy (single source of truth for backend + frontend)
+PASSWORD_MIN_LENGTH = 8
+PASSWORD_REQUIRE_CATEGORIES = 3  # At least 3 of 4 categories required
+
 # Year range and cutoff for 2-digit year conversion
 # YEAR_MIN is also the cutoff boundary (e.g., 1980 → cutoff 80)
 YEAR_MIN = 1980

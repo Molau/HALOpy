@@ -11,6 +11,19 @@
  */
 
 /**
+ * Escape HTML special characters to prevent XSS.
+ * Use for ALL user/API-supplied data inserted into HTML template literals.
+ * @param {*} text - Value to escape (converted to string)
+ * @returns {string} HTML-safe string
+ */
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+/**
  * Setup consistent keyboard handling for any Bootstrap modal.
  * Call this ONCE after modal.show().
  * 

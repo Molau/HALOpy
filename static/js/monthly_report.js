@@ -7,13 +7,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     let fixedObserver = '';
     let currentReportData = null; // Store current report data for save/print
 
-    // Helper function to escape HTML
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
     // Elements
     const filterDialog = document.getElementById('filter-dialog');
     const observerSelect = document.getElementById('observer-select');

@@ -22,10 +22,10 @@ let ALL_PILLAR_HEIGHT_VALUES = []; // All height values including 0
 // Global cloud mode flag - loaded once at startup
 let isCloudMode = false;
 
-// Password policy configuration
-const PASSWORD_POLICY = {
+// Password policy configuration (defaults, overridden by /api/constants at startup)
+let PASSWORD_POLICY = {
     minLength: 8,
-    requireCategories: 3, // At least 3 of 4 categories required
+    requireCategories: 3,
     categories: {
         lowercase: /[a-z]/,
         uppercase: /[A-Z]/,
@@ -139,6 +139,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             CIRCULAR_HALOS = new Set(constants.circular_halos);
             PILLAR_HEIGHT_VALUES = constants.pillar_height_values;
             ALL_PILLAR_HEIGHT_VALUES = constants.all_pillar_height_values;
+            if (constants.password_policy) {
+                PASSWORD_POLICY.minLength = constants.password_policy.min_length;
+                PASSWORD_POLICY.requireCategories = constants.password_policy.require_categories;
+            }
         }
     } catch (e) {
         console.error('Failed to load application constants:', e);
@@ -2594,7 +2598,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
     // Build observer options - pre-select fixed observer if set
     const observerOptions = observers.map(obs => {
         const selected = (fixedObserver && String(obs.KK) === String(fixedObserver)) ? ' selected' : '';
-        return `<option value="${obs.KK}"${selected}>${obs.KK} - ${obs.VName} ${obs.NName}</option>`;
+        return `<option value="${obs.KK}"${selected}>${obs.KK} - ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`;
     }).join('');
     
     // Build year options (0-99: 80-99=1980-1999, 0-79=2000-2079)
@@ -3171,12 +3175,12 @@ function formatObservationForDisplay(obs) {
     
     // Sectors
     if (obs.sectors && obs.sectors.trim()) {
-        html += `<strong>${i18nStrings.fields.sectors}:</strong> ${obs.sectors.trim()}<br>`;
+        html += `<strong>${i18nStrings.fields.sectors}:</strong> ${escapeHtml(obs.sectors.trim())}<br>`;
     }
     
     // Remarks
     if (obs.remarks && obs.remarks.trim()) {
-        html += `<strong>${i18nStrings.fields.remarks}:</strong> ${obs.remarks.trim()}<br>`;
+        html += `<strong>${i18nStrings.fields.remarks}:</strong> ${escapeHtml(obs.remarks.trim())}<br>`;
     }
     
     return html;
@@ -4658,7 +4662,7 @@ async function showNewFileDialog() {
         // Sync state from server (count=0, dirty=false)
         await refreshFileStatus();
         
-        showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', filename)}`, 'success');
+        showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', escapeHtml(filename))}`, 'success');
     } catch (err) {
         if (err.name === 'AbortError') {
             // User cancelled the file picker
@@ -4713,7 +4717,7 @@ async function saveFile() {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 
-                showNotification(`<strong>✓</strong> ${newFilename} gespeichert`, 'success');
+                showNotification(`<strong>✓</strong> ${escapeHtml(newFilename)} gespeichert`, 'success');
             } else {
                 const result = await response.json();
                 showErrorDialog(i18nStrings.common.error + ': ' + result.error);
@@ -5144,7 +5148,6 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             }
             
             // Parse CSV to extract observations
-            // CSV column order (23 cols): KK,O,JJ,MM,TT,g,ZS,ZM,d,DD,N,C,c,EE,H,F,V,f,zz,GG,8HHHH,sectors,remarks
             const lines = text.split('\n').filter(line => line.trim());
             // Helper: parseInt that preserves 0 (|| -1 would convert 0 to -1 since 0 is falsy)
             const csvInt = (val) => { const n = parseInt(val); return isNaN(n) ? -1 : n; };
@@ -6374,7 +6377,7 @@ async function checkAutosaveRecovery() {
                 modal.hide();
                 
                 // Show success notification
-                const message = `${result.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${result.filename}" ${i18nStrings.messages.loaded}`;
+                const message = `${result.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${escapeHtml(result.filename)}" ${i18nStrings.messages.loaded}`;
                 showNotification(`<strong>✓</strong> ${message}`, 'success', 5000);
             } catch (error) {
                 showErrorDialog(i18nStrings.messages.autosave_recovery_error + ': ' + error.message);
@@ -6454,7 +6457,7 @@ async function continueLoadFile() {
                         <div class="spinner-border text-primary mb-3" role="status">
                             <span class="visually-hidden">${i18nStrings.messages.loading_spinner}</span>
                         </div>
-                        <p class="mb-0">${i18nStrings.messages.loading_file} "${file.name}" ...</p>
+                        <p class="mb-0">${i18nStrings.messages.loading_file} "${escapeHtml(file.name)}" ...</p>
                     </div>
                 </div>
             </div>
@@ -6524,10 +6527,10 @@ async function continueLoadFile() {
             }
             
             // Show success message
-            showNotification(`<strong>✓</strong> ${window.haloData.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${file.name}" ${i18nStrings.messages.loaded}`);
+            showNotification(`<strong>✓</strong> ${window.haloData.count} ${i18nStrings.common.observations} ${i18nStrings.messages.loaded_from} "${escapeHtml(file.name)}" ${i18nStrings.messages.loaded}`);
         } catch (error) {
             bsModal.hide();
-            showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>✗</strong> ${i18nStrings.messages.error_loading}: ${escapeHtml(error.message)}`, 'danger', 5000);
         }
     });
     
@@ -6594,7 +6597,7 @@ async function continueMergeFile() {
                         <div class="spinner-border text-primary mb-3" role="status">
                             <span class="visually-hidden">${i18nStrings.messages.loading_spinner}</span>
                         </div>
-                        <p class="mb-0">${i18nStrings.messages.merging_file} "${file.name}" ...</p>
+                        <p class="mb-0">${i18nStrings.messages.merging_file} "${escapeHtml(file.name)}" ...</p>
                     </div>
                 </div>
             </div>
@@ -6634,10 +6637,10 @@ async function continueMergeFile() {
             
             // Show success message with count of added observations
             // (addedCount already computed above)
-            showNotification(`<strong>✓</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${file.name}"`);
+            showNotification(`<strong>✓</strong> ${addedCount} ${i18nStrings.common.observations} ${i18nStrings.messages.added} "${escapeHtml(file.name)}"`);
         } catch (error) {
             bsModal.hide();
-            showNotification(`<strong>✗</strong> ${i18nStrings.messages.merge_error}: ${error.message}`, 'danger', 5000);
+            showNotification(`<strong>✗</strong> ${i18nStrings.messages.merge_error}: ${escapeHtml(error.message)}`, 'danger', 5000);
             document.body.appendChild(errorMsg);
             setTimeout(() => errorMsg.remove(), 5000);
         }
@@ -6708,7 +6711,7 @@ async function checkAndDisplayFileInfo() {
                 
                 // Show notification if file was auto-loaded
                 if (status.auto_loaded) {
-                    showNotification(`<strong>✓</strong> ${status.filename} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
+                    showNotification(`<strong>✓</strong> ${escapeHtml(status.filename)} ${i18nStrings.messages.loaded} (${status.count} ${i18nStrings.observations.records_label})`);
                 }
             } else {
                 // No data loaded
@@ -6772,7 +6775,7 @@ async function showFixedObserverDialog() {
         let options = `<option value="">${i18nStrings.settings.no_fixed_observer}</option>`;
         observers.forEach(obs => {
             const selected = String(obs.KK) === String(currentObserver) ? 'selected' : '';
-            options += `<option value="${obs.KK}" ${selected}>${obs.KK} - ${obs.VName} ${obs.NName}</option>`;
+            options += `<option value="${obs.KK}" ${selected}>${obs.KK} - ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`;
         });
         
         // Create Bootstrap modal
@@ -7101,7 +7104,7 @@ async function showChangePasswordDialog() {
             const observers = await observersResponse.json();
             
             const observerOptions = observers.map(obs => 
-                `<option value="${obs.KK}">${obs.KK} - ${obs.VName} ${obs.NName}</option>`
+                `<option value="${obs.KK}">${obs.KK} - ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`
             ).join('');
             
             modalHtml = `
@@ -7260,7 +7263,7 @@ async function showChangePasswordDialog() {
                     
                     if (response.ok && result.success) {
                         modal.hide();
-                        const userName = selectedUser === 'admin' ? i18n.admin_user : selectedUser;
+                        const userName = selectedUser === 'admin' ? i18n.admin_user : escapeHtml(selectedUser);
                         showNotification(i18n.success_password_set.replace('{user}', userName), 'success');
                     } else {
                         showError(result.error);
@@ -7999,7 +8002,7 @@ async function showDeleteObserverDialog() {
         // Create observer options sorted by KK
         const observers = data.observers.sort((a, b) => a.KK.localeCompare(b.KK));
         const observerOptions = observers.map(obs => 
-            `<option value="${obs.KK}">${obs.KK} ${obs.VName} ${obs.NName}</option>`
+            `<option value="${obs.KK}">${obs.KK} ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`
         ).join('');
         
         const modalHtml = `
@@ -8080,13 +8083,13 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
         return `
             <tr>
                 <td>${observer.KK}</td>
-                <td>${observer.VName} ${observer.NName}</td>
+                <td>${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</td>
                 <td>${seitDisplay}</td>
                 <td>${aktivDisplay}</td>
-                <td>${site.HbOrt}</td>
+                <td>${escapeHtml(site.HbOrt)}</td>
                 <td>${String(site.GH).padStart(2, '0')}</td>
                 <td>${site.HLG}° ${site.HLM}' ${site.HOW} / ${site.HBG}° ${site.HBM}' ${site.HNS}</td>
-                <td>${site.NbOrt}</td>
+                <td>${escapeHtml(site.NbOrt)}</td>
                 <td>${String(site.GN).padStart(2, '0')}</td>
                 <td>${site.NLG}° ${site.NLM}' ${site.NOW} / ${site.NBG}° ${site.NBM}' ${site.NNS}</td>
             </tr>`;
@@ -8097,7 +8100,7 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             <div class="modal-dialog modal-xl modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.delete_observer}: ${observer.KK} ${observer.VName} ${observer.NName}</h5>
+                        <h5 class="modal-title">${i18nStrings.observers.delete_observer}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -8212,7 +8215,7 @@ async function showEditObserverDialog() {
         // Create observer options sorted by KK
         const observers = data.observers.sort((a, b) => a.KK.localeCompare(b.KK));
         const observerOptions = observers.map(obs => 
-            `<option value="${obs.KK}">${obs.KK} ${obs.VName} ${obs.NName}</option>`
+            `<option value="${obs.KK}">${obs.KK} ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`
         ).join('');
         
         const modalHtml = `
@@ -8273,7 +8276,7 @@ function showEditTypeDialog(observer) {
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.modify_title}: ${observer.KK} ${observer.VName} ${observer.NName}</h5>
+                        <h5 class="modal-title">${i18nStrings.observers.modify_title}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -8360,11 +8363,11 @@ function showEditBaseDataDialog(observer) {
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label small mb-0">${i18nStrings.observers.first_name_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="edit-vname" value="${observer.VName}" maxlength="15" required>
+                                    <input type="text" class="form-control form-control-sm" id="edit-vname" value="${escapeHtml(observer.VName)}" maxlength="15" required>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label small mb-0">${i18nStrings.observers.last_name_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="edit-nname" value="${observer.NName}" maxlength="15" required>
+                                    <input type="text" class="form-control form-control-sm" id="edit-nname" value="${escapeHtml(observer.NName)}" maxlength="15" required>
                                 </div>
                             </div>
                             <div id="edit-base-error" class="text-danger mt-2" style="display:none; font-size: 12px;"></div>
@@ -8483,7 +8486,7 @@ async function showAddSiteDialog(observer) {
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.modify_add_site}: ${observer.KK} ${observer.VName} ${observer.NName}</h5>
+                        <h5 class="modal-title">${i18nStrings.observers.modify_add_site}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -8783,7 +8786,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.modify_edit_site}: ${observer.KK} ${observer.VName} ${observer.NName}</h5>
+                        <h5 class="modal-title">${i18nStrings.observers.modify_edit_site}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -9021,7 +9024,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.modify_edit_site}: ${observer.KK} ${observer.VName} ${observer.NName}</h5>
+                        <h5 class="modal-title">${i18nStrings.observers.modify_edit_site}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -9344,7 +9347,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.modify_delete_site}: ${observer.KK} ${observer.VName} ${observer.NName}</h5>
+                        <h5 class="modal-title">${i18nStrings.observers.modify_delete_site}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">

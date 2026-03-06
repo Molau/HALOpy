@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!observer) {
                 return null; // Return null if observer not found (will be filtered out)
             }
-            return `${String(kkNum).padStart(2, '0')} - ${observer.VName} ${observer.NName}`;
+            return `${String(kkNum).padStart(2, '0')} - ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}`;
         }
         
         // Special handling for GG (geographic region) - filter out non-existent regions

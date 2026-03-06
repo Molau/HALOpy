@@ -45,8 +45,10 @@ def make_observation_key(obs: Dict[str, str]) -> Tuple[int, int, int, int, int, 
     """
     Create unique key tuple for observation.
     
-    Key fields: (KK, O, JJ, MM, TT, ZS, ZM, EE, GG)
+    Key fields: (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
     
+    g (location) is included because the same observer can report the same
+    halo type on the same day from different sites (g=0 primary, g=2 secondary).
     ZS/ZM (time) are included because the same observer can report the same
     halo type on the same day at different times (e.g. morning and afternoon).
     
@@ -59,11 +61,11 @@ def make_observation_key(obs: Dict[str, str]) -> Tuple[int, int, int, int, int, 
     Example:
         >>> key = make_observation_key(obs)
         >>> key
-        (44, 1, 25, 1, 15, 12, 30, 22, 10)
+        (44, 1, 25, 1, 15, 0, 12, 30, 22)
     """
     return (_int(obs, 'KK'), _int(obs, 'O'), _int(obs, 'JJ'),
-            _int(obs, 'MM'), _int(obs, 'TT'), _int(obs, 'ZS'), _int(obs, 'ZM'),
-            _int(obs, 'EE'), _int(obs, 'GG'))
+            _int(obs, 'MM'), _int(obs, 'TT'), _int(obs, 'g'),
+            _int(obs, 'ZS'), _int(obs, 'ZM'), _int(obs, 'EE'))
 
 
 def observation_matches_key(obs: Dict[str, str], key: Tuple) -> bool:
@@ -72,7 +74,7 @@ def observation_matches_key(obs: Dict[str, str], key: Tuple) -> bool:
     
     Args:
         obs: Observation to check
-        key: Key tuple (KK, O, JJ, MM, TT, ZS, ZM, EE, GG)
+        key: Key tuple (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
         
     Returns:
         True if observation matches key
@@ -90,13 +92,13 @@ def find_observation(collection: List[Dict[str, str]], key: Tuple) -> Optional[D
     
     Args:
         collection: List of observations
-        key: Key tuple (KK, O, JJ, MM, TT, ZS, ZM, EE, GG)
+        key: Key tuple (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
         
     Returns:
         Observation if found, None otherwise
         
     Example:
-        >>> obs = find_observation(observations, (44, 1, 25, 1, 15, 12, 30, 22, 10))
+        >>> obs = find_observation(observations, (44, 1, 25, 1, 15, 0, 12, 30, 22))
     """
     for obs in collection:
         if observation_matches_key(obs, key):
@@ -110,10 +112,7 @@ def find_observation_index(collection: List[Dict[str, str]], key: Tuple) -> int:
     
     Args:
         collection: List of observations
-        key: Key tuple (KK, O, JJ, MM, TT, ZS, ZM, EE, GG)
-        
-    Returns:
-        Index if found, -1 otherwise
+        key: Key tuple (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
     """
     for i, obs in enumerate(collection):
         if observation_matches_key(obs, key):
@@ -155,7 +154,7 @@ def update_observation(key: Tuple, updated_obs: Dict[str, str],
     Update observation in collection.
     
     Args:
-        key: Key of observation to update (KK, O, JJ, MM, TT, ZS, ZM, EE, GG)
+        key: Key of observation to update (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
         updated_obs: New observation data
         collection: Existing collection
         
@@ -180,7 +179,7 @@ def delete_observation(key: Tuple, collection: List[Dict[str, str]]) -> Tuple[bo
     Delete observation from collection.
     
     Args:
-        key: Key of observation to delete (KK, O, JJ, MM, TT, ZS, ZM, EE, GG)
+        key: Key of observation to delete (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
         collection: Existing collection
         
     Returns:

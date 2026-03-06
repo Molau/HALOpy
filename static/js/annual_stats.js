@@ -6,13 +6,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Use global i18n from main.js
     let currentStatsData = null; // Store current stats data for save/print
 
-    // Helper function to escape HTML
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
     // Elements
     const filterDialog = document.getElementById('filter-dialog');
     const yearSelect = document.getElementById('year-select');

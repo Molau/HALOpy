@@ -206,7 +206,7 @@ class ObservationForm {
         // Build observer options
         const observerOptions = this.observers.map(obs => {
             const selected = obs.KK === this.fixedObserver ? 'selected' : '';
-            return `<option value="${obs.KK}" ${selected}>${obs.KK} - ${obs.VName || ''} ${obs.NName || ''}</option>`;
+            return `<option value="${obs.KK}" ${selected}>${obs.KK} - ${escapeHtml(obs.VName || '')} ${escapeHtml(obs.NName || '')}</option>`;
         }).join('');
         
         // Build year options (0-99: 80-99=1980-1999, 0-79=2000-2079)

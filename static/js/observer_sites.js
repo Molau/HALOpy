@@ -38,7 +38,7 @@ async function showAddSiteDialog(observer) {
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.modify_add_site}: ${observer.KK} ${observer.VName} ${observer.NName}</h5>
+                        <h5 class="modal-title">${i18nStrings.observers.modify_add_site}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -316,8 +316,8 @@ function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                         <table class="table table-sm table-bordered">
                             <tr><td><strong>${i18nStrings.observers.since_label}:</strong></td><td>${i18nStrings.months[site.seit_month]} ${site.seit_year}</td></tr>
                             <tr><td><strong>${i18nStrings.common.active}:</strong></td><td>${site.active === 1 ? i18nStrings.common.yes : i18nStrings.common.no}</td></tr>
-                            <tr><td><strong>${i18nStrings.observers.primary_site_label}:</strong></td><td>${site.HbOrt} (GG ${site.GH})</td></tr>
-                            <tr><td><strong>${i18nStrings.observers.secondary_site_label}:</strong></td><td>${site.NbOrt} (GG ${site.GN})</td></tr>
+                            <tr><td><strong>${i18nStrings.observers.primary_site_label}:</strong></td><td>${escapeHtml(site.HbOrt)} (GG ${site.GH})</td></tr>
+                            <tr><td><strong>${i18nStrings.observers.secondary_site_label}:</strong></td><td>${escapeHtml(site.NbOrt)} (GG ${site.GN})</td></tr>
                         </table>
                     </div>
                     <div class="modal-footer py-1">
@@ -390,8 +390,8 @@ function showDeleteSiteConfirmDialog(observer, sites, currentIndex) {
                         <table class="table table-sm table-bordered">
                             <tr><td><strong>${i18nStrings.observers.since_label}:</strong></td><td>${i18nStrings.months[site.seit_month]} ${site.seit_year}</td></tr>
                             <tr><td><strong>${i18nStrings.common.active}:</strong></td><td>${site.active === 1 ? i18nStrings.common.yes : i18nStrings.common.no}</td></tr>
-                            <tr><td><strong>${i18nStrings.observers.primary_site_label}:</strong></td><td>${site.HbOrt} (GG ${site.GH})</td></tr>
-                            <tr><td><strong>${i18nStrings.observers.secondary_site_label}:</strong></td><td>${site.NbOrt} (GG ${site.GN})</td></tr>
+                            <tr><td><strong>${i18nStrings.observers.primary_site_label}:</strong></td><td>${escapeHtml(site.HbOrt)} (GG ${site.GH})</td></tr>
+                            <tr><td><strong>${i18nStrings.observers.secondary_site_label}:</strong></td><td>${escapeHtml(site.NbOrt)} (GG ${site.GN})</td></tr>
                         </table>
                         <p class="text-muted small">${i18nStrings.observers.delete_site_info}</p>
                     </div>

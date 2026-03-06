@@ -60,6 +60,9 @@ config.json
 # Deployment documentation with sensitive server info
 docs/DEPLOYMENT_EC2.md
 
+# Security analysis with vulnerability details
+docs/CODE_ANALYSIS.md
+
 # Temporary test files
 temp/
 *.$$$

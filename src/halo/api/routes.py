@@ -29,6 +29,7 @@ import numpy as np
 from flask import Blueprint, jsonify, request, current_app, Response, session, g, send_file, make_response
 
 from halo import __version__
+from halo.web.extensions import csrf
 
 # Project imports
 from halo.config import is_cloud_mode, get_cloud_server_url
@@ -886,7 +887,8 @@ def delete_observation() -> Dict[str, Any]:
             # Cloud Mode: Delete from database (Layer 3b)
             key = (
                 data.get('KK'), data.get('O'), data.get('JJ'),
-                data.get('MM'), data.get('TT'), data.get('EE'), data.get('GG')
+                data.get('MM'), data.get('TT'), data.get('g'),
+                data.get('ZS'), data.get('ZM'), data.get('EE')
             )
             success = obs_db.delete_one(key)
             
@@ -1487,6 +1489,7 @@ def save_file() -> Dict[str, Any]:
 
 
 @api_blueprint.route('/file/upload', methods=['POST'])
+@csrf.exempt
 def upload_file() -> Dict[str, Any]:
     """
     Upload observations - works in both Cloud and Local mode.
@@ -1612,6 +1615,7 @@ def upload_file() -> Dict[str, Any]:
 
 
 @api_blueprint.route('/file/download', methods=['POST'])
+@csrf.exempt
 def download_file() -> Dict[str, Any]:
     """Download filtered observations as CSV file - implements 'Datei -> Download'
     
@@ -1754,6 +1758,7 @@ def autosave() -> Dict[str, Any]:
 
 
 @api_blueprint.route('/observers/upload', methods=['POST'])
+@csrf.exempt
 def upload_observers() -> Dict[str, Any]:
     """Upload observer data to server - replaces existing data
     
@@ -1880,6 +1885,7 @@ def upload_observers() -> Dict[str, Any]:
 
 
 @api_blueprint.route('/observers/download', methods=['POST'])
+@csrf.exempt
 def download_observers() -> Dict[str, Any]:
     """Download observer data as CSV file
     
@@ -2182,7 +2188,9 @@ def get_constants():
         HALO_BRIGHTNESS_FACTORS,
         DEFAULT_OBSERVATION_LIMIT,
         PILLAR_HEIGHT_VALUES,
-        ALL_PILLAR_HEIGHT_VALUES
+        ALL_PILLAR_HEIGHT_VALUES,
+        PASSWORD_MIN_LENGTH,
+        PASSWORD_REQUIRE_CATEGORIES
     )
     
     return jsonify({
@@ -2193,7 +2201,11 @@ def get_constants():
         'halo_brightness_factors': HALO_BRIGHTNESS_FACTORS,
         'default_observation_limit': DEFAULT_OBSERVATION_LIMIT,
         'pillar_height_values': PILLAR_HEIGHT_VALUES,
-        'all_pillar_height_values': ALL_PILLAR_HEIGHT_VALUES
+        'all_pillar_height_values': ALL_PILLAR_HEIGHT_VALUES,
+        'password_policy': {
+            'min_length': PASSWORD_MIN_LENGTH,
+            'require_categories': PASSWORD_REQUIRE_CATEGORIES
+        }
     })
 
 

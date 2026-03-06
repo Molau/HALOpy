@@ -5,9 +5,12 @@ Handles user authentication against AWS Parameter Store.
 Passwords are stored as bcrypt hashes in AWS SSM Parameter Store.
 """
 
+import re
+
 import bcrypt
 from typing import Optional, Tuple
 from halo.config import is_cloud_mode
+from halo.models.constants import PASSWORD_MIN_LENGTH, PASSWORD_REQUIRE_CATEGORIES
 
 
 class AuthService:
@@ -15,6 +18,23 @@ class AuthService:
     
     # Admin user credentials
     ADMIN_USERNAME = 'admin'
+    
+    @staticmethod
+    def validate_password(password: str) -> Tuple[bool, Optional[str]]:
+        """Validate password against the central password policy."""
+        if len(password) < PASSWORD_MIN_LENGTH:
+            return False, "error_password_too_short"
+        
+        categories_matched = sum([
+            bool(re.search(r'[a-z]', password)),
+            bool(re.search(r'[A-Z]', password)),
+            bool(re.search(r'[0-9]', password)),
+            bool(re.search(r'[^a-zA-Z0-9]', password)),
+        ])
+        if categories_matched < PASSWORD_REQUIRE_CATEGORIES:
+            return False, "error_password_complexity"
+        
+        return True, None
     
     @staticmethod
     def verify_password(username: str, password: str) -> Tuple[bool, Optional[str]]:
@@ -163,9 +183,10 @@ class AuthService:
             if not success:
                 return False, "error_current_password_wrong"
         
-        # Validate new password
-        if len(new_password) < 4:
-            return False, "error_password_too_short"
+        # Validate new password against central policy
+        valid, error = AuthService.validate_password(new_password)
+        if not valid:
+            return False, error
         
         try:
             import boto3

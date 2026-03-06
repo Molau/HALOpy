@@ -303,13 +303,13 @@ function displayObservers() {
         rows += `
             <tr>
                 <td>${obs.KK}</td>
-                <td>${obs.VName} ${obs.NName}</td>
+                <td>${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</td>
                 <td>${obs.seit}</td>
                 <td>${obs.aktiv === '1' ? i18nStrings.common.yes : i18nStrings.common.no}</td>
-                <td>${obs.HbOrt}</td>
+                <td>${escapeHtml(obs.HbOrt)}</td>
                 <td>${ghFormatted}</td>
                 <td style="font-size: 0.9em;">${hCoords}</td>
-                <td>${obs.NbOrt}</td>
+                <td>${escapeHtml(obs.NbOrt)}</td>
                 <td>${gnFormatted}</td>
                 <td style="font-size: 0.9em;">${nCoords}</td>
             </tr>

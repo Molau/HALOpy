@@ -22,6 +22,7 @@ from halo.services.settings import Settings
 import halo.io.observations_file as obs_file
 import halo.io.observers_file as observer_file
 import halo.io.observers_db as observer_db
+from halo.web.extensions import csrf
 
 
 def create_app(config=None):
@@ -93,6 +94,9 @@ def create_app(config=None):
             "supports_credentials": False
         }
     })
+    
+    # CSRF Protection (Cloud Mode uses session-based auth → needs CSRF)
+    csrf.init_app(app)
     
     # Load persisted settings from halo.cfg (CSV)
     # Cloud Mode: Settings loaded per-request (need session context)

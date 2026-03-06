@@ -360,7 +360,7 @@ def update_one(key: Tuple, obs: Dict[str, str]) -> bool:
     Update existing observation (proper SQL UPDATE).
     
     Args:
-        key: 7-tuple (KK, O, JJ, MM, TT, EE, GG)
+        key: 9-tuple (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
         obs: Updated observation dict
         
     Returns:
@@ -368,8 +368,8 @@ def update_one(key: Tuple, obs: Dict[str, str]) -> bool:
         False if not found (0 rows affected)
         
     Example:
-        >>> key = (44, 1, 25, 12, 31, 22, 26)
-        >>> obs = {'KK': '44', 'O': '1', 'JJ': '25', 'MM': '12', 'TT': '31', 'EE': '22', 'GG': '26', ...}
+        >>> key = (44, 1, 25, 12, 31, 0, 12, 30, 22)
+        >>> obs = {'KK': '44', 'O': '1', 'JJ': '25', 'MM': '12', 'TT': '31', 'g': '0', 'ZS': '12', 'ZM': '30', 'EE': '22', ...}
         >>> if update_one(key, obs):
         ...     print("Observation updated")
         ... else:
@@ -378,7 +378,7 @@ def update_one(key: Tuple, obs: Dict[str, str]) -> bool:
     with get_connection() as conn:
         with conn.cursor() as cursor:
             values = _observation_to_tuple(obs)
-            KK, O, JJ, MM, TT, EE, GG = key
+            KK, O, JJ, MM, TT, g, ZS, ZM, EE = key
             
             cursor.execute("""
                 UPDATE observations SET
@@ -386,8 +386,9 @@ def update_one(key: Tuple, obs: Dict[str, str]) -> bool:
                     "ZS"=%s, "ZM"=%s, "d"=%s, "DD"=%s, "N"=%s, "C"=%s, "c"=%s,
                     "EE"=%s, "H"=%s, "F"=%s, "V"=%s, "f"=%s, "zz"=%s, "GG"=%s,
                     pillar=%s, sectors=%s, remarks=%s
-                WHERE "KK"=%s AND "O"=%s AND "JJ"=%s AND "MM"=%s AND "TT"=%s AND "EE"=%s AND "GG"=%s
-            """, values + (KK, O, JJ, MM, TT, EE, GG))
+                WHERE "KK"=%s AND "O"=%s AND "JJ"=%s AND "MM"=%s AND "TT"=%s
+                    AND "g"=%s AND "ZS"=%s AND "ZM"=%s AND "EE"=%s
+            """, values + (KK, O, JJ, MM, TT, g, ZS, ZM, EE))
             
             affected_rows = cursor.rowcount
             conn.commit()
@@ -399,14 +400,14 @@ def delete_one(key: Tuple) -> bool:
     Delete observation by key.
     
     Args:
-        key: 7-tuple (KK, O, JJ, MM, TT, EE, GG)
+        key: 9-tuple (KK, O, JJ, MM, TT, g, ZS, ZM, EE)
         
     Returns:
         True if deleted (1 row affected)
         False if not found (0 rows affected)
         
     Example:
-        >>> key = (44, 1, 25, 12, 31, 22, 26)
+        >>> key = (44, 1, 25, 12, 31, 0, 12, 30, 22)
         >>> if delete_one(key):
         ...     print("Observation deleted")
         ... else:
@@ -414,12 +415,13 @@ def delete_one(key: Tuple) -> bool:
     """
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            KK, O, JJ, MM, TT, EE, GG = key
+            KK, O, JJ, MM, TT, g, ZS, ZM, EE = key
             
             cursor.execute("""
                 DELETE FROM observations
-                WHERE "KK"=%s AND "O"=%s AND "JJ"=%s AND "MM"=%s AND "TT"=%s AND "EE"=%s AND "GG"=%s
-            """, (KK, O, JJ, MM, TT, EE, GG))
+                WHERE "KK"=%s AND "O"=%s AND "JJ"=%s AND "MM"=%s AND "TT"=%s
+                    AND "g"=%s AND "ZS"=%s AND "ZM"=%s AND "EE"=%s
+            """, (KK, O, JJ, MM, TT, g, ZS, ZM, EE))
             
             affected_rows = cursor.rowcount
             conn.commit()
@@ -471,6 +473,7 @@ def save_many(observations: List[Dict[str, str]]) -> int:
                 try:
                     values = _observation_to_tuple(obs)
                     
+                    cursor.execute("SAVEPOINT insert_obs")
                     cursor.execute("""
                         INSERT INTO observations (
                             "KK", "O", "JJ", "MM", "TT", "g",
@@ -484,12 +487,13 @@ def save_many(observations: List[Dict[str, str]]) -> int:
                             %s, %s, %s
                         )
                     """, values)
+                    cursor.execute("RELEASE SAVEPOINT insert_obs")
                     
                     inserted_count += 1
                     
                 except psycopg2.IntegrityError:
-                    # Skip duplicate
-                    conn.rollback()
+                    # Rollback only the failed insert, keep previous inserts
+                    cursor.execute("ROLLBACK TO SAVEPOINT insert_obs")
                     continue
             
             conn.commit()

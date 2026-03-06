@@ -120,8 +120,8 @@ CREATE TABLE observations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    -- Unique constraint: observation key (KK,O,JJ,MM,TT,g,ZS,ZM,EE,GG)
-    CONSTRAINT observations_unique_key UNIQUE ("KK", "O", "JJ", "MM", "TT", "g", "ZS", "ZM", "EE", "GG")
+    -- Unique constraint: observation key (KK,O,JJ,MM,TT,g,ZS,ZM,EE)
+    CONSTRAINT observations_unique_key UNIQUE ("KK", "O", "JJ", "MM", "TT", "g", "ZS", "ZM", "EE")
 );
 
 -- Indexes for observations (based on common query patterns)
@@ -131,7 +131,7 @@ CREATE INDEX idx_observations_kk_date ON observations("KK", "JJ", "MM");
 CREATE INDEX idx_observations_halo_type ON observations("EE");
 CREATE INDEX idx_observations_region ON observations("GG");
 CREATE INDEX idx_observations_object ON observations("O");
-CREATE INDEX idx_observations_composite_key ON observations("KK", "O", "JJ", "MM", "TT", "EE", "GG");
+CREATE INDEX idx_observations_composite_key ON observations("KK", "O", "JJ", "MM", "TT", "g", "ZS", "ZM", "EE");
 
 -- Foreign key constraint (optional - can be enabled if referential integrity needed)
 -- ALTER TABLE observations ADD CONSTRAINT fk_observations_observer 
