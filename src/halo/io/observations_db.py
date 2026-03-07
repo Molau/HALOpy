@@ -17,7 +17,7 @@ except ImportError:
     psycopg2 = None  # type: ignore
 
 from typing import Dict, List, Optional, Tuple
-from halo.models.constants import YEAR_CUTOFF
+from halo.models.constants import YEAR_CUTOFF, jj_to_full_year
 from halo.io.db_connection import get_connection
 
 logger = logging.getLogger(__name__)
