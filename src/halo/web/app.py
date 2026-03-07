@@ -197,7 +197,7 @@ def create_app(config=None):
             'lang': get_language,  # Current language
             'i18n': g.i18n if hasattr(g, 'i18n') else get_i18n(),
             'static_version': int(time.time()),  # Cache-busting timestamp
-            'update_repo': app.config.get('UPDATE_REPO', ''),
+            'update_repo': '' if is_cloud_mode() else app.config.get('UPDATE_REPO', ''),
             'is_cloud': is_cloud_mode()  # Cloud mode flag for templates
         }
     
