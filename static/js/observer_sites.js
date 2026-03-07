@@ -243,7 +243,7 @@ async function showAddSiteDialog(observer) {
             
             // Send to API
             const resp = await fetch(`/api/observers/${observer.KK}/sites`, {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(siteData)
             });

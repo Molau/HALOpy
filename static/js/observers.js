@@ -38,11 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
         goToPage(maxPage);
     });
     
-    // Exit button
-    document.getElementById('btn-exit-observers').addEventListener('click', () => {
-        window.navigateInternal('/');
-    });
-    
     // ESC key to return to main menu
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -243,6 +238,7 @@ async function applyFilter() {
     
     // Close dialog
     const modal = bootstrap.Modal.getInstance(document.getElementById('filter-dialog'));
+    document.activeElement?.blur();
     modal.hide();
     
     // Load observers
@@ -261,8 +257,7 @@ async function loadObservers(filterType, filterValue, latestOnly) {
         filteredObservers = data.observers;
         currentPage = 1;  // Reset to first page
         displayObservers();
-        // Show exit button after observers are loaded
-        document.getElementById('btn-exit-observers').style.display = '';
+
     } catch (error) {
         console.error('Error loading observers:', error);
         showWarning(i18nStrings.observers.loading_error);
@@ -370,6 +365,11 @@ function displayObservers() {
     // Decision #033: Keyboard handling + cleanup
     setupModalKeyboard(modalEl, modalEl.querySelector('.btn-primary'));
     setupModalCleanup(modalEl);
+    
+    // Return to main page after modal is closed
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        window.navigateInternal('/');
+    }, { once: true });
 }
 
 /**

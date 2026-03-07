@@ -13,10 +13,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         1, -1, 0, -8, 9
     ];
 
-    // Combined halo types that can be split into individual components
-    // From constants.py COMBINED_TO_INDIVIDUAL_HALOS
-    const COMBINED_HALO_TYPES = new Set([4, 10, 16, 20, 26, 43, 47, 50, 55, 76]);
-
     // Modal elements
     const paramDialog = document.getElementById('param-dialog');
 
@@ -349,9 +345,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }));
             
             case 'GG':
-                // Use exact region list from observation form
-                const regionNumbers = [1,2,3,4,5,6,7,8,9,10,11,16,17,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39];
-                return regionNumbers.map(gg => {
+                // Use region list from backend constants
+                return GEOGRAPHIC_REGIONS.map(gg => {
                     const regionName = i18nStrings.geographic_regions[String(gg)];
                     return { value: gg, display: `${String(gg).padStart(2, '0')} - ${regionName}` };
                 });
@@ -395,14 +390,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 ];
             
             case 'EE':
-                // Only halo types 1-77 and 99 (exclude 78-98)
-                const haloTypes = [];
-                for (let i = 1; i <= 77; i++) {
+                // Use valid halo types from backend constants
+                return VALID_HALO_TYPES.map(i => {
                     const haloName = i18nStrings.halo_types[String(i)];
-                    haloTypes.push({ value: i, display: `${String(i).padStart(2, '0')} - ${haloName}` });
-                }
-                haloTypes.push({ value: 99, display: `99 - ${i18nStrings.halo_types['99']}` });
-                return haloTypes;
+                    return { value: i, display: `${String(i).padStart(2, '0')} - ${haloName}` };
+                });
             
             case 'DD':
                 // Duration: display key values 0, 10, 20, 30, etc.
@@ -484,9 +476,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Special handling for GG (geographic region) - filter out non-existent regions
         if (paramCode === 'GG') {
-            const validRegions = [1,2,3,4,5,6,7,8,9,10,11,16,17,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39];
             const ggNum = parseInt(rawValue);
-            if (!validRegions.includes(ggNum)) {
+            if (!GEOGRAPHIC_REGIONS.includes(ggNum)) {
                 return null; // Return null if region doesn't exist (will be filtered out)
             }
             const regionName = i18nStrings.geographic_regions[String(ggNum)];
@@ -518,11 +509,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             return `${hoursVal} ${hourText}`;
         }
         
-        // Special handling for EE (halo type) - filter out non-existent types (78-98)
+        // Special handling for EE (halo type) - filter out non-existent types
         if (paramCode === 'EE') {
             const eeNum = parseInt(rawValue);
-            // Valid halo types: 1-77 and 99
-            if (eeNum < 1 || (eeNum > 77 && eeNum !== 99)) {
+            if (!VALID_HALO_TYPES.includes(eeNum)) {
                 return null; // Return null if halo type doesn't exist (will be filtered out)
             }
             const haloName = i18nStrings.halo_types[String(eeNum)];
@@ -2692,19 +2682,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         return lines.join('\n');
     }
-    
-    // Export/Import functions - deactivated for now, may be needed later
-    /*
-    function exportAnalysisResult() {
-        // TODO: Implement export functionality
-
-    }
-    
-    function importAnalysisResult() {
-        // TODO: Implement import functionality
-
-    }
-    */
     
     // Build single parameter result table
     function buildSingleParameterTable(data, paramName, total, paramCode) {

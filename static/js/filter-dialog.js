@@ -358,7 +358,7 @@ class FilterDialog {
         const filter1SelectElem = document.getElementById('filter-1-select');
         filter1SelectElem.innerHTML = '';
         
-        for (let i = 1; i <= 39; i++) {
+        GEOGRAPHIC_REGIONS.forEach(i => {
             const regionName = i18nStrings.geographic_regions[String(i)];
             if (regionName && regionName.trim()) {
                 const option = document.createElement('option');
@@ -366,19 +366,19 @@ class FilterDialog {
                 option.textContent = `${String(i).padStart(2, '0')} - ${regionName}`;
                 filter1SelectElem.appendChild(option);
             }
-        }
+        });
     }
     
     populateHaloTypeSelect() {
         const filter2SelectElem = document.getElementById('filter-2-select');
         filter2SelectElem.innerHTML = '';
         
-        for (let i = 1; i <= 99; i++) {
+        VALID_HALO_TYPES.forEach(i => {
             const option = document.createElement('option');
             option.value = i;
             option.textContent = `${String(i).padStart(2, '0')} - ${i18nStrings.halo_types[i] || i18nStrings.common.unknown}`;
             filter2SelectElem.appendChild(option);
-        }
+        });
     }
     
     applyFilters() {

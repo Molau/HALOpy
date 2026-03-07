@@ -21,7 +21,7 @@
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <!-- Version/Info Menu -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">≡</a>
+                    <a class="nav-link dropdown-toggle menu-title" href="#" data-page="version" data-bs-toggle="dropdown">≡</a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="#" data-action="help-version">{{ g.i18n.get('help.version') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="help-new">{{ g.i18n.get('help.whats_new') }}</a></li>
@@ -29,7 +29,7 @@
                 </li>
                 <!-- File Menu -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.file') }}</a>
+                    <a class="nav-link dropdown-toggle menu-title" href="#" data-page="file" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.file') }}</a>
                     <ul class="dropdown-menu">
                         {% if not is_cloud %}
                         <li><a class="dropdown-item" href="#" data-action="new-file">{{ g.i18n.get('file.new_file') }}</a></li>
@@ -44,7 +44,7 @@
                 </li>
                 <!-- Observations Menu -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.observations') }}</a>
+                    <a class="nav-link dropdown-toggle menu-title" href="#" data-page="observations" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.observations') }}</a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="#" data-action="obs-display">{{ g.i18n.get('common.display') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="obs-add">{{ g.i18n.get('common.add') }}</a></li>
@@ -54,7 +54,7 @@
                 </li>
                 <!-- Observers Menu -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.observers') }}</a>
+                    <a class="nav-link dropdown-toggle menu-title" href="#" data-page="observers" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.observers') }}</a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="/observers">{{ g.i18n.get('common.display') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="observer-add">{{ g.i18n.get('common.add') }}</a></li>
@@ -66,11 +66,11 @@
                 </li>
                 <!-- Analysis Menu -->
                 <li class="nav-item">
-                    <a class="nav-link menu-title" href="/analysis">{{ g.i18n.get('menu_titles.analysis') }}</a>
+                    <a class="nav-link menu-title" href="/analysis" data-page="analysis">{{ g.i18n.get('menu_titles.analysis') }}</a>
                 </li>
                 <!-- Output Menu -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.output') }}</a>
+                    <a class="nav-link dropdown-toggle menu-title" href="#" data-page="output" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.output') }}</a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="#" data-action="output-monthly-report">{{ g.i18n.get('output.monthly_report') }}</a></li>
                         <li><a class="dropdown-item" href="#" data-action="output-monthly-stats">{{ g.i18n.get('output.monthly_stats') }}</a></li>
@@ -79,7 +79,7 @@
                 </li>
                 <!-- Settings Menu -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle menu-title" href="#" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.settings') }}</a>
+                    <a class="nav-link dropdown-toggle menu-title" href="#" data-page="settings" data-bs-toggle="dropdown">{{ g.i18n.get('menu_titles.settings') }}</a>
                     <ul class="dropdown-menu">
                         {% if not is_cloud %}
                         <li><a class="dropdown-item" href="#" data-action="settings-fixed-observer">{{ g.i18n.get('settings.fixed_observer') }}</a></li>
@@ -97,12 +97,12 @@
                 </li>
                 <!-- Help Menu -->
                 <li class="nav-item">
-                    <a class="nav-link menu-title" href="#" onclick="handleMenuAction('help-text'); return false;">{{ g.i18n.get('menu_titles.help') }}</a>
+                    <a class="nav-link menu-title" href="#" data-page="help" onclick="handleMenuAction('help-text'); return false;">{{ g.i18n.get('menu_titles.help') }}</a>
                 </li>
                 <!-- Logout Menu (cloud mode only) -->
                 {% if is_cloud %}
                 <li class="nav-item">
-                    <a class="nav-link menu-title" href="#" onclick="handleMenuAction('logout'); return false;">{{ g.i18n.get('menu_titles.logout') }}</a>
+                    <a class="nav-link menu-title" href="#" data-page="logout" onclick="handleMenuAction('logout'); return false;">{{ g.i18n.get('menu_titles.logout') }}</a>
                 </li>
                 {% endif %}
             </ul>

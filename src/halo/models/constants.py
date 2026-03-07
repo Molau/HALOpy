@@ -41,6 +41,10 @@ def jj_to_full_year(jj: int) -> int:
 # Region 12 (Deutschland gesamt) is not used for observations
 GEOGRAPHIC_REGIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
 
+# Valid halo types (EE field): 1-77 and 99
+# Types 78-98 are reserved/unused (MaxKenn = 77 in H_TYPES.PAS, 99 = other)
+VALID_HALO_TYPES = list(range(1, 78)) + [99]
+
 # Circular halo types (complete rings around sun/moon)
 # These halos need sector specification when incomplete (V=1)
 CIRCULAR_HALOS = {1, 7, 12, 31, 32, 33, 34, 35, 36, 40}

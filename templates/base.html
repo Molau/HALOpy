@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="{{ lang() }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ g.i18n.get('app.window_title') }} {% if is_cloud %}(cloud){% else %}(local){% endif %}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}?v={{ static_version }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/bootstrap-icons/bootstrap-icons.css') }}?v={{ static_version }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ static_version }}">
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="d-flex flex-column min-vh-100">
+    {% include 'header.html' %}
+
+    {% block content %}{% endblock %}
+
+    {% include 'footer.html' %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

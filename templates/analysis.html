@@ -1,13 +1,6 @@
-<!DOCTYPE html>
-<html lang="{{ lang() }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ g.i18n.get('app.window_title') }} {% if is_cloud %}(cloud){% else %}(local){% endif %}</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}?v={{ static_version }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='fonts/bootstrap-icons/bootstrap-icons.css') }}?v={{ static_version }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}?v={{ static_version }}" rel="stylesheet">
+{% extends 'base.html' %}
+
+{% block head_extra %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/github-markdown.min.css') }}?v={{ static_version }}">
     <style>
         /* Keep filter2 select background white when disabled, only grey out text */
@@ -106,9 +99,14 @@
             }
         }
     </style>
-</head>
-<body>
-    {% include 'header.html' %}
+{% endblock %}
+
+{% block content %}
+
+    <script>
+        // Mark analysis menu as active
+        document.addEventListener('DOMContentLoaded', () => highlightMenu('analysis'));
+    </script>
 
     <!-- Main Content Area -->
     <div class="container-fluid mt-3">
@@ -991,12 +989,12 @@
         </div>
     </div>
 
-    {% include 'footer.html' %}
+{% endblock %}
 
+{% block scripts %}
     <script src="{{ url_for('static', filename='js/chart.umd.js') }}?v={{ static_version }}"></script>
     <script src="{{ url_for('static', filename='js/plotly.min.js') }}?v={{ static_version }}"></script>
     <script src="{{ url_for('static', filename='js/marked.min.js') }}?v={{ static_version }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}?v={{ static_version }}"></script>
     <script src="{{ url_for('static', filename='js/analysis.js') }}?v={{ static_version }}"></script>
-</body>
-</html>
+{% endblock %}

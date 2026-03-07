@@ -507,7 +507,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Table header with box drawing characters
         html += '╔═══════════╦══════════════╦══════════════╦══════════════╦══════════════╗\n';
-        html += '║           ║     ' + i18nStrings.annual_stats.table_sun.padEnd(9) + '║     ' + i18nStrings.annual_stats.table_moon.padEnd(9) + '║    ' + i18nStrings.annual_stats.table_total.padEnd(10) + '║   ' + i18nStrings.annual_stats.table_activity.padEnd(11) + '║\n';
+        html += '║           ║     ' + i18nStrings.annual_stats.table_sun.padEnd(9) + '║     ' + i18nStrings.annual_stats.table_moon.padEnd(9) + '║    ' + i18nStrings.annual_stats.table_totals.padEnd(10) + '║   ' + i18nStrings.annual_stats.table_activity.padEnd(11) + '║\n';
         html += '║   ' + i18nStrings.annual_stats.table_month.padEnd(8) + '║   ' + i18nStrings.annual_stats.table_ee + '   ' + i18nStrings.annual_stats.table_days + '  ║   ' + i18nStrings.annual_stats.table_ee + '   ' + i18nStrings.annual_stats.table_days + '  ║   ' + i18nStrings.annual_stats.table_ee + '   ' + i18nStrings.annual_stats.table_days + '  ║   ' + i18nStrings.annual_stats.table_real.padEnd(6) + i18nStrings.annual_stats.table_relative.padEnd(5) + '║\n';
         html += '╠═══════════╬══════════════╬══════════════╬══════════════╬══════════════╣\n';
         
@@ -539,7 +539,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Totals row
         html += '╠═══════════╬══════════════╬══════════════╬══════════════╬══════════════╣\n';
-        html += '║ ' + i18nStrings.annual_stats.table_total.padEnd(9) + ' ║ ';
+        html += '║ ' + i18nStrings.annual_stats.table_totals.padEnd(9) + ' ║ ';
         html += (totals.sun_ee || 0).toString().padStart(4);
         html += '   ';
         html += (totals.sun_days || 0).toString().padStart(3);
@@ -1050,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             
             // Totals
-            csv += i18nStrings.annual_stats.table_total + ',';
+            csv += i18nStrings.annual_stats.table_totals + ',';
             csv += (data.totals.sun_ee || 0) + ',' + (data.totals.sun_days || 0) + ',';
             csv += (data.totals.moon_ee || 0) + ',' + (data.totals.moon_days || 0) + ',';
             csv += (data.totals.total_ee || 0) + ',' + (data.totals.total_days || 0) + ',';
@@ -1255,7 +1255,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += '<th rowspan="2">' + i18nStrings.annual_stats.table_month + '</th>';
             html += '<th colspan="2">' + i18nStrings.annual_stats.table_sun + '</th>';
             html += '<th colspan="2">' + i18nStrings.annual_stats.table_moon + '</th>';
-            html += '<th colspan="2">' + i18nStrings.annual_stats.table_total + '</th>';
+            html += '<th colspan="2">' + i18nStrings.annual_stats.table_totals + '</th>';
             html += '<th colspan="2">' + i18nStrings.annual_stats.table_activity + '</th>';
             html += '</tr>';
             html += '<tr>';
@@ -1290,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Totals row
             html += '<tr style="font-weight: bold; border-top: 2px solid #000;">';
-            html += '<td>' + i18nStrings.annual_stats.table_total + '</td>';
+            html += '<td>' + i18nStrings.annual_stats.table_totals + '</td>';
             html += '<td style="text-align: right;">' + (data.totals.sun_ee || 0) + '</td>';
             html += '<td style="text-align: right;">' + (data.totals.sun_days || 0) + '</td>';
             html += '<td style="text-align: right;">' + (data.totals.moon_ee || 0) + '</td>';
@@ -1477,7 +1477,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             md += '| ' + i18nStrings.annual_stats.table_month + ' | ';
             md += i18nStrings.annual_stats.table_sun + ' EE | ' + i18nStrings.annual_stats.table_sun + ' ' + i18nStrings.annual_stats.table_days + ' | ';
             md += i18nStrings.annual_stats.table_moon + ' EE | ' + i18nStrings.annual_stats.table_moon + ' ' + i18nStrings.annual_stats.table_days + ' | ';
-            md += i18nStrings.annual_stats.table_total + ' EE | ' + i18nStrings.annual_stats.table_total + ' ' + i18nStrings.annual_stats.table_days + ' | ';
+            md += i18nStrings.annual_stats.table_totals + ' EE | ' + i18nStrings.annual_stats.table_totals + ' ' + i18nStrings.annual_stats.table_days + ' | ';
             md += i18nStrings.annual_stats.table_real + ' | ' + i18nStrings.annual_stats.table_relative + ' |\n';
             
             md += '|---|---:|---:|---:|---:|---:|---:|---:|---:|\n';
@@ -1493,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             
             // Totals row
-            md += '| **' + i18nStrings.annual_stats.table_total + '** | ';
+            md += '| **' + i18nStrings.annual_stats.table_totals + '** | ';
             md += '**' + (data.totals.sun_ee || 0) + '** | **' + (data.totals.sun_days || 0) + '** | ';
             md += '**' + (data.totals.moon_ee || 0) + '** | **' + (data.totals.moon_days || 0) + '** | ';
             md += '**' + (data.totals.total_ee || 0) + '** | **' + (data.totals.total_days || 0) + '** | ';

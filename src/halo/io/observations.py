@@ -584,75 +584,125 @@ def convert_all_legacy_format(collection: List[Dict[str, str]]) -> List[Dict[str
 
 def validate_observation(obs: Dict[str, str]) -> Tuple[bool, List[str]]:
     """
-    Validate observation data.
+    Validate observation data against HALO_DATA_FORMAT specification.
     
     Checks:
-        - Required fields present
-        - Value ranges
-        - Field dependencies
-        - Date validity
+        - Required fields present and in range
+        - Optional field value ranges
+        - Field dependencies (d/N/C, EE/HO/HU)
         
     Args:
         obs: Observation to validate
         
     Returns:
         Tuple of (is_valid, error_messages)
-        
-    Example:
-        >>> is_valid, errors = validate_observation(obs)
-        >>> if not is_valid:
-        ...     for error in errors:
-        ...         print(f"Error: {error}")
     """
+    from halo.models.constants import VALID_HALO_TYPES, GEOGRAPHIC_REGIONS
+
     errors = []
     
+    # --- Required fields ---
     kk = _int(obs, 'KK')
     o = _int(obs, 'O')
     mm = _int(obs, 'MM')
     tt = _int(obs, 'TT')
     ee = _int(obs, 'EE')
     gg = _int(obs, 'GG')
-    d = _int(obs, 'd', -1)
-    h = _int(obs, 'H', -1)
-    f = _int(obs, 'F', -1)
-    n = _int(obs, 'N', -1)
-    c_val = _int(obs, 'C', -1)
+    g = _int(obs, 'g')
     
-    # Check required fields
     if kk < 1 or kk > 99:
-        errors.append(f"Invalid observer code KK: {kk} (must be 1-99)")
+        errors.append(f"Invalid KK: {kk} (must be 1-99)")
     
-    if o < 0 or o > 9:
-        errors.append(f"Invalid observation site O: {o} (must be 0-9)")
+    if o < 1 or o > 5:
+        errors.append(f"Invalid O: {o} (must be 1-5)")
     
     if mm < 1 or mm > 12:
-        errors.append(f"Invalid month MM: {mm} (must be 1-12)")
+        errors.append(f"Invalid MM: {mm} (must be 1-12)")
     
     if tt < 1 or tt > 31:
-        errors.append(f"Invalid day TT: {tt} (must be 1-31)")
+        errors.append(f"Invalid TT: {tt} (must be 1-31)")
     
-    if ee < 1 or ee > 99:
-        errors.append(f"Invalid halo type EE: {ee} (must be 1-99)")
+    if ee not in VALID_HALO_TYPES:
+        errors.append(f"Invalid EE: {ee} (must be 1-77 or 99)")
     
-    if gg < 1 or gg > 39:
-        errors.append(f"Invalid geographic region GG: {gg} (must be 1-39)")
+    if gg not in GEOGRAPHIC_REGIONS:
+        errors.append(f"Invalid GG: {gg} (must be a valid region code)")
     
-    # Value range checks for optional fields
-    if d != -1 and (d < 0 or d > 9):
-        errors.append(f"Invalid cirrus density d: {d} (must be -1 or 0-9)")
+    if g < 0 or g > 2:
+        errors.append(f"Invalid g: {g} (must be 0-2)")
     
-    if h != -1 and (h < 0 or h > 9):
-        errors.append(f"Invalid brightness H: {h} (must be -1 or 0-9)")
+    # --- Optional fields (allow -1 = not specified) ---
+    zs = _int(obs, 'ZS', -1)
+    zm = _int(obs, 'ZM', -1)
+    dd = _int(obs, 'DD', -1)
+    d = _int(obs, 'd', -1)
+    n = _int(obs, 'N', -1)
+    c_val = _int(obs, 'C', -1)
+    c_low = _int(obs, 'c', -1)
+    h = _int(obs, 'H', -1)
+    f = _int(obs, 'F', -1)
+    v = _int(obs, 'V', -1)
+    front = _int(obs, 'f', -1)
+    zz = _int(obs, 'zz', -1)
+    ho = _int(obs, 'HO', -1)
+    hu = _int(obs, 'HU', -1)
     
-    if f != -1 and (f < 0 or f > 9):
-        errors.append(f"Invalid colour F: {f} (must be -1 or 0-9)")
+    if zs != -1 and (zs < 0 or zs > 23):
+        errors.append(f"Invalid ZS: {zs} (must be 0-23)")
     
-    # Field dependencies (basic checks - full rules in HALO_DATA_FORMAT.md)
+    if zm != -1 and (zm < 0 or zm > 59):
+        errors.append(f"Invalid ZM: {zm} (must be 0-59)")
+    
+    if dd != -1 and (dd < 0 or dd > 99):
+        errors.append(f"Invalid DD: {dd} (must be 0-99)")
+    
+    if d != -1 and (d < 0 or d > 7 or d == 3):
+        errors.append(f"Invalid d: {d} (must be 0-2, 4-7)")
+    
+    if n != -1 and (n < 0 or n > 9):
+        errors.append(f"Invalid N: {n} (must be 0-9)")
+    
+    if c_val != -1 and (c_val < 0 or c_val > 7):
+        errors.append(f"Invalid C: {c_val} (must be 0-7)")
+    
+    if c_low != -1 and (c_low < 0 or c_low > 9):
+        errors.append(f"Invalid c: {c_low} (must be 0-9)")
+    
+    if h != -1 and (h < 0 or h > 3):
+        errors.append(f"Invalid H: {h} (must be 0-3)")
+    
+    if f != -1 and (f < 0 or f > 5):
+        errors.append(f"Invalid F: {f} (must be 0-5)")
+    
+    if v != -1 and v not in (1, 2):
+        errors.append(f"Invalid V: {v} (must be 1-2)")
+    
+    if front != -1 and (front < 0 or front > 8):
+        errors.append(f"Invalid f: {front} (must be 0-8)")
+    
+    if zz != -1 and (zz < 0 or zz > 99):
+        errors.append(f"Invalid zz: {zz} (must be 0-99)")
+    
+    if ho != -1 and (ho < 1 or ho > 90):
+        errors.append(f"Invalid HO: {ho} (must be 1-90)")
+    
+    if hu != -1 and (hu < 1 or hu > 90):
+        errors.append(f"Invalid HU: {hu} (must be 1-90)")
+    
+    # --- Field dependencies ---
+    # d >= 4 (non-cirrus) forces N=0 and C=0
     if d >= 4 and n != 0:
-        errors.append("Field dependency: d ≥ 4 requires N = 0")
+        errors.append("Field dependency: d >= 4 requires N = 0")
     
     if d >= 4 and c_val != 0:
-        errors.append("Field dependency: d ≥ 4 requires C = 0")
+        errors.append("Field dependency: d >= 4 requires C = 0")
+    
+    # 8HHHH depends on EE (light pillar types 8, 9, 10)
+    if ee not in (8, 9, 10):
+        if ho != -1:
+            errors.append("Field dependency: HO only valid for EE 8, 9, 10")
+        if hu != -1:
+            errors.append("Field dependency: HU only valid for EE 8, 9, 10")
     
     return (len(errors) == 0, errors)
 

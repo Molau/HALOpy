@@ -1,27 +1,10 @@
-<!DOCTYPE html>
-<html lang="{{ lang() }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ g.i18n.get('app.window_title') }} {% if is_cloud %}(cloud){% else %}(local){% endif %}</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <!-- Bootstrap CSS -->
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}?v={{ static_version }}" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/bootstrap-icons/bootstrap-icons.css') }}?v={{ static_version }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ static_version }}">
-</head>
-<body class="d-flex flex-column min-vh-100">
-    {% include 'header.html' %}
+{% extends 'base.html' %}
+
+{% block content %}
 
     <script>
         // Mark settings menu as active
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                const menus = document.querySelectorAll('.menu-title');
-                // Find Einstellungen/Settings menu (7th menu item, index 6)
-                if (menus[6]) menus[6].classList.add('active');
-            }, 50);
-        });
+        document.addEventListener('DOMContentLoaded', () => highlightMenu('settings'));
     </script>
 
     <main class="container mt-4">
@@ -52,8 +35,8 @@
         </div>
     </main>
 
-    {% include 'footer.html' %}
+{% endblock %}
 
+{% block scripts %}
     <script src="{{ url_for('static', filename='js/main.js') }}?v={{ static_version }}"></script>
-</body>
-</html>
+{% endblock %}

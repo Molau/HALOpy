@@ -42,42 +42,6 @@ class ObservationCSV:
     """
     
     @staticmethod
-    def _parse_int(value: str, default: int = -1, slash_as_not_present: bool = False) -> int:
-        """
-        Parse integer, handling special values.
-        
-        Standard behavior (for most fields):
-        - '/' or ' ' or '' = not observed/unknown → -1
-        
-        Special behavior for d and 8HHHH (when slash_as_not_present=True):
-        - '/' = observed but not present → 0 (no cirrus for d, not relevant for HO/HU)
-        - ' ' or '' = not observed/unknown → -1
-        
-        Args:
-            value: String value to parse
-            default: Default value for empty/space (-1 by default)
-            slash_as_not_present: If True, treat '/' as 0 (for d and 8HHHH fields only)
-            
-        Returns:
-            Parsed integer or special value (-1 or 0)
-        """
-        value_stripped = value.strip()
-        
-        # Empty or space = unknown (always -1)
-        if not value_stripped or value_stripped == ' ':
-            return -1
-        
-        # Slash: either 0 (for d, 8HHHH) or -1 (for all other fields)
-        # Also check for double slash '//' which is used in 8HHHH field
-        if value_stripped == '/' or value_stripped == '//':
-            return 0 if slash_as_not_present else -1
-        
-        try:
-            return int(value_stripped)
-        except ValueError:
-            return default
-    
-    @staticmethod
     def _detect_format_and_encoding(filepath: Path) -> Tuple[bool, str]:
         """
         Detect if CSV file is in legacy format and determine encoding.

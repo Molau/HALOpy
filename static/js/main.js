@@ -15,9 +15,12 @@ window.i18nStrings = i18nStrings;
 let observerData = null; // cache of observer data with regions
 
 // Application constants loaded from backend
+let GEOGRAPHIC_REGIONS = []; // Will be loaded from /api/constants on page load
 let CIRCULAR_HALOS = new Set(); // Will be loaded from /api/constants on page load
 let PILLAR_HEIGHT_VALUES = []; // Light pillar height values (-1, 1-90)
 let ALL_PILLAR_HEIGHT_VALUES = []; // All height values including 0
+let VALID_HALO_TYPES = []; // Valid halo type numbers (1-77, 99)
+let COMBINED_HALO_TYPES = new Set(); // Combined halo types from backend
 
 // Global cloud mode flag - loaded once at startup
 let isCloudMode = false;
@@ -139,6 +142,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             CIRCULAR_HALOS = new Set(constants.circular_halos);
             PILLAR_HEIGHT_VALUES = constants.pillar_height_values;
             ALL_PILLAR_HEIGHT_VALUES = constants.all_pillar_height_values;
+            VALID_HALO_TYPES = constants.valid_halo_types;
+            if (constants.combined_to_individual_halos) {
+                COMBINED_HALO_TYPES = new Set(Object.keys(constants.combined_to_individual_halos).map(Number));
+            }
             if (constants.password_policy) {
                 PASSWORD_POLICY.minLength = constants.password_policy.min_length;
                 PASSWORD_POLICY.requireCategories = constants.password_policy.require_categories;
@@ -431,31 +438,31 @@ function handleMenuAction(action) {
     switch(action) {
         // File menu
         case 'new-file':
-            highlightFileMenu();
+            highlightMenu('file');
             showNewFileDialog();
             break;
         case 'load':
-            highlightFileMenu();
+            highlightMenu('file');
             showLoadFileDialog();
             break;
         case 'select':
-            highlightFileMenu();
+            highlightMenu('file');
             showSelectDialog();
             break;
         case 'merge':
-            highlightFileMenu();
+            highlightMenu('file');
             showMergeFileDialog();
             break;
         case 'save':
-            highlightFileMenu();
+            highlightMenu('file');
             showSaveFileDialog();
             break;
         case 'upload':
-            highlightFileMenu();
+            highlightMenu('file');
             showUploadDialog();
             break;
         case 'download':
-            highlightFileMenu();
+            highlightMenu('file');
             showDownloadDialog();
             break;
         
@@ -495,31 +502,31 @@ function handleMenuAction(action) {
             
         // Settings menu
         case 'settings-fixed-observer':
-            highlightSettingsMenu();
+            highlightMenu('settings');
             showFixedObserverDialog();
             break;
         case 'settings-datum':
-            highlightSettingsMenu();
+            highlightMenu('settings');
             showDatumDialog();
             break;
         case 'settings-eingabeart':
-            highlightSettingsMenu();
+            highlightMenu('settings');
             showEingabeartDialog();
             break;
         case 'settings-ausgabeart':
-            highlightSettingsMenu();
+            highlightMenu('settings');
             showAusgabeartDialog();
             break;
         case 'settings-change-password':
-            highlightSettingsMenu();
+            highlightMenu('settings');
             showChangePasswordDialog();
             break;
         case 'settings-active-observers':
-            highlightSettingsMenu();
+            highlightMenu('settings');
             showActiveObserversDialog();
             break;
         case 'settings-startup-file':
-            highlightSettingsMenu();
+            highlightMenu('settings');
             showStartupFileDialog();
             break;
             
@@ -536,15 +543,15 @@ function handleMenuAction(action) {
             
         // Help menu
         case 'help-version':
-            highlightVersionMenu();
+            highlightMenu('version');
             showVersionDialog();
             break;
         case 'help-new':
-            highlightVersionMenu();
+            highlightMenu('version');
             showWhatsNewDialog();
             break;
         case 'help-text':
-            highlightHelpMenu();
+            highlightMenu('help');
             showHelpDialog();
             break;
         
@@ -2120,7 +2127,6 @@ async function loadI18n(lang) {
         const response = await fetch(`/api/i18n/${lang}?v=${Date.now()}`);
         i18nStrings = await response.json();
         window.i18nStrings = i18nStrings;
-        updatePageText();
     } catch (error) {}
 }
 
@@ -2215,13 +2221,7 @@ function isNewerVersion(a, b) {
     return false;
 }
 
-// Update page text with current language
-function updatePageText() {
-    // Note: With server-side rendering, the page is already in the correct language
-    // This function is now redundant since we reload the page on language switch
-    // Keeping it for compatibility but it does nothing
-    // The templates use {% if lang() == 'de' %}...{% endif %} for proper server-side rendering
-}
+
 
 // Setup language switcher buttons
 // Setup language switcher buttons
@@ -2331,38 +2331,14 @@ function updateDropdownItem(action, text) {
 
 // Clear all menu highlights (called when returning to main page or closing dialogs)
 function clearMenuHighlights() {
-    const menus = document.querySelectorAll('.menu-title');
-    menus.forEach(menu => menu.classList.remove('active'));
+    document.querySelectorAll('.menu-title').forEach(menu => menu.classList.remove('active'));
 }
 
-// Highlight Info/Version menu (index 0) when version items are invoked
-function highlightVersionMenu() {
-    const menus = document.querySelectorAll('.menu-title');
-    menus.forEach(menu => menu.classList.remove('active'));
-    if (menus[0]) menus[0].classList.add('active');
-}
-
-// Highlight File menu (index 1) when file items are invoked
-function highlightFileMenu() {
-    const menus = document.querySelectorAll('.menu-title');
-    menus.forEach(menu => menu.classList.remove('active'));
-    if (menus[1]) menus[1].classList.add('active');
-}
-
-// Highlight Settings menu (index 6) when settings items are invoked
-function highlightSettingsMenu() {
-    const menus = document.querySelectorAll('.menu-title');
-    // Remove active class from all menus
-    menus.forEach(menu => menu.classList.remove('active'));
-    // Add active class to Settings menu (index 6)
-    if (menus[6]) menus[6].classList.add('active');
-}
-
-// Highlight Help menu (index 7) when help items are invoked
-function highlightHelpMenu() {
-    const menus = document.querySelectorAll('.menu-title');
-    menus.forEach(menu => menu.classList.remove('active'));
-    if (menus[7]) menus[7].classList.add('active');
+// Highlight a specific menu by its data-page attribute
+function highlightMenu(page) {
+    clearMenuHighlights();
+    const menu = document.querySelector(`.menu-title[data-page="${page}"]`);
+    if (menu) menu.classList.add('active');
 }
 
 // Show help
@@ -3484,9 +3460,21 @@ async function showDisplayCompactList(filterState) {
     });
 }
 
-// Kurzausgabe formatter (from observations.js)
+// Kurzausgabe formatter - Direct 1:1 translation from H_BEOBNG.PAS lines 200-308
 function kurzausgabe(obs) {
+    // For web display: Monitor=True, Expo=False, sep1=0, sep2=32 (space)
+    // Build the first six 5-char blocks without separators, then insert spaces.
     let first = '';
+    const addBlockSpaces = (s) => {
+        let out = '';
+        for (let i = 0; i < s.length; i += 5) {
+            const chunk = s.substring(i, i + 5);
+            if (!chunk) break;
+            out += chunk;
+            if (chunk.length === 5) out += ' ';
+        }
+        return out;
+    };
     
     // KK - observer code
     if (obs.KK < 100) {
@@ -3524,21 +3512,21 @@ function kurzausgabe(obs) {
         first += String(Math.floor(obs.ZM / 10)) + String(obs.ZM % 10);
     }
     
-    // d - duration
+    // d - origin/density (1 digit)
     if (obs.d === null || obs.d === -1) {
         first += '/';
     } else {
         first += String(obs.d);
     }
     
-    // DD - halo source
+    // DD - duration (2 digits)
     if (obs.DD === null || obs.DD === -1) {
         first += '//';
     } else {
         first += String(Math.floor(obs.DD / 10)) + String(obs.DD % 10);
     }
     
-    // N - sky coverage
+    // N - cloud cover
     if (obs.N === null || obs.N === -1) {
         first += '/';
     } else {
@@ -3559,12 +3547,8 @@ function kurzausgabe(obs) {
         first += String(obs.c);
     }
     
-    // EE - halo type
-    if (obs.EE === null || obs.EE === -1) {
-        first += '//';
-    } else {
-        first += String(Math.floor(obs.EE / 10)) + String(obs.EE % 10);
-    }
+    // EE - halo type (2 digits)
+    first += String(Math.floor(obs.EE / 10)) + String(obs.EE % 10);
     
     // H - brightness
     if (obs.H === null || obs.H === -1) {
@@ -3573,7 +3557,7 @@ function kurzausgabe(obs) {
         first += String(obs.H);
     }
     
-    // F - colour
+    // F - color
     if (obs.F === null || obs.F === -1) {
         first += '/';
     } else {
@@ -3587,48 +3571,78 @@ function kurzausgabe(obs) {
         first += String(obs.V);
     }
     
-    // f - weather phenomenon
+    // f - weather front (space if -1, not '/')
     if (obs.f === null || obs.f === -1) {
-        first += '/';
+        first += ' ';
     } else {
         first += String(obs.f);
     }
     
     // zz - precipitation
     if (obs.zz === null || obs.zz === -1) {
+        first += '  ';
+    } else if (obs.zz === 99) {
         first += '//';
-    } else if (obs.zz === 0) {
-        first += '99';
     } else {
         first += String(Math.floor(obs.zz / 10)) + String(obs.zz % 10);
     }
     
-    // GG - observing region
-    if (obs.GG === null || obs.GG === -1) {
-        first += '//';
+    // GG - geographic region (1-39)
+    first += String(Math.floor(obs.GG / 10)) + String(obs.GG % 10);
+
+    // Now insert spaces after every 5 characters for the first blocks
+    let erg = addBlockSpaces(first);
+    
+    // 8HHHH - light pillar heights (Pascal lines 271-290)
+    if (obs.EE === 8) {
+        // Upper light pillar only
+        if (obs.HO === null || obs.HO === -1) {
+            erg += '8  //';  // HO not observed
+        } else if (obs.HO === 0) {
+            erg += '8  //';  // HO not relevant
+        } else {
+            erg += '8' + String(Math.floor(obs.HO / 10)) + String(obs.HO % 10) + '//';
+        }
+    } else if (obs.EE === 9) {
+        // Lower light pillar only
+        if (obs.HU === null || obs.HU === -1) {
+            erg += '8//  ';  // HU not observed
+        } else if (obs.HU === 0) {
+            erg += '8//  ';  // HU not relevant
+        } else {
+            erg += '8//' + String(Math.floor(obs.HU / 10)) + String(obs.HU % 10);
+        }
+    } else if (obs.EE === 10) {
+        // Both upper and lower light pillars
+        erg += '8';
+        if (obs.HO === null || obs.HO === -1 || obs.HO === 0) {
+            erg += '  ';  // HO not observed or not relevant
+        } else {
+            erg += String(Math.floor(obs.HO / 10)) + String(obs.HO % 10);
+        }
+        if (obs.HU === null || obs.HU === -1 || obs.HU === 0) {
+            erg += '  ';  // HU not observed or not relevant
+        } else {
+            erg += String(Math.floor(obs.HU / 10)) + String(obs.HU % 10);
+        }
     } else {
-        first += String(Math.floor(obs.GG / 10)) + String(obs.GG % 10);
+        // No light pillar - use empty field not slashes
+        erg += '     ';
     }
     
-    // Now add spaces after every 5 characters (up to position 35)
-    let erg = '';
-    for (let i = 0; i < first.length; i += 5) {
-        const chunk = first.substring(i, i + 5);
-        if (!chunk) break;
-        erg += chunk;
-        if (chunk.length === 5) erg += ' ';
-    }
+    // Separator after 8HHHH block
+    erg += ' ';
     
-    // lp8 - light pillar field (8HHHH) - 5 characters
-    let lp8 = obs.lp8 || '     ';
-    erg += lp8.padEnd(5, ' ') + ' ';
-    
-    // Sectors - 15 characters
+    // Sectors - always exactly 15 chars (pad with spaces if shorter)
     let sectors = obs.sectors || '';
+    // Trim and then pad to exactly 15 chars
     sectors = sectors.trim().substring(0, 15).padEnd(15, ' ');
-    erg += sectors + ' ';
+    erg += sectors;
     
-    // Remarks
+    // Separator before remarks
+    erg += ' ';
+    
+    // Remarks - rest of line
     if (obs.remarks) {
         erg += obs.remarks.trim();
     }
@@ -4425,20 +4439,10 @@ async function showSelectDialog() {
         if (filterType === 'MM') {
             const month = document.getElementById('select-month').value;
             const year = document.getElementById('select-year').value;
-
-
-            console.log('Display:', document.getElementById('select-month').options[document.getElementById('select-month').selectedIndex].text, 
-                        document.getElementById('select-year').options[document.getElementById('select-year').selectedIndex].text);
         } else if (filterType === 'TT') {
             const day = document.getElementById('select-day').value;
             const month = document.getElementById('select-day-month').value;
             const year = document.getElementById('select-day-year').value;
-
-
-
-            console.log('Display:', document.getElementById('select-day').options[document.getElementById('select-day').selectedIndex].text,
-                        document.getElementById('select-day-month').options[document.getElementById('select-day-month').selectedIndex].text,
-                        document.getElementById('select-day-year').options[document.getElementById('select-day-year').selectedIndex].text);
         } else if (filterType === 'ZZ') {
             const fromHour = document.getElementById('select-time-from-hour').value;
             const fromMinute = document.getElementById('select-time-from-minute').value;
@@ -6253,11 +6257,7 @@ async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, 
     }
 }
 
-// Helper function - shows a toast message in top-right corner
-function showMessage(text, type = 'info') {
-    // Legacy function - delegate to standardized showNotification()
-    showNotification(text, type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info');
-}
+
 
 // Auto-save helper function
 async function triggerAutosave() {
@@ -6390,7 +6390,6 @@ async function checkAutosaveRecovery() {
         modal.show();
     } catch (error) {
         // Silently ignore - autosave check is optional and may fail if feature not enabled
-        console.debug('[AUTOSAVE RECOVERY] Skipped:', error.message);
     }
 }
 
@@ -8254,6 +8253,7 @@ async function showEditObserverDialog() {
             }
             
             const selectedObserver = observers.find(obs => obs.KK === selectedKK);
+            document.activeElement?.blur();
             modal.hide();
             modalEl.addEventListener('hidden.bs.modal', () => {
                 modalEl.remove();
@@ -8325,6 +8325,7 @@ function showEditTypeDialog(observer) {
     // Handle OK button
     document.getElementById('btn-edit-type-ok').addEventListener('click', () => {
         const selectedType = document.querySelector('input[name="editType"]:checked').value;
+        document.activeElement?.blur();
         modal.hide();
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();
@@ -8417,7 +8418,7 @@ function showEditBaseDataDialog(observer) {
             const result = await resp.json();
             
             if (!resp.ok) {
-                errEl.textContent = result.error;
+                errEl.textContent = i18nStrings.observers['error_' + result.error];
                 errEl.style.display = 'block';
                 return;
             }
@@ -8448,23 +8449,19 @@ function showEditBaseDataDialog(observer) {
  * Functions for adding, editing, and deleting observation sites
  */
 
-// Add new observation site
-async function showAddSiteDialog(observer) {
-    
-    // Generate month options
+// Generate option lists for observer site forms (shared across all site dialogs)
+function generateSiteFormOptions() {
     const monthOptions = Object.keys(i18nStrings.months).map(m => {
         const monthNum = parseInt(m);
         const monthName = i18nStrings.months[m];
         return `<option value="${monthNum}">${monthName}</option>`;
     }).join('');
     
-    // Generate year options (YEAR_MIN-YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
         const year = YEAR_MIN + i;
         return `<option value="${year}">${year}</option>`;
     }).join('');
     
-    // Generate region options
     const regionOptions = Object.keys(i18nStrings.geographic_regions).map(regionNum => {
         const regionName = i18nStrings.geographic_regions[regionNum];
         if (regionName) {
@@ -8473,40 +8470,43 @@ async function showAddSiteDialog(observer) {
         return '';
     }).filter(opt => opt).join('');
     
-    // Generate coordinate options
     const latDegOptions = Array.from({length: 91}, (_, i) => `<option value="${i}">${i}</option>`).join('');
     const lonDegOptions = Array.from({length: 181}, (_, i) => `<option value="${i}">${i}</option>`).join('');
     const minOptions = Array.from({length: 60}, (_, i) => `<option value="${i}">${i}</option>`).join('');
     
-    const modalHtml = `
-        <div class="modal fade" id="add-site-modal" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header py-2">
-                        <h5 class="modal-title">${i18nStrings.observers.modify_add_site}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="add-site-form">
-                            <div class="row g-2">
+    return { monthOptions, yearOptions, regionOptions, latDegOptions, lonDegOptions, minOptions };
+}
+
+// Generate observer site form fields HTML
+// prefix: ID prefix for all fields (e.g. 'site-', 'edit-site-')
+// disabled: true for read-only display (confirm/delete dialogs)
+// showRequired: true to show * markers on labels
+function generateSiteFormFields(prefix, options, { disabled = false, showRequired = true } = {}) {
+    const d = disabled ? ' disabled' : '';
+    const r = disabled ? '' : ' required';
+    const req = showRequired ? ' <span class="text-danger">*</span>' : '';
+    const empty = disabled ? '<option value="">--</option>' : '';
+    const { monthOptions, yearOptions, regionOptions, latDegOptions, lonDegOptions, minOptions } = options;
+    
+    return `<div class="row g-2">
                                 <!-- Since (Month/Year) and Active -->
                                 <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_month_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="site-seit-month" required>
-                                        <option value="">--</option>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.since_month_label}${req}</label>
+                                    <select class="form-select form-select-sm" id="${prefix}seit-month"${r}${d}>
+                                        ${empty}
                                         ${monthOptions}
                                     </select>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_year_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="site-seit-year" required>
-                                        <option value="">--</option>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.since_year_label}${req}</label>
+                                    <select class="form-select form-select-sm" id="${prefix}seit-year"${r}${d}>
+                                        ${empty}
                                         ${yearOptions}
                                     </select>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.common.active} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="site-active" required>
+                                    <label class="form-label small mb-0">${i18nStrings.common.active}${req}</label>
+                                    <select class="form-select form-select-sm" id="${prefix}active"${r}${d}>
                                         <option value="1">${i18nStrings.common.yes}</option>
                                         <option value="0">${i18nStrings.common.no}</option>
                                     </select>
@@ -8517,47 +8517,47 @@ async function showAddSiteDialog(observer) {
                                     <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="site-hb-ort" maxlength="20" required>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label}${req}</label>
+                                    <input type="text" class="form-control form-control-sm" id="${prefix}hb-ort" maxlength="20"${r}${d}>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="site-gh" required>
-                                        <option value="">--</option>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label}${req}</label>
+                                    <select class="form-select form-select-sm" id="${prefix}gh"${r}${d}>
+                                        ${empty}
                                         ${regionOptions}
                                     </select>
                                 </div>
                                 
                                 <!-- Main Site Coordinates -->
                                 <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label}${req}</label>
                                     <div class="input-group input-group-sm">
-                                        <select class="form-select" id="site-hlg" required>
+                                        <select class="form-select" id="${prefix}hlg"${r}${d}>
                                             ${lonDegOptions}
                                         </select>
                                         <span class="input-group-text">°</span>
-                                        <select class="form-select" id="site-hlm" required>
+                                        <select class="form-select" id="${prefix}hlm"${r}${d}>
                                             ${minOptions}
                                         </select>
                                         <span class="input-group-text">'</span>
-                                        <select class="form-select" id="site-how" style="max-width: 70px;" required>
+                                        <select class="form-select" id="${prefix}how" style="max-width: 70px;"${r}${d}>
                                             <option value="O">O</option>
                                             <option value="W">W</option>
                                         </select>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label}${req}</label>
                                     <div class="input-group input-group-sm">
-                                        <select class="form-select" id="site-hbg" required>
+                                        <select class="form-select" id="${prefix}hbg"${r}${d}>
                                             ${latDegOptions}
                                         </select>
                                         <span class="input-group-text">°</span>
-                                        <select class="form-select" id="site-hbm" required>
+                                        <select class="form-select" id="${prefix}hbm"${r}${d}>
                                             ${minOptions}
                                         </select>
                                         <span class="input-group-text">'</span>
-                                        <select class="form-select" id="site-hns" style="max-width: 70px;" required>
+                                        <select class="form-select" id="${prefix}hns" style="max-width: 70px;"${r}${d}>
                                             <option value="N">N</option>
                                             <option value="S">S</option>
                                         </select>
@@ -8569,53 +8569,124 @@ async function showAddSiteDialog(observer) {
                                     <h6 class="mb-1">${i18nStrings.observers.secondary_site_label}</h6>
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.secondary_site_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="site-nb-ort" maxlength="20" required>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.secondary_site_label}${req}</label>
+                                    <input type="text" class="form-control form-control-sm" id="${prefix}nb-ort" maxlength="20"${r}${d}>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="site-gn" required>
-                                        <option value="">--</option>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label}${req}</label>
+                                    <select class="form-select form-select-sm" id="${prefix}gn"${r}${d}>
+                                        ${empty}
                                         ${regionOptions}
                                     </select>
                                 </div>
                                 
                                 <!-- Secondary Site Coordinates -->
                                 <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label}${req}</label>
                                     <div class="input-group input-group-sm">
-                                        <select class="form-select" id="site-nlg" required>
+                                        <select class="form-select" id="${prefix}nlg"${r}${d}>
                                             ${lonDegOptions}
                                         </select>
                                         <span class="input-group-text">°</span>
-                                        <select class="form-select" id="site-nlm" required>
+                                        <select class="form-select" id="${prefix}nlm"${r}${d}>
                                             ${minOptions}
                                         </select>
                                         <span class="input-group-text">'</span>
-                                        <select class="form-select" id="site-now" style="max-width: 70px;" required>
+                                        <select class="form-select" id="${prefix}now" style="max-width: 70px;"${r}${d}>
                                             <option value="O">O</option>
                                             <option value="W">W</option>
                                         </select>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label} <span class="text-danger">*</span></label>
+                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label}${req}</label>
                                     <div class="input-group input-group-sm">
-                                        <select class="form-select" id="site-nbg" required>
+                                        <select class="form-select" id="${prefix}nbg"${r}${d}>
                                             ${latDegOptions}
                                         </select>
                                         <span class="input-group-text">°</span>
-                                        <select class="form-select" id="site-nbm" required>
+                                        <select class="form-select" id="${prefix}nbm"${r}${d}>
                                             ${minOptions}
                                         </select>
                                         <span class="input-group-text">'</span>
-                                        <select class="form-select" id="site-nns" style="max-width: 70px;" required>
+                                        <select class="form-select" id="${prefix}nns" style="max-width: 70px;"${r}${d}>
                                             <option value="N">N</option>
                                             <option value="S">S</option>
                                         </select>
                                     </div>
                                 </div>
-                            </div>
+                            </div>`;
+}
+
+// Populate a site form with data from a site object
+function populateSiteForm(prefix, site) {
+    const yearNum = parseInt(site.seit_year);
+    const fullYear = yearNum < (YEAR_MIN - 1900) ? 2000 + yearNum : 1900 + yearNum;
+    
+    document.getElementById(`${prefix}seit-month`).value = site.seit_month;
+    document.getElementById(`${prefix}seit-year`).value = fullYear;
+    document.getElementById(`${prefix}active`).value = site.active;
+    document.getElementById(`${prefix}hb-ort`).value = site.HbOrt;
+    document.getElementById(`${prefix}gh`).value = String(site.GH).padStart(2, '0');
+    document.getElementById(`${prefix}hlg`).value = site.HLG;
+    document.getElementById(`${prefix}hlm`).value = site.HLM;
+    document.getElementById(`${prefix}how`).value = site.HOW;
+    document.getElementById(`${prefix}hbg`).value = site.HBG;
+    document.getElementById(`${prefix}hbm`).value = site.HBM;
+    document.getElementById(`${prefix}hns`).value = site.HNS;
+    document.getElementById(`${prefix}nb-ort`).value = site.NbOrt;
+    document.getElementById(`${prefix}gn`).value = String(site.GN).padStart(2, '0');
+    document.getElementById(`${prefix}nlg`).value = site.NLG;
+    document.getElementById(`${prefix}nlm`).value = site.NLM;
+    document.getElementById(`${prefix}now`).value = site.NOW;
+    document.getElementById(`${prefix}nbg`).value = site.NBG;
+    document.getElementById(`${prefix}nbm`).value = site.NBM;
+    document.getElementById(`${prefix}nns`).value = site.NNS;
+}
+
+// Collect site form data into an object
+function collectSiteFormData(prefix, observer) {
+    return {
+        KK: observer.KK,
+        VName: observer.VName,
+        NName: observer.NName,
+        seit_month: parseInt(document.getElementById(`${prefix}seit-month`).value),
+        seit_year: parseInt(document.getElementById(`${prefix}seit-year`).value),
+        active: parseInt(document.getElementById(`${prefix}active`).value),
+        HbOrt: document.getElementById(`${prefix}hb-ort`).value.trim(),
+        GH: document.getElementById(`${prefix}gh`).value.padStart(2, '0'),
+        HLG: parseInt(document.getElementById(`${prefix}hlg`).value),
+        HLM: parseInt(document.getElementById(`${prefix}hlm`).value),
+        HOW: document.getElementById(`${prefix}how`).value,
+        HBG: parseInt(document.getElementById(`${prefix}hbg`).value),
+        HBM: parseInt(document.getElementById(`${prefix}hbm`).value),
+        HNS: document.getElementById(`${prefix}hns`).value,
+        NbOrt: document.getElementById(`${prefix}nb-ort`).value.trim(),
+        GN: document.getElementById(`${prefix}gn`).value.padStart(2, '0'),
+        NLG: parseInt(document.getElementById(`${prefix}nlg`).value),
+        NLM: parseInt(document.getElementById(`${prefix}nlm`).value),
+        NOW: document.getElementById(`${prefix}now`).value,
+        NBG: parseInt(document.getElementById(`${prefix}nbg`).value),
+        NBM: parseInt(document.getElementById(`${prefix}nbm`).value),
+        NNS: document.getElementById(`${prefix}nns`).value
+    };
+}
+
+// Add new observation site
+async function showAddSiteDialog(observer) {
+    const options = generateSiteFormOptions();
+    
+    const modalHtml = `
+        <div class="modal fade" id="add-site-modal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h5 class="modal-title">${i18nStrings.observers.modify_add_site}: ${escapeHtml(observer.KK)} ${escapeHtml(observer.VName)} ${escapeHtml(observer.NName)}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="add-site-form">
+                            ${generateSiteFormFields('site-', options, { disabled: false, showRequired: true })}
                             <div id="site-error" class="text-danger mt-2" style="display:none; font-size: 12px;"></div>
                         </form>
                     </div>
@@ -8660,30 +8731,7 @@ async function showAddSiteDialog(observer) {
             errEl.style.display = 'none';
             
             // Collect form data
-            const siteData = {
-                KK: observer.KK,
-                VName: observer.VName,
-                NName: observer.NName,
-                seit_month: parseInt(document.getElementById('site-seit-month').value),
-                seit_year: parseInt(document.getElementById('site-seit-year').value),
-                active: parseInt(document.getElementById('site-active').value),
-                HbOrt: document.getElementById('site-hb-ort').value.trim(),
-                GH: document.getElementById('site-gh').value.padStart(2, '0'),
-                HLG: parseInt(document.getElementById('site-hlg').value),
-                HLM: parseInt(document.getElementById('site-hlm').value),
-                HOW: document.getElementById('site-how').value,
-                HBG: parseInt(document.getElementById('site-hbg').value),
-                HBM: parseInt(document.getElementById('site-hbm').value),
-                HNS: document.getElementById('site-hns').value,
-                NbOrt: document.getElementById('site-nb-ort').value.trim(),
-                GN: document.getElementById('site-gn').value.padStart(2, '0'),
-                NLG: parseInt(document.getElementById('site-nlg').value),
-                NLM: parseInt(document.getElementById('site-nlm').value),
-                NOW: document.getElementById('site-now').value,
-                NBG: parseInt(document.getElementById('site-nbg').value),
-                NBM: parseInt(document.getElementById('site-nbm').value),
-                NNS: document.getElementById('site-nns').value
-            };
+            const siteData = collectSiteFormData('site-', observer);
             
             // Validate
             if (!siteData.seit_month || !siteData.seit_year || !siteData.HbOrt || !siteData.GH || !siteData.NbOrt || !siteData.GN) {
@@ -8694,7 +8742,7 @@ async function showAddSiteDialog(observer) {
             
             // Send to API
             const resp = await fetch(`/api/observers/${observer.KK}/sites`, {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(siteData)
             });
@@ -8702,7 +8750,7 @@ async function showAddSiteDialog(observer) {
             const result = await resp.json();
             
             if (!resp.ok) {
-                errEl.textContent = result.error;
+                errEl.textContent = i18nStrings.observers['error_' + result.error];
                 errEl.style.display = 'block';
                 return;
             }
@@ -8750,33 +8798,7 @@ async function showEditSiteDialog(observer) {
 
 async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     const site = sites[currentIndex];
-    
-    // Generate month options
-    const monthOptions = Object.keys(i18nStrings.months).map(m => {
-        const monthNum = parseInt(m);
-        const monthName = i18nStrings.months[m];
-        return `<option value="${monthNum}">${monthName}</option>`;
-    }).join('');
-    
-    // Generate year options (YEAR_MIN-YEAR_MAX)
-    const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = YEAR_MIN + i;
-        return `<option value="${year}">${year}</option>`;
-    }).join('');
-    
-    // Generate region options
-    const regionOptions = Object.keys(i18nStrings.geographic_regions).map(regionNum => {
-        const regionName = i18nStrings.geographic_regions[regionNum];
-        if (regionName) {
-            return `<option value="${regionNum.padStart(2, '0')}">${regionNum.padStart(2, '0')} - ${regionName}</option>`;
-        }
-        return '';
-    }).filter(opt => opt).join('');
-    
-    // Generate coordinate options
-    const latDegOptions = Array.from({length: 91}, (_, i) => `<option value="${i}">${i}</option>`).join('');
-    const lonDegOptions = Array.from({length: 181}, (_, i) => `<option value="${i}">${i}</option>`).join('');
-    const minOptions = Array.from({length: 60}, (_, i) => `<option value="${i}">${i}</option>`).join('');
+    const options = generateSiteFormOptions();
     
     const modalHtml = `
         <div class="modal fade" id="edit-site-confirm-modal" tabindex="-1">
@@ -8789,134 +8811,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                     <div class="modal-body">
                         <p class="mb-2">${i18nStrings.observers.modify_edit_question}</p>
                         <form id="edit-site-confirm-form">
-                            <div class="row g-2">
-                                <!-- Since (Month/Year) and Active -->
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_month_label}</label>
-                                    <select class="form-select form-select-sm" id="confirm-edit-site-seit-month" disabled>
-                                        <option value="">--</option>
-                                        ${monthOptions}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_year_label}</label>
-                                    <select class="form-select form-select-sm" id="confirm-edit-site-seit-year" disabled>
-                                        <option value="">--</option>
-                                        ${yearOptions}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.common.active}</label>
-                                    <select class="form-select form-select-sm" id="confirm-edit-site-active" disabled>
-                                        <option value="1">${i18nStrings.common.yes}</option>
-                                        <option value="0">${i18nStrings.common.no}</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- Main Observation Site -->
-                                <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label}</label>
-                                    <input type="text" class="form-control form-control-sm" id="confirm-edit-site-hb-ort" maxlength="20" disabled>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label}</label>
-                                    <select class="form-select form-select-sm" id="confirm-edit-site-gh" disabled>
-                                        <option value="">--</option>
-                                        ${regionOptions}
-                                    </select>
-                                </div>
-                                
-                                <!-- Main Site Coordinates -->
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label}</label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="confirm-edit-site-hlg" disabled>
-                                            ${lonDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="confirm-edit-site-hlm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="confirm-edit-site-how" style="max-width: 70px;" disabled>
-                                            <option value="O">O</option>
-                                            <option value="W">W</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label}</label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="confirm-edit-site-hbg" disabled>
-                                            ${latDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="confirm-edit-site-hbm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="confirm-edit-site-hns" style="max-width: 70px;" disabled>
-                                            <option value="N">N</option>
-                                            <option value="S">S</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <!-- Secondary Observation Site -->
-                                <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.secondary_site_label}</h6>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.secondary_site_label}</label>
-                                    <input type="text" class="form-control form-control-sm" id="confirm-edit-site-nb-ort" maxlength="20" disabled>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label}</label>
-                                    <select class="form-select form-select-sm" id="confirm-edit-site-gn" disabled>
-                                        <option value="">--</option>
-                                        ${regionOptions}
-                                    </select>
-                                </div>
-                                
-                                <!-- Secondary Site Coordinates -->
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label}</label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="confirm-edit-site-nlg" disabled>
-                                            ${lonDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="confirm-edit-site-nlm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="confirm-edit-site-now" style="max-width: 70px;" disabled>
-                                            <option value="O">O</option>
-                                            <option value="W">W</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label}</label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="confirm-edit-site-nbg" disabled>
-                                            ${latDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="confirm-edit-site-nbm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="confirm-edit-site-nns" style="max-width: 70px;" disabled>
-                                            <option value="N">N</option>
-                                            <option value="S">S</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
+                            ${generateSiteFormFields('confirm-edit-site-', options, { disabled: true, showRequired: false })}
                         </form>
                         <p class="text-muted small mt-2">${i18nStrings.observers.delete_site_info.replace('{0}', currentIndex + 1).replace('{1}', sites.length)}</p>
                     </div>
@@ -8933,30 +8828,8 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     const modalEl = document.getElementById('edit-site-confirm-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
-    // Convert 2-digit year to 4-digit year
-    const yearNum = parseInt(site.seit_year);
-    const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
-    
     // Pre-fill form with existing values (disabled)
-    document.getElementById('confirm-edit-site-seit-month').value = site.seit_month;
-    document.getElementById('confirm-edit-site-seit-year').value = fullYear;
-    document.getElementById('confirm-edit-site-active').value = site.active;
-    document.getElementById('confirm-edit-site-hb-ort').value = site.HbOrt;
-    document.getElementById('confirm-edit-site-gh').value = String(site.GH).padStart(2, '0');
-    document.getElementById('confirm-edit-site-hlg').value = site.HLG;
-    document.getElementById('confirm-edit-site-hlm').value = site.HLM;
-    document.getElementById('confirm-edit-site-how').value = site.HOW;
-    document.getElementById('confirm-edit-site-hbg').value = site.HBG;
-    document.getElementById('confirm-edit-site-hbm').value = site.HBM;
-    document.getElementById('confirm-edit-site-hns').value = site.HNS;
-    document.getElementById('confirm-edit-site-nb-ort').value = site.NbOrt;
-    document.getElementById('confirm-edit-site-gn').value = String(site.GN).padStart(2, '0');
-    document.getElementById('confirm-edit-site-nlg').value = site.NLG;
-    document.getElementById('confirm-edit-site-nlm').value = site.NLM;
-    document.getElementById('confirm-edit-site-now').value = site.NOW;
-    document.getElementById('confirm-edit-site-nbg').value = site.NBG;
-    document.getElementById('confirm-edit-site-nbm').value = site.NBM;
-    document.getElementById('confirm-edit-site-nns').value = site.NNS;
+    populateSiteForm('confirm-edit-site-', site);
     
     modal.show();
     
@@ -8988,33 +8861,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
 
 async function showEditSiteFormDialog(observer, sites, currentIndex) {
     const site = sites[currentIndex];
-    
-    // Generate month options
-    const monthOptions = Object.keys(i18nStrings.months).map(m => {
-        const monthNum = parseInt(m);
-        const monthName = i18nStrings.months[m];
-        return `<option value="${monthNum}">${monthName}</option>`;
-    }).join('');
-    
-    // Generate year options (YEAR_MIN-YEAR_MAX)
-    const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = YEAR_MIN + i;
-        return `<option value="${year}">${year}</option>`;
-    }).join('');
-    
-    // Generate region options
-    const regionOptions = Object.keys(i18nStrings.geographic_regions).map(regionNum => {
-        const regionName = i18nStrings.geographic_regions[regionNum];
-        if (regionName) {
-            return `<option value="${regionNum.padStart(2, '0')}">${regionNum.padStart(2, '0')} - ${regionName}</option>`;
-        }
-        return '';
-    }).filter(opt => opt).join('');
-    
-    // Generate coordinate options
-    const latDegOptions = Array.from({length: 91}, (_, i) => `<option value="${i}">${i}</option>`).join('');
-    const lonDegOptions = Array.from({length: 181}, (_, i) => `<option value="${i}">${i}</option>`).join('');
-    const minOptions = Array.from({length: 60}, (_, i) => `<option value="${i}">${i}</option>`).join('');
+    const options = generateSiteFormOptions();
     
     const modalHtml = `
         <div class="modal fade" id="edit-site-modal" tabindex="-1">
@@ -9026,134 +8873,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
                     </div>
                     <div class="modal-body">
                         <form id="edit-site-form">
-                            <div class="row g-2">
-                                <!-- Since (Month/Year) and Active -->
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_month_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="edit-site-seit-month" required>
-                                        <option value="">--</option>
-                                        ${monthOptions}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_year_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="edit-site-seit-year" required>
-                                        <option value="">--</option>
-                                        ${yearOptions}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.common.active} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="edit-site-active" required>
-                                        <option value="1">${i18nStrings.common.yes}</option>
-                                        <option value="0">${i18nStrings.common.no}</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- Main Observation Site -->
-                                <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="edit-site-hb-ort" maxlength="20" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="edit-site-gh" required>
-                                        <option value="">--</option>
-                                        ${regionOptions}
-                                    </select>
-                                </div>
-                                
-                                <!-- Main Site Coordinates -->
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="edit-site-hlg" required>
-                                            ${lonDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="edit-site-hlm" required>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="edit-site-how" style="max-width: 70px;" required>
-                                            <option value="O">O</option>
-                                            <option value="W">W</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="edit-site-hbg" required>
-                                            ${latDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="edit-site-hbm" required>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="edit-site-hns" style="max-width: 70px;" required>
-                                            <option value="N">N</option>
-                                            <option value="S">S</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <!-- Secondary Observation Site -->
-                                <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.secondary_site_label}</h6>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.secondary_site_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="edit-site-nb-ort" maxlength="20" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="edit-site-gn" required>
-                                        <option value="">--</option>
-                                        ${regionOptions}
-                                    </select>
-                                </div>
-                                
-                                <!-- Secondary Site Coordinates -->
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="edit-site-nlg" required>
-                                            ${lonDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="edit-site-nlm" required>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="edit-site-now" style="max-width: 70px;" required>
-                                            <option value="O">O</option>
-                                            <option value="W">W</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="edit-site-nbg" required>
-                                            ${latDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="edit-site-nbm" required>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="edit-site-nns" style="max-width: 70px;" required>
-                                            <option value="N">N</option>
-                                            <option value="S">S</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
+                            ${generateSiteFormFields('edit-site-', options, { disabled: false, showRequired: true })}
                             <div id="edit-site-error" class="text-danger mt-2" style="display:none; font-size: 12px;"></div>
                         </form>
                     </div>
@@ -9169,34 +8889,8 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
     const modalEl = document.getElementById('edit-site-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
-    // Convert 2-digit year to 4-digit year
-    const yearNum = parseInt(site.seit_year);
-    const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
-    
-    // Pad GH and GN to 2 digits for select matching
-    const ghPadded = String(site.GH).padStart(2, '0');
-    const gnPadded = String(site.GN).padStart(2, '0');
-    
     // Pre-fill form with existing values
-    document.getElementById('edit-site-seit-month').value = String(site.seit_month);
-    document.getElementById('edit-site-seit-year').value = String(fullYear);
-    document.getElementById('edit-site-active').value = String(site.active);
-    document.getElementById('edit-site-hb-ort').value = site.HbOrt;
-    document.getElementById('edit-site-gh').value = ghPadded;
-    document.getElementById('edit-site-hlg').value = String(site.HLG);
-    document.getElementById('edit-site-hlm').value = String(site.HLM);
-    document.getElementById('edit-site-how').value = site.HOW;
-    document.getElementById('edit-site-hbg').value = String(site.HBG);
-    document.getElementById('edit-site-hbm').value = String(site.HBM);
-    document.getElementById('edit-site-hns').value = site.HNS;
-    document.getElementById('edit-site-nb-ort').value = site.NbOrt;
-    document.getElementById('edit-site-gn').value = gnPadded;
-    document.getElementById('edit-site-nlg').value = String(site.NLG);
-    document.getElementById('edit-site-nlm').value = String(site.NLM);
-    document.getElementById('edit-site-now').value = site.NOW;
-    document.getElementById('edit-site-nbg').value = String(site.NBG);
-    document.getElementById('edit-site-nbm').value = String(site.NBM);
-    document.getElementById('edit-site-nns').value = site.NNS;
+    populateSiteForm('edit-site-', site);
     
     modal.show();
     
@@ -9215,31 +8909,8 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             errEl.style.display = 'none';
             
             // Collect form data
-            const yearValue = parseInt(document.getElementById('edit-site-seit-year').value);
-            const siteData = {
-                KK: observer.KK,
-                VName: observer.VName,
-                NName: observer.NName,
-                seit_month: parseInt(document.getElementById('edit-site-seit-month').value),
-                seit_year: yearValue % 100,  // Convert 4-digit to 2-digit year
-                active: parseInt(document.getElementById('edit-site-active').value),
-                HbOrt: document.getElementById('edit-site-hb-ort').value.trim(),
-                GH: document.getElementById('edit-site-gh').value.padStart(2, '0'),
-                HLG: parseInt(document.getElementById('edit-site-hlg').value),
-                HLM: parseInt(document.getElementById('edit-site-hlm').value),
-                HOW: document.getElementById('edit-site-how').value,
-                HBG: parseInt(document.getElementById('edit-site-hbg').value),
-                HBM: parseInt(document.getElementById('edit-site-hbm').value),
-                HNS: document.getElementById('edit-site-hns').value,
-                NbOrt: document.getElementById('edit-site-nb-ort').value.trim(),
-                GN: document.getElementById('edit-site-gn').value.padStart(2, '0'),
-                NLG: parseInt(document.getElementById('edit-site-nlg').value),
-                NLM: parseInt(document.getElementById('edit-site-nlm').value),
-                NOW: document.getElementById('edit-site-now').value,
-                NBG: parseInt(document.getElementById('edit-site-nbg').value),
-                NBM: parseInt(document.getElementById('edit-site-nbm').value),
-                NNS: document.getElementById('edit-site-nns').value
-            };
+            const siteData = collectSiteFormData('edit-site-', observer);
+            siteData.seit_year = siteData.seit_year % 100;  // Convert 4-digit to 2-digit year
             
             // Validate
             if (!siteData.seit_month || !siteData.seit_year || !siteData.HbOrt || !siteData.GH || !siteData.NbOrt || !siteData.GN) {
@@ -9258,7 +8929,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             const result = await resp.json();
             
             if (!resp.ok) {
-                errEl.textContent = result.error;
+                errEl.textContent = i18nStrings.observers['error_' + result.error];
                 errEl.style.display = 'block';
                 return;
             }
@@ -9311,33 +8982,7 @@ async function showDeleteSiteDialog(observer) {
 
 async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     const site = sites[currentIndex];
-    
-    // Generate month options
-    const monthOptions = Object.keys(i18nStrings.months).map(m => {
-        const monthNum = parseInt(m);
-        const monthName = i18nStrings.months[m];
-        return `<option value="${monthNum}">${monthName}</option>`;
-    }).join('');
-    
-    // Generate year options (YEAR_MIN-YEAR_MAX)
-    const yearOptions = Array.from({length: 100}, (_, i) => {
-        const year = YEAR_MIN + i;
-        return `<option value="${year}">${year}</option>`;
-    }).join('');
-    
-    // Generate region options
-    const regionOptions = Object.keys(i18nStrings.geographic_regions).map(regionNum => {
-        const regionName = i18nStrings.geographic_regions[regionNum];
-        if (regionName) {
-            return `<option value="${regionNum.padStart(2, '0')}">${regionNum.padStart(2, '0')} - ${regionName}</option>`;
-        }
-        return '';
-    }).filter(opt => opt).join('');
-    
-    // Generate coordinate options
-    const latDegOptions = Array.from({length: 91}, (_, i) => `<option value="${i}">${i}</option>`).join('');
-    const lonDegOptions = Array.from({length: 181}, (_, i) => `<option value="${i}">${i}</option>`).join('');
-    const minOptions = Array.from({length: 60}, (_, i) => `<option value="${i}">${i}</option>`).join('');
+    const options = generateSiteFormOptions();
     
     const modalHtml = `
         <div class="modal fade" id="delete-site-modal" tabindex="-1">
@@ -9349,140 +8994,13 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
                     </div>
                     <div class="modal-body">
                         <form id="delete-site-form">
-                            <div class="row g-2">
-                                <!-- Since (Month/Year) and Active -->
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_month_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="delete-site-seit-month" disabled>
-                                        <option value="">--</option>
-                                        ${monthOptions}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.since_year_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="delete-site-seit-year" disabled>
-                                        <option value="">--</option>
-                                        ${yearOptions}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.common.active} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="delete-site-active" disabled>
-                                        <option value="1">${i18nStrings.common.yes}</option>
-                                        <option value="0">${i18nStrings.common.no}</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- Main Observation Site -->
-                                <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.primary_site_label}</h6>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.primary_site_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="delete-site-hb-ort" maxlength="20" disabled>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="delete-site-gh" disabled>
-                                        <option value="">--</option>
-                                        ${regionOptions}
-                                    </select>
-                                </div>
-                                
-                                <!-- Main Site Coordinates -->
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="delete-site-hlg" disabled>
-                                            ${lonDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="delete-site-hlm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="delete-site-how" style="max-width: 70px;" disabled>
-                                            <option value="O">O</option>
-                                            <option value="W">W</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="delete-site-hbg" disabled>
-                                            ${latDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="delete-site-hbm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="delete-site-hns" style="max-width: 70px;" disabled>
-                                            <option value="N">N</option>
-                                            <option value="S">S</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <!-- Secondary Observation Site -->
-                                <div class="col-12 mt-2">
-                                    <h6 class="mb-1">${i18nStrings.observers.secondary_site_label}</h6>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.secondary_site_label} <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-sm" id="delete-site-nb-ort" maxlength="20" disabled>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.region_label} <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm" id="delete-site-gn" disabled>
-                                        <option value="">--</option>
-                                        ${regionOptions}
-                                    </select>
-                                </div>
-                                
-                                <!-- Secondary Site Coordinates -->
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.longitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="delete-site-nlg" disabled>
-                                            ${lonDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="delete-site-nlm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="delete-site-now" style="max-width: 70px;" disabled>
-                                            <option value="O">O</option>
-                                            <option value="W">W</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small mb-0">${i18nStrings.observers.latitude_label} <span class="text-danger">*</span></label>
-                                    <div class="input-group input-group-sm">
-                                        <select class="form-select" id="delete-site-nbg" disabled>
-                                            ${latDegOptions}
-                                        </select>
-                                        <span class="input-group-text">°</span>
-                                        <select class="form-select" id="delete-site-nbm" disabled>
-                                            ${minOptions}
-                                        </select>
-                                        <span class="input-group-text">'</span>
-                                        <select class="form-select" id="delete-site-nns" style="max-width: 70px;" disabled>
-                                            <option value="N">N</option>
-                                            <option value="S">S</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
+                            ${generateSiteFormFields('delete-site-', options, { disabled: true, showRequired: true })}
                         </form>
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
                         <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-delete-site-no">${i18nStrings.common.no}</button>
-                        <button type="button" class="btn btn-danger btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
+                        <button type="button" class="btn btn-primary btn-sm px-3" id="btn-delete-site-yes">${i18nStrings.common.yes}</button>
                     </div>
                 </div>
             </div>
@@ -9492,30 +9010,8 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     const modalEl = document.getElementById('delete-site-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
-    // Convert 2-digit year to 4-digit for display
-    const yearNum = parseInt(site.seit_year);
-    const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
-    
     // Pre-fill form with existing values (disabled)
-    document.getElementById('delete-site-seit-month').value = site.seit_month;
-    document.getElementById('delete-site-seit-year').value = fullYear;
-    document.getElementById('delete-site-active').value = site.active;
-    document.getElementById('delete-site-hb-ort').value = site.HbOrt;
-    document.getElementById('delete-site-gh').value = String(site.GH).padStart(2, '0');
-    document.getElementById('delete-site-hlg').value = site.HLG;
-    document.getElementById('delete-site-hlm').value = site.HLM;
-    document.getElementById('delete-site-how').value = site.HOW;
-    document.getElementById('delete-site-hbg').value = site.HBG;
-    document.getElementById('delete-site-hbm').value = site.HBM;
-    document.getElementById('delete-site-hns').value = site.HNS;
-    document.getElementById('delete-site-nb-ort').value = site.NbOrt;
-    document.getElementById('delete-site-gn').value = String(site.GN).padStart(2, '0');
-    document.getElementById('delete-site-nlg').value = site.NLG;
-    document.getElementById('delete-site-nlm').value = site.NLM;
-    document.getElementById('delete-site-now').value = site.NOW;
-    document.getElementById('delete-site-nbg').value = site.NBG;
-    document.getElementById('delete-site-nbm').value = site.NBM;
-    document.getElementById('delete-site-nns').value = site.NNS;
+    populateSiteForm('delete-site-', site);
     
     modal.show();
     

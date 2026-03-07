@@ -22,7 +22,7 @@ from halo.services.settings import Settings
 import halo.io.observations_file as obs_file
 import halo.io.observers_file as observer_file
 import halo.io.observers_db as observer_db
-from halo.web.extensions import csrf
+from halo.web.extensions import csrf, limiter
 
 
 def create_app(config=None):
@@ -97,6 +97,13 @@ def create_app(config=None):
     
     # CSRF Protection (Cloud Mode uses session-based auth → needs CSRF)
     csrf.init_app(app)
+    
+    # Rate-Limiting (protects auth endpoints against brute-force)
+    limiter.init_app(app)
+    
+    # Session timeout: 12 hours
+    from datetime import timedelta
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
     
     # Load persisted settings from halo.cfg (CSV)
     # Cloud Mode: Settings loaded per-request (need session context)

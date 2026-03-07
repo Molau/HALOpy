@@ -1,25 +1,14 @@
-<!DOCTYPE html>
-<html lang="{{ lang() }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ g.i18n.get('app.window_title') }} {% if is_cloud %}(cloud){% else %}(local){% endif %}</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <!-- Bootstrap CSS -->
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}?v={{ static_version }}" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='fonts/bootstrap-icons/bootstrap-icons.css') }}?v={{ static_version }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ static_version }}">
-</head>
-<body class="d-flex flex-column min-vh-100">
-    {% include 'header.html' %}
+{% extends 'base.html' %}
+
+{% block head_extra %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/github-markdown.min.css') }}?v={{ static_version }}">
+{% endblock %}
+
+{% block content %}
 
     <script>
         // Mark output menu as active
-        document.addEventListener('DOMContentLoaded', () => {
-            const menus = document.querySelectorAll('.menu-title');
-            // Find Ausgabe/Output menu (6th menu item, index 5)
-            if (menus[5]) menus[5].classList.add('active');
-        });
+        document.addEventListener('DOMContentLoaded', () => highlightMenu('output'));
     </script>
 
     <main class="container mt-4">
@@ -112,13 +101,10 @@
         </div>
     </main>
 
-    {% include 'footer.html' %}
+{% endblock %}
 
-    <!-- Markdown parser -->
+{% block scripts %}
     <script src="{{ url_for('static', filename='js/marked.min.js') }}?v={{ static_version }}"></script>
-    <!-- GitHub Markdown CSS for styled output -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/github-markdown.min.css') }}?v={{ static_version }}">
     <script src="{{ url_for('static', filename='js/main.js') }}?v={{ static_version }}"></script>
     <script src="{{ url_for('static', filename='js/monthly_report.js') }}?v={{ static_version }}"></script>
-</body>
-</html>
+{% endblock %}
