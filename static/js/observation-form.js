@@ -984,15 +984,15 @@ class ObservationForm {
                         this.fields.hu.value = PILLAR_HEIGHT_VALUES[0]; // -1
                     }
                 } else {
-                    // All other EE values (including -1 and circular halos): HO = 0, HU = 0
-                    setOptionStates(this.fields.ho, hoOpts, ['0']);
-                    setOptionStates(this.fields.hu, huOpts, ['0']);
+                    // All other EE values (including -1 and circular halos): HO/HU irrelevant
+                    setOptionStates(this.fields.ho, hoOpts, ['-1']);
+                    setOptionStates(this.fields.hu, huOpts, ['-1']);
                     
-                    this.fieldConstraints.HO = ['0'];
-                    this.fieldConstraints.HU = ['0'];
+                    this.fieldConstraints.HO = ['-1'];
+                    this.fieldConstraints.HU = ['-1'];
                     
-                    this.fields.ho.value = '0';
-                    this.fields.hu.value = '0';
+                    this.fields.ho.value = '-1';
+                    this.fields.hu.value = '-1';
                 }
             }
             
@@ -1582,8 +1582,8 @@ class ObservationForm {
             TT: parseInt(this.fields.tt.value),
             g: parseInt(this.fields.g.value),
             GG: parseInt(this.fields.gg.value),
-            ZS: this.fields.zs.value ? parseInt(this.fields.zs.value) : 99,
-            ZM: this.fields.zm.value ? parseInt(this.fields.zm.value) : 99,
+            ZS: this.fields.zs.value ? parseInt(this.fields.zs.value) : -1,
+            ZM: this.fields.zm.value ? parseInt(this.fields.zm.value) : -1,
             DD: this.fields.dd.value && this.fields.dd.value !== '-1' ? parseInt(this.fields.dd.value) : -1,
             d: this.fields.d.value && this.fields.d.value !== '-1' ? parseInt(this.fields.d.value) : -1,
             N: this.fields.n.value && this.fields.n.value !== '-1' ? parseInt(this.fields.n.value) : -1,

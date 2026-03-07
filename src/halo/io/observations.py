@@ -683,26 +683,13 @@ def validate_observation(obs: Dict[str, str]) -> Tuple[bool, List[str]]:
     if zz != -1 and (zz < 0 or zz > 99):
         errors.append(f"Invalid zz: {zz} (must be 0-99)")
     
-    if ho != -1 and (ho < 1 or ho > 90):
-        errors.append(f"Invalid HO: {ho} (must be 1-90)")
+    if ho != -1 and ho != 0 and (ho < 1 or ho > 90):
+        errors.append(f"Invalid HO: {ho} (must be 0 or 1-90)")
     
-    if hu != -1 and (hu < 1 or hu > 90):
-        errors.append(f"Invalid HU: {hu} (must be 1-90)")
+    if hu != -1 and hu != 0 and (hu < 1 or hu > 90):
+        errors.append(f"Invalid HU: {hu} (must be 0 or 1-90)")
     
-    # --- Field dependencies ---
-    # d >= 4 (non-cirrus) forces N=0 and C=0
-    if d >= 4 and n != 0:
-        errors.append("Field dependency: d >= 4 requires N = 0")
-    
-    if d >= 4 and c_val != 0:
-        errors.append("Field dependency: d >= 4 requires C = 0")
-    
-    # 8HHHH depends on EE (light pillar types 8, 9, 10)
-    if ee not in (8, 9, 10):
-        if ho != -1:
-            errors.append("Field dependency: HO only valid for EE 8, 9, 10")
-        if hu != -1:
-            errors.append("Field dependency: HU only valid for EE 8, 9, 10")
+    # Field dependencies are enforced client-side (observation-form.js constraints)
     
     return (len(errors) == 0, errors)
 

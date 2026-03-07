@@ -355,7 +355,7 @@ def upload_file() -> Dict[str, Any]:
         {
             "observerKK": "44",          # Local Mode only
             "password": "password",      # Local Mode only
-            "observations": [...],
+            "csv_text": "KK,O,...\n44,1,...",  # Raw CSV content
             "use_session": true/false,   # Cloud Mode: true, Local Mode: false
             "replace_mode": true/false   # true=Replace (default), false=Append
         }
@@ -364,7 +364,7 @@ def upload_file() -> Dict[str, Any]:
     data = request.get_json()
     observer_kk = data.get('observerKK')
     password = data.get('password', '')
-    new_observations_data = data.get('observations', [])
+    csv_text = data.get('csv_text', '')
     use_session = data.get('use_session', False)  # True in Cloud Mode
     replace_mode = data.get('replace_mode', True)  # Default: Replace mode
     
@@ -403,28 +403,28 @@ def upload_file() -> Dict[str, Any]:
         is_admin = (user_kk is None)  # None = admin
         authenticated_kk = user_kk
     
-    if not new_observations_data:
+    if not csv_text:
         return jsonify({'error': 'no_observations_to_upload'}), 400
     
     try:
-        # Convert observation dicts to Observation objects
+        # Parse CSV text using the standard parser (same as local file load)
+        all_observations = ObservationCSV.read_observations_from_stream(
+            csv_text.split('\n')
+        )
+        
+        if not all_observations:
+            return jsonify({'error': 'no_observations_to_upload'}), 400
+        
         # SECURITY: Filter to only include observations matching authenticated user's KK
         # EXCEPTION: Admin can upload all observations
         new_observations = []
         filtered_out_count = 0
         
-        for obs_dict in new_observations_data:
+        for obs in all_observations:
             # Admin can upload all, regular users only their own
-            if not is_admin and str(obs_dict.get('KK')) != str(observer_kk):
+            if not is_admin and obs.get('KK', '') != str(observer_kk):
                 filtered_out_count += 1
                 continue
-            
-            obs = {}
-            for field in ['KK','O','JJ','MM','TT','GG','ZS','ZM','DD','d','N','C','c','EE','H','F','V','f','zz','g','HO','HU']:
-                val = obs_dict.get(field)
-                obs[field] = str(val) if val is not None else ''
-            obs['sectors'] = obs_dict.get('sectors', '') or ''
-            obs['remarks'] = obs_dict.get('remarks', '') or ''
             new_observations.append(obs)
         
         if not new_observations:

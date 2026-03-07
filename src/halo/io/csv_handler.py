@@ -196,14 +196,13 @@ class ObservationCSV:
     def read_observations_from_stream(stream) -> List[Dict[str, str]]:
         """
         Read observations from in-memory text stream (CSV format).
-        Uses _parse_observation_parts for consistency.
+        Uses csv.reader for proper handling of quoted fields (e.g. remarks
+        with commas), then _parse_observation_parts for consistency.
         """
         observations = []
-        for line in stream:
-            # Skip header line if present
-            if line.startswith('KK,'):
-                continue
-            parts = line.rstrip(',\n').split(',')
+        lines = [line for line in stream if not line.startswith('KK,')]
+        reader = csv.reader(lines)
+        for parts in reader:
             if len(parts) < 20:
                 continue
             obs = ObservationCSV._parse_observation_parts(parts)
