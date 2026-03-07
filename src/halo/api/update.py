@@ -7,8 +7,6 @@ Licensed under MIT License - see LICENSE file for details.
 # Standard library imports
 import os
 import shutil
-import subprocess
-import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -17,6 +15,7 @@ from urllib.request import urlopen
 # Third-party imports
 from flask import Blueprint, jsonify, request, current_app
 from halo.web.extensions import csrf
+from halo.config import is_cloud_mode
 
 update_blueprint = Blueprint('update', __name__, url_prefix='/api')
 
@@ -82,24 +81,27 @@ def update_from_github(repo: str, tag: str | None, root_path: Path) -> dict:
         return {"success": False, "error": str(e)}
 
 
-def restart_server(root_path: Path) -> None:
-    """Spawn a new server process and exit the current one."""
-    try:
-        halo_py = root_path / 'halo.py'
-        python_exec = sys.executable
-        shutil.which(python_exec)
-        os.spawnl(os.P_NOWAIT, python_exec, python_exec, str(halo_py))
-    except Exception:
-        python_exec = sys.executable
-        halo_py = root_path / 'halo.py'
-        subprocess.Popen([python_exec, str(halo_py)])
-    finally:
-        os._exit(0)
+def _check_update_auth():
+    """Check authorization for update/restart operations.
+    
+    Cloud Mode: Disabled entirely (deployment managed externally).
+    Local Mode: Requires request from localhost.
+    """
+    if is_cloud_mode():
+        return jsonify({'error': 'not_available_in_cloud_mode'}), 403
+    remote = request.remote_addr or ''
+    if remote not in ('127.0.0.1', '::1', 'localhost'):
+        return jsonify({'error': 'localhost_only'}), 403
+    return None
 
 
 @update_blueprint.route('/update', methods=['POST'])
 @csrf.exempt
 def perform_update():
+    auth_error = _check_update_auth()
+    if auth_error:
+        return auth_error
+
     data = request.get_json(silent=True) or {}
     repo = data.get('repo') or current_app.config.get('UPDATE_REPO', '')
     tag = data.get('tag')
@@ -108,12 +110,3 @@ def perform_update():
     result = update_from_github(repo, tag, root_path)
     status = 200 if result.get('success') else 500
     return jsonify(result), status
-
-
-@update_blueprint.route('/restart', methods=['POST'])
-@csrf.exempt
-def restart():
-    root_path = Path(__file__).parent.parent.parent.parent
-    # Spawn new process and exit current
-    restart_server(root_path)
-    return jsonify({"success": True})

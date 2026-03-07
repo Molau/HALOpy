@@ -171,6 +171,7 @@
     "chart_print_failed": "Fehler beim Drucken des Diagramms",
     "chart_save_failed": "Fehler beim Speichern des Diagramms",
     "markdown_save_failed": "Fehler beim Speichern der Markdown-Datei",
+    "file_saved": "{filename} gespeichert",
     "unknown_error": "Unbekannter Fehler"
   },
   "filter_dialog": {
@@ -434,6 +435,7 @@
     "total": "Summe",
     "title_one_param": "Auswertung mit einem Parameter",
     "title_two_params": "Auswertung mit zwei Parametern",
+    "error_analysis": "Fehler bei der Auswertung",
     "and": "und"
   },
   "output": {
@@ -478,7 +480,7 @@
     "table_month": "Monat",
     "table_sun": "Sonne",
     "table_moon": "Mond",
-    "table_total": "gesamt",
+    "table_totals": "Gesamt",
     "table_activity": "Aktivität",
     "table_ee": "EE",
     "table_days": "Tage",
@@ -829,6 +831,9 @@
     "region": "Gebiet",
     "ho": "obere Lichtsäule",
     "hu": "untere Lichtsäule",
+    "ho_label": "8HO (obere Lichtsäule)",
+    "hu_label": "HU (untere Lichtsäule)",
+    "hour_display": "{h} Uhr",
     "sectors": "Sektoren",
     "remarks": "Bemerkungen",
     "select": "-- Bitte wählen --",

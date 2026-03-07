@@ -52,18 +52,19 @@ def check_dependencies():
                 missing.append(pkg_name)
     
     if missing:
-        print(f"Fehlende Pakete erkannt: {', '.join(missing)}")
-        print("Installiere fehlende Pakete ...")
+        # Console messages before Flask/i18n init – English only (no i18n available at startup)
+        print(f"Missing packages detected: {', '.join(missing)}")
+        print("Installing missing packages ...")
         try:
             # Install only the missing packages (not the full requirements.txt,
             # which may contain platform-specific packages like uwsgi)
             subprocess.check_call([
                 sys.executable, '-m', 'pip', 'install'] + missing)
-            print("Abhängigkeiten erfolgreich installiert.")
+            print("Dependencies installed successfully.")
             print()
         except subprocess.CalledProcessError as e:
-            print(f"WARNUNG: pip install fehlgeschlagen (Exit-Code {e.returncode}).")
-            print(f"Bitte manuell ausführen: pip install {' '.join(missing)}")
+            print(f"WARNING: pip install failed (exit code {e.returncode}).")
+            print(f"Please run manually: pip install {' '.join(missing)}")
             print()
 
 

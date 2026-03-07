@@ -2039,36 +2039,6 @@ def reload_observers() -> Dict[str, Any]:
         return jsonify({'error': str(e)}), 500
 
 
-@api_blueprint.route('/file/autosave_old', methods=['POST'])
-def autosave_old() -> Dict[str, Any]:
-    """Auto-save current observations to .$$$ temp file - OLD VERSION"""
-    
-    filename = current_app.config.get('LOADED_FILE')
-    if not filename:
-        return jsonify({'error': 'No file loaded'}), 400
-    
-    observations = current_app.config.get('OBSERVATIONS', [])
-    if not observations:
-        return jsonify({'error': 'No observations to save'}), 400
-    
-    # Create temp filename with .$$$ extension
-    base_name = os.path.splitext(filename)[0]
-    temp_filename = f"{base_name}.$$$"
-    
-    temp_filepath = obs_file.get_data_path(temp_filename)
-    
-    try:
-        obs_file.create_temp_backup(temp_filename, observations)
-        
-        return jsonify({
-            'success': True,
-            'temp_file': temp_filename,
-            'count': len(observations)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @api_blueprint.route('/file/check_autosave', methods=['GET'])
 def check_autosave() -> Dict[str, Any]:
     """Check if any .$$$ autosave files exist in temp directory"""
@@ -2364,37 +2334,27 @@ def fixed_observer() -> Dict[str, Any]:
         })
 
 
-@api_blueprint.route('/config/upload_password', methods=['GET', 'PUT'])
-def upload_password() -> Dict[str, Any]:
-    """Get or set upload password (obfuscated) and associated observer_kk."""
+@api_blueprint.route('/config/upload_observer_kk', methods=['GET', 'PUT'])
+def upload_observer_kk() -> Dict[str, Any]:
+    """Get or set the saved observer_kk for upload/download convenience."""
     
     if request.method == 'PUT':
         data = request.get_json()
-        password = data.get('password', '')
         observer_kk = data.get('observer_kk', '')
         
-        # Obfuscate password before storing
-        obfuscated = Settings.obfuscate(password) if password else ''
-        
-        current_app.config['UPLOAD_PASSWORD'] = obfuscated
         current_app.config['UPLOAD_OBSERVER_KK'] = str(observer_kk)
         
-        # Persist settings
+        # Persist setting
         root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'UPLOAD_PASSWORD', obfuscated)
         Settings.save_key(current_app.config, root_path, 'UPLOAD_OBSERVER_KK', str(observer_kk))
         
         return jsonify({
             'success': True
         })
     else:
-        # Get obfuscated password and deobfuscate it
-        obfuscated = current_app.config.get('UPLOAD_PASSWORD', '')
-        password = Settings.deobfuscate(obfuscated) if obfuscated else ''
         observer_kk = current_app.config.get('UPLOAD_OBSERVER_KK', '')
         
         return jsonify({
-            'password': password,
             'observer_kk': observer_kk
         })
 
@@ -3112,12 +3072,6 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
     return '\n'.join(lines)
 
 
-def _format_monthly_stats_html(data: Dict[str, Any], month_name: str, year: str, i18n) -> str:
-    """Format monthly statistics as HTML - returns JSON for client-side HTML formatting."""
-    # Return JSON data; client-side formatter will generate HTML tables
-    return json.dumps(data)
-
-
 def _format_monthly_stats_markdown(data: Dict[str, Any], month_name: str, year: str, i18n) -> str:
     """Format monthly statistics as Markdown with pipe tables."""
     lines = []
@@ -3169,7 +3123,7 @@ def _format_monthly_stats_markdown(data: Dict[str, Any], month_name: str, year: 
             row += f" {obs['total_days']} |"
             lines.append(row)
         
-        footnote = i18n.get('statistics.footnote_ee_days', '1) = EE (Sonne)  2) = Tage (Sonne)  3) = Tage (Mond)  4) = Tage (gesamt)').replace('<br>', ' ')
+        footnote = i18n.get('statistics.footnote_ee_days').replace('<br>', ' ')
         footnote = footnote.replace('&nbsp;', ' ')
         lines.append('')
         lines.append(f'_{footnote}_')
@@ -3747,8 +3701,8 @@ def _generate_monthly_stats_chart(data: Dict[str, Any], mm: int, jj: int, i18n) 
     ax.legend(loc='upper left', fontsize=10, framealpha=0.9)
     
     # Add title and subtitle
-    title = f'Haloaktivität im {month_name} {year}'
-    subtitle = f'berechnet aus {observation_count} Einzelbeobachtungen'
+    title = i18n.get('monthly_stats.chart_title').replace('{month}', month_name).replace('{year}', year)
+    subtitle = i18n.get('monthly_stats.chart_subtitle').replace('{count}', str(observation_count))
     fig.suptitle(title, fontsize=14, fontweight='bold', y=0.98)
     ax.text(0.5, 1.02, subtitle, transform=ax.transAxes, 
             ha='center', va='bottom', fontsize=10, style='italic')
@@ -3817,8 +3771,8 @@ def _generate_monthly_stats_bar_chart(data: Dict[str, Any], mm: int, jj: int, i1
     ax.legend(loc='upper left', fontsize=10, framealpha=0.9)
     
     # Add title and subtitle
-    title = f'Haloaktivität im {month_name} {year}'
-    subtitle = f'berechnet aus {observation_count} Einzelbeobachtungen'
+    title = i18n.get('monthly_stats.chart_title').replace('{month}', month_name).replace('{year}', year)
+    subtitle = i18n.get('monthly_stats.chart_subtitle').replace('{count}', str(observation_count))
     fig.suptitle(title, fontsize=14, fontweight='bold', y=0.98)
     ax.text(0.5, 1.02, subtitle, transform=ax.transAxes, 
             ha='center', va='bottom', fontsize=10, style='italic')
@@ -3917,7 +3871,7 @@ def _generate_annual_stats_chart(data: Dict[str, Any], jj: int, i18n) -> bytes:
     
     # Add subtitle with observation count
     total_ee = data.get('totals', {}).get('total_ee', 0)
-    subtitle = f'berechnet aus {total_ee} Einzelbeobachtungen'
+    subtitle = i18n.get('annual_stats.chart_subtitle').replace('{count}', str(total_ee))
     fig.text(0.5, 0.91, subtitle, ha='center', fontsize=10, color='#666')
     
     # Adjust layout to prevent label cutoff
@@ -3989,7 +3943,7 @@ def _generate_annual_stats_bar_chart(data: Dict[str, Any], jj: int, i18n) -> byt
     
     # Add subtitle with observation count
     total_ee = data.get('totals', {}).get('total_ee', 0)
-    subtitle = f'berechnet aus {total_ee} Einzelbeobachtungen'
+    subtitle = i18n.get('annual_stats.chart_subtitle').replace('{count}', str(total_ee))
     ax.text(0.5, 1.02, subtitle, transform=ax.transAxes, 
             ha='center', va='bottom', fontsize=10, style='italic')
     
@@ -4020,7 +3974,7 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
     # ============================================================================
     # Main Title
     # ============================================================================
-    title = i18n.get('annual_stats.title', 'Jahresübersicht') + ' ' + year
+    title = i18n.get('annual_stats.title') + ' ' + year
     title_padding = max(0, (73 - len(title)) // 2)
     lines.append(' ' * title_padding + title)
     lines.append(' ' * title_padding + '═' * len(title))
@@ -4034,8 +3988,8 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
     
     if monthly_stats:
         lines.append('╔═══════════╦══════════════╦══════════════╦══════════════╦══════════════╗')
-        lines.append('║           ║     ' + i18n.get('annual_stats.table_sun', 'Sonne').ljust(9)[:9] + '║     ' + i18n.get('annual_stats.table_moon', 'Mond').ljust(9)[:9] + '║    ' + i18n.get('annual_stats.table_total', 'Gesamt').ljust(10)[:10] + '║  ' + i18n.get('annual_stats.table_activity', 'Aktivität').ljust(11)[:11] +  ' ║')
-        lines.append('║   ' + i18n.get('annual_stats.table_month', 'Monat').ljust(8)[:8] + '║   ' + i18n.get('annual_stats.table_ee', 'EE') + '   ' + i18n.get('annual_stats.table_days', 'Tg') + '  ║   ' + i18n.get('annual_stats.table_ee', 'EE') + '   ' + i18n.get('annual_stats.table_days', 'Tg') + '  ║   ' + i18n.get('annual_stats.table_ee', 'EE') + '   ' + i18n.get('annual_stats.table_days', 'Tg') + '  ║  ' + i18n.get('annual_stats.table_real', 'real').ljust(6)[:6] + i18n.get('annual_stats.table_relative', 'rel').ljust(5)[:5] + ' ║')
+        lines.append('║           ║     ' + i18n.get('annual_stats.table_sun').ljust(9)[:9] + '║     ' + i18n.get('annual_stats.table_moon').ljust(9)[:9] + '║    ' + i18n.get('annual_stats.table_totals').ljust(10)[:10] + '║  ' + i18n.get('annual_stats.table_activity').ljust(11)[:11] +  ' ║')
+        lines.append('║   ' + i18n.get('annual_stats.table_month').ljust(8)[:8] + '║   ' + i18n.get('annual_stats.table_ee') + '   ' + i18n.get('annual_stats.table_days') + '  ║   ' + i18n.get('annual_stats.table_ee') + '   ' + i18n.get('annual_stats.table_days') + '  ║   ' + i18n.get('annual_stats.table_ee') + '   ' + i18n.get('annual_stats.table_days') + '  ║  ' + i18n.get('annual_stats.table_real').ljust(6)[:6] + i18n.get('annual_stats.table_relative').ljust(5)[:5] + ' ║')
         lines.append('╠═══════════╬══════════════╬══════════════╬══════════════╬══════════════╣')
         
         # 12 month rows
@@ -4068,7 +4022,7 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
         total_real = totals.get('real', 0.0)
         total_relative = totals.get('relative', 0.0)
         
-        totals_label = i18n.get('annual_stats.table_totals', 'Gesamt')
+        totals_label = i18n.get('annual_stats.table_totals')
         totals_row = f"║ {totals_label.ljust(9)[:9]} ║  {total_sun_ee:4d}  {total_sun_days:3d}   ║  {total_moon_ee:4d}  {total_moon_days:3d}   ║  {total_total_ee:4d}  {total_total_days:3d}   ║ {total_real:6.1f} {total_relative:5.1f} ║"
         lines.append(totals_row)
         
@@ -4081,7 +4035,7 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
     # ============================================================================
     observer_data = data.get('observer_distribution', [])
     if observer_data:
-        title_line = i18n.get('annual_stats.observer_dist_title', 'Beobachter EE-Verteilung')
+        title_line = i18n.get('annual_stats.observer_dist_title')
         title_padding = max(0, (73 - len(title_line)) // 2)
         lines.append(' ' * title_padding + title_line)
         lines.append(' ' * title_padding + '═' * len(title_line))
@@ -4091,18 +4045,18 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
         lines.append('╔══╦═════╦══════╦═════╦══════╦═════╦══════╦═════╦══════╦═════╦═════╦══════╗')
         
         # Header row
-        header = '║' + i18n.get('annual_stats.observer_dist_kk', ' KK').ljust(2)[:2] + '║'
-        header += i18n.get('annual_stats.observer_dist_ee01', 'EE01').ljust(5)[:5] + '║'
-        header += '   ' + i18n.get('annual_stats.observer_dist_percent', '%').ljust(3)[:3] + '║'
-        header += i18n.get('annual_stats.observer_dist_ee02', 'EE02').ljust(5)[:5] + '║'
-        header += '   ' + i18n.get('annual_stats.observer_dist_percent', '%').ljust(3)[:3] + '║'
-        header += i18n.get('annual_stats.observer_dist_ee03', 'EE03').ljust(5)[:5] + '║'
-        header += '   ' + i18n.get('annual_stats.observer_dist_percent', '%').ljust(3)[:3] + '║'
-        header += i18n.get('annual_stats.observer_dist_ee567', 'EE567').ljust(5)[:5] + '║'
-        header += '   ' + i18n.get('annual_stats.observer_dist_percent', '%').ljust(3)[:3] + '║'
-        header += i18n.get('annual_stats.observer_dist_ee17', 'EE1-7').ljust(5)[:5] + '║'
-        header += i18n.get('annual_stats.observer_dist_ee_so', 'EE(So)').ljust(5)[:5] + '║'
-        header += i18n.get('annual_stats.observer_dist_ht_ges', 'HT(G)').ljust(6)[:6] + '║'
+        header = '║' + i18n.get('annual_stats.observer_dist_kk').ljust(2)[:2] + '║'
+        header += i18n.get('annual_stats.observer_dist_ee01').ljust(5)[:5] + '║'
+        header += '   ' + i18n.get('annual_stats.observer_dist_percent').ljust(3)[:3] + '║'
+        header += i18n.get('annual_stats.observer_dist_ee02').ljust(5)[:5] + '║'
+        header += '   ' + i18n.get('annual_stats.observer_dist_percent').ljust(3)[:3] + '║'
+        header += i18n.get('annual_stats.observer_dist_ee03').ljust(5)[:5] + '║'
+        header += '   ' + i18n.get('annual_stats.observer_dist_percent').ljust(3)[:3] + '║'
+        header += i18n.get('annual_stats.observer_dist_ee567').ljust(5)[:5] + '║'
+        header += '   ' + i18n.get('annual_stats.observer_dist_percent').ljust(3)[:3] + '║'
+        header += i18n.get('annual_stats.observer_dist_ee17').ljust(5)[:5] + '║'
+        header += i18n.get('annual_stats.observer_dist_ee_so').ljust(5)[:5] + '║'
+        header += i18n.get('annual_stats.observer_dist_ht_ges').ljust(6)[:6] + '║'
         lines.append(header)
         
         # Header separator
@@ -4139,7 +4093,7 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
     moon_ee_counts = data.get('moon_ee_counts', {})
     
     if sun_ee_counts or moon_ee_counts:
-        title_line = i18n.get('annual_stats.ee_observed_title', 'EE-Beobachtungen')
+        title_line = i18n.get('annual_stats.ee_observed_title')
         title_padding = max(0, (73 - len(title_line)) // 2)
         lines.append(' ' * title_padding + title_line)
         lines.append(' ' * title_padding + '═' * len(title_line))
@@ -4147,12 +4101,12 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
         
         # Sun halos table
         if sun_ee_counts:
-            lines.append(_format_ee_table(i18n.get('annual_stats.ee_sun_label', 'Sonne'), sun_ee_counts, i18n))
+            lines.append(_format_ee_table(i18n.get('annual_stats.ee_sun_label'), sun_ee_counts, i18n))
             lines.append('')
         
         # Moon halos table
         if moon_ee_counts:
-            lines.append(_format_ee_table(i18n.get('annual_stats.ee_moon_label', 'Mond'), moon_ee_counts, i18n))
+            lines.append(_format_ee_table(i18n.get('annual_stats.ee_moon_label'), moon_ee_counts, i18n))
             lines.append('')
     
     # ============================================================================
@@ -4160,14 +4114,14 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
     # ============================================================================
     phenomena_list = data.get('phenomena', [])
     lines.append('')
-    title_line = i18n.get('annual_stats.phenomena_title', 'Seltene Beobachtungen')
+    title_line = i18n.get('annual_stats.phenomena_title')
     title_padding = max(0, (74 - len(title_line)) // 2)
     lines.append(' ' * title_padding + title_line)
     lines.append(' ' * title_padding + '═' * len(title_line))
     
     if not phenomena_list:
         lines.append('')
-        phenomena_none_text = i18n.get('annual_stats.phenomena_none', 'Keine besonderen Beobachtungen')
+        phenomena_none_text = i18n.get('annual_stats.phenomena_none')
         # Center relative to title, not fixed width
         phenomena_padding = max(0, (len(title_line) - len(phenomena_none_text)) // 2 + title_padding)
         lines.append(' ' * phenomena_padding + phenomena_none_text)
@@ -4295,7 +4249,7 @@ def _format_ee_table(label: str, ee_counts: Dict[int, int], i18n) -> str:
         lines.append('   ╠═════════════╬' + '═════╬' * (len(row_ees) - 1) + '═════╣')
         
         # Counts
-        line = '   ║      ' + i18n.get('annual_stats.ee_count_label', 'Anz.').ljust(7)[:7] + '║'
+        line = '   ║      ' + i18n.get('annual_stats.ee_count_label').ljust(7)[:7] + '║'
         for ee in row_ees:
             count = ee_counts.get(ee, 0)
             line += str(count).rjust(4) + ' ║'
@@ -4322,7 +4276,7 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
     """
     lines = []
     
-    title = i18n.get('annual_stats.title_with_year', 'Jahresstatistik {year}').replace('{year}', year)
+    title = i18n.get('annual_stats.title_with_year').replace('{year}', year)
     lines.append(f'# {title}')
     lines.append('')
     
@@ -4333,13 +4287,13 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
     totals = data.get('totals', {})
     
     if monthly_stats and totals:
-        table_month = i18n.get('annual_stats.table_month', 'Monat')
-        table_sun = i18n.get('annual_stats.table_sun', 'Sonne')
-        table_moon = i18n.get('annual_stats.table_moon', 'Mond')
-        table_total = i18n.get('annual_stats.table_total', 'Gesamt')
-        table_days = i18n.get('annual_stats.table_days', 'Tage')
-        table_real = i18n.get('annual_stats.table_real', 'real')
-        table_relative = i18n.get('annual_stats.table_relative', 'rel.')
+        table_month = i18n.get('annual_stats.table_month')
+        table_sun = i18n.get('annual_stats.table_sun')
+        table_moon = i18n.get('annual_stats.table_moon')
+        table_total = i18n.get('annual_stats.table_totals')
+        table_days = i18n.get('annual_stats.table_days')
+        table_real = i18n.get('annual_stats.table_real')
+        table_relative = i18n.get('annual_stats.table_relative')
         
         lines.append(f'| {table_month} | {table_sun} EE | {table_sun} {table_days} | {table_moon} EE | {table_moon} {table_days} | {table_total} EE | {table_total} {table_days} | {table_real} | {table_relative} |')
         lines.append('|---|---:|---:|---:|---:|---:|---:|---:|---:|')
@@ -4372,13 +4326,13 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
     moon_ee_counts = data.get('moon_ee_counts', {})
     
     if sun_ee_counts or moon_ee_counts:
-        ee_observed_title = i18n.get('annual_stats.ee_observed_title', 'EE-Beobachtungen')
+        ee_observed_title = i18n.get('annual_stats.ee_observed_title')
         lines.append(f'## {ee_observed_title}')
         lines.append('')
         
         # Sun halos
         if sun_ee_counts:
-            ee_sun_label = i18n.get('annual_stats.ee_sun_label', 'Sonne')
+            ee_sun_label = i18n.get('annual_stats.ee_sun_label')
             lines.append(f'### {ee_sun_label}')
             lines.append('')
             
@@ -4393,7 +4347,7 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
                 separator += '---:|'
             lines.append(separator)
             
-            ee_count_label = i18n.get('annual_stats.ee_count_label', 'Anzahl')
+            ee_count_label = i18n.get('annual_stats.ee_count_label')
             row = f'| {ee_count_label} |'
             for ee in sun_ees:
                 row += f' {sun_ee_counts.get(ee, 0)} |'
@@ -4402,7 +4356,7 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
         
         # Moon halos
         if moon_ee_counts:
-            ee_moon_label = i18n.get('annual_stats.ee_moon_label', 'Mond')
+            ee_moon_label = i18n.get('annual_stats.ee_moon_label')
             lines.append(f'### {ee_moon_label}')
             lines.append('')
             
@@ -4417,7 +4371,7 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
                 separator += '---:|'
             lines.append(separator)
             
-            ee_count_label = i18n.get('annual_stats.ee_count_label', 'Anzahl')
+            ee_count_label = i18n.get('annual_stats.ee_count_label')
             row = f'| {ee_count_label} |'
             for ee in moon_ees:
                 row += f' {moon_ee_counts.get(ee, 0)} |'
@@ -4430,19 +4384,19 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
     observer_distribution = data.get('observer_distribution', [])
     
     if observer_distribution:
-        observer_dist_title = i18n.get('annual_stats.observer_dist_title', 'Beobachter EE-Verteilung')
+        observer_dist_title = i18n.get('annual_stats.observer_dist_title')
         lines.append(f'## {observer_dist_title}')
         lines.append('')
         
-        observer_dist_kk = i18n.get('annual_stats.observer_dist_kk', 'KK')
-        observer_dist_ee01 = i18n.get('annual_stats.observer_dist_ee01', 'EE01')
-        observer_dist_ee02 = i18n.get('annual_stats.observer_dist_ee02', 'EE02')
-        observer_dist_ee03 = i18n.get('annual_stats.observer_dist_ee03', 'EE03')
-        observer_dist_ee567 = i18n.get('annual_stats.observer_dist_ee567', 'EE567')
-        observer_dist_ee17 = i18n.get('annual_stats.observer_dist_ee17', 'EE1-7')
-        observer_dist_ee_so = i18n.get('annual_stats.observer_dist_ee_so', 'EE(So)')
-        observer_dist_ht_ges = i18n.get('annual_stats.observer_dist_ht_ges', 'HT(ges)')
-        observer_dist_percent = i18n.get('annual_stats.observer_dist_percent', '%')
+        observer_dist_kk = i18n.get('annual_stats.observer_dist_kk')
+        observer_dist_ee01 = i18n.get('annual_stats.observer_dist_ee01')
+        observer_dist_ee02 = i18n.get('annual_stats.observer_dist_ee02')
+        observer_dist_ee03 = i18n.get('annual_stats.observer_dist_ee03')
+        observer_dist_ee567 = i18n.get('annual_stats.observer_dist_ee567')
+        observer_dist_ee17 = i18n.get('annual_stats.observer_dist_ee17')
+        observer_dist_ee_so = i18n.get('annual_stats.observer_dist_ee_so')
+        observer_dist_ht_ges = i18n.get('annual_stats.observer_dist_ht_ges')
+        observer_dist_percent = i18n.get('annual_stats.observer_dist_percent')
         
         header = f'| {observer_dist_kk} | {observer_dist_ee01} | {observer_dist_percent} | '
         header += f'{observer_dist_ee02} | {observer_dist_percent} | {observer_dist_ee03} | '
@@ -4463,15 +4417,15 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
     # Table 4: Phenomena
     # ============================================================================
     phenomena_list = data.get('phenomena', [])
-    phenomena_title = i18n.get('annual_stats.phenomena_title', 'Halophänomene')
+    phenomena_title = i18n.get('annual_stats.phenomena_title')
     
     if phenomena_list:
         lines.append(f'## {phenomena_title}')
         lines.append('')
         
-        phenomena_date = i18n.get('annual_stats.phenomena_date', 'Datum')
-        phenomena_time = i18n.get('annual_stats.phenomena_time', 'Zeit')
-        phenomena_other_ee = i18n.get('annual_stats.phenomena_other_ee', 'usw.')
+        phenomena_date = i18n.get('annual_stats.phenomena_date')
+        phenomena_time = i18n.get('annual_stats.phenomena_time')
+        phenomena_other_ee = i18n.get('annual_stats.phenomena_other_ee')
         
         header = f'| {phenomena_date} | KK | GG | {phenomena_time} | O |'
         ee_columns = [1, 2, 3, 5, 6, 7, 8, 9, 11, 12]
@@ -4506,19 +4460,11 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
     else:
         lines.append(f'## {phenomena_title}')
         lines.append('')
-        phenomena_none = i18n.get('annual_stats.phenomena_none', 'Keine besonderen Beobachtungen')
+        phenomena_none = i18n.get('annual_stats.phenomena_none')
         lines.append(phenomena_none)
         lines.append('')
     
     return '\n'.join(lines)
-
-
-
-def _format_annual_stats_html(data: Dict[str, Any], year: str, i18n) -> str:
-    """Return HTML formatted annual statistics (or just return JSON for client-side rendering)."""
-    # For now, return JSON as HTML format indicates client-side rendering
-    # This maintains consistency with monthly-stats pattern
-    return jsonify(data)
 
 
 @api_blueprint.route('/annual-stats', methods=['GET'])
@@ -7331,63 +7277,4 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             pass
 
     return result, sh_debug
-
-
-def _format_parameter_value(value, param_name, all_params, prefix):
-    """Format a parameter value for display."""
-    
-    if value is None or value == '__none__':
-        return 'keine Angabe'  # Note: this function is currently unused (formatting done in JS)
-    
-    # For KK (observer), format as "KK - Firstname Lastname"
-    if param_name == 'KK':
-        try:
-            kk = int(value) if isinstance(value, (int, float, str)) else None
-            if kk is not None:
-                # Get observers from app config
-                observers = current_app.config.get('OBSERVERS', [])
-                # Find observer with matching KK (observers are dicts with 'KK' key)
-                observer = next((obs for obs in observers if obs['KK'] == str(kk).zfill(2)), None)
-                if observer:
-                    vname = observer['VName']
-                    nname = observer['NName']
-                    return f"{str(kk).zfill(2)} - {vname} {nname}".strip()
-                # Fallback if observer not found
-                return str(kk).zfill(2)
-        except (ValueError, IndexError):
-            pass
-    
-    # For year (JJ), convert 2-digit to 4-digit for display
-    if param_name == 'JJ':
-        year = int(value)
-        return str(jj_to_full_year(year))
-    
-    # For SH (solar altitude), just return numeric string (no degree symbol)
-    if param_name == 'SH':
-        try:
-            altitude = int(value)
-            return str(altitude)
-        except (ValueError, TypeError):
-            return str(value)
-
-    # For HO_HU (light pillar heights), return numeric string
-    if param_name == 'HO_HU':
-        try:
-            return str(int(value))
-        except (ValueError, TypeError):
-            return str(value)
-    
-    # For EE with split option, remove asterisk
-    if param_name == 'EE':
-        split_key = f'{prefix}_ee_split'
-        if not all_params.get(split_key) and isinstance(value, str):
-            return value.rstrip('*')
-    
-    # For C with split option, remove plus sign
-    if param_name == 'C':
-        split_key = f'{prefix}_c_split'
-        if not all_params.get(split_key) and isinstance(value, str):
-            return value.rstrip('+')
-    
-    return value
 

@@ -556,10 +556,20 @@ def build_analysis_sql(params: dict) -> Tuple[str, List]:
     conditions = []
     sql_params = []
     
+    # Whitelist of valid HALO parameter names that may appear in SQL
+    VALID_ANALYSIS_PARAMS = {
+        'JJ', 'MM', 'TT', 'ZZ', 'SH', 'KK', 'GG', 'O',
+        'f', 'C', 'd', 'EE', 'DD', 'H', 'F', 'V', 'zz',
+        'HO_HU', 'SE'
+    }
+    
     # Helper to process a single filter (filter1 or filter2)
     def add_filter(prefix: str):
         param_name = params.get(f'{prefix}')
         if not param_name:
+            return
+        
+        if param_name not in VALID_ANALYSIS_PARAMS:
             return
         
         param_value = params.get(f'{prefix}_value')
@@ -706,6 +716,9 @@ def build_analysis_sql(params: dict) -> Tuple[str, List]:
     def add_param_range(prefix: str):
         param_name = params.get(prefix)
         if not param_name:
+            return
+        
+        if param_name not in VALID_ANALYSIS_PARAMS:
             return
         
         from_val = params.get(f'{prefix}_from')

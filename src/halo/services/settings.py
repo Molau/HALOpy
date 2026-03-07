@@ -1,5 +1,4 @@
 # Standard library imports
-import base64
 import csv
 from pathlib import Path
 from typing import Dict, Any
@@ -105,8 +104,6 @@ class Settings:
                             app_config['DATE_DEFAULT_YEAR'] = int(value)
                         except ValueError:
                             app_config['DATE_DEFAULT_YEAR'] = 2026
-                    elif key == 'UPLOAD_PASSWORD':
-                        app_config['UPLOAD_PASSWORD'] = value
                     elif key == 'UPLOAD_OBSERVER_KK':
                         app_config['UPLOAD_OBSERVER_KK'] = value
                     elif key == 'LANGUAGE':
@@ -147,7 +144,6 @@ class Settings:
         if not is_cloud_mode():
             rows.insert(3, ['FIXED_OBSERVER', app_config.get('FIXED_OBSERVER', '')])
             rows.append(['STARTUP_FILE_PATH', app_config.get('STARTUP_FILE_PATH', '')])
-            rows.append(['UPLOAD_PASSWORD', app_config.get('UPLOAD_PASSWORD', '')])
             rows.append(['UPLOAD_OBSERVER_KK', app_config.get('UPLOAD_OBSERVER_KK', '')])
         
         with open(cfg_file, 'w', encoding='utf-8', newline='') as f:
@@ -160,23 +156,4 @@ class Settings:
         app_config[key] = value
         Settings.save_from(app_config, root_path)
 
-    @staticmethod
-    def obfuscate(text: str) -> str:
-        """Simple obfuscation using base64 and character shift."""
-        # Shift characters by 13 (simple ROT13-like)
-        shifted = ''.join(chr(ord(c) + 13) for c in text)
-        # Base64 encode
-        encoded = base64.b64encode(shifted.encode('utf-8')).decode('utf-8')
-        return encoded
 
-    @staticmethod
-    def deobfuscate(text: str) -> str:
-        """Reverse the obfuscation."""
-        try:
-            # Base64 decode
-            decoded = base64.b64decode(text.encode('utf-8')).decode('utf-8')
-            # Reverse character shift
-            unshifted = ''.join(chr(ord(c) - 13) for c in decoded)
-            return unshifted
-        except Exception:
-            return ''

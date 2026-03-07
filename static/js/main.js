@@ -2802,14 +2802,14 @@ async function showGroupModifyDialogMenu(filteredObs) {
                             <div class="col-md-6">
                                 <div class="row g-1">
                                     <div class="col-6">
-                                        <label class="form-label">8HO (obere Lichts?ule)</label>
+                                        <label class="form-label">${i18nStrings.fields.ho_label}</label>
                                         <select class="form-select form-select-sm" id="group-ho">
                                             <option value="">--</option>
                                             ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}?</option>`).join('')}
                                         </select>
                                     </div>
                                     <div class="col-6">
-                                        <label class="form-label">HU (untere Lichts?ule)</label>
+                                        <label class="form-label">${i18nStrings.fields.hu_label}</label>
                                         <select class="form-select form-select-sm" id="group-hu">
                                             <option value="">--</option>
                                             ${Array.from({length: 90}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}?</option>`).join('')}
@@ -4090,7 +4090,7 @@ async function showSelectDialog() {
             case 'ZZ':
                 const hours = [];
                 for (let i = 0; i <= 23; i++) {
-                    hours.push({ value: i, display: `${i} Uhr` });
+                    hours.push({ value: i, display: i18nStrings.fields.hour_display.replace('{h}', i) });
                 }
                 return hours;
             
@@ -4626,6 +4626,7 @@ async function showNewFileDialog() {
     try {
         // Use File System Access API for native save dialog
         const fileHandle = await window.showSaveFilePicker({
+            // || is a safeguard for File System API, not an i18n fallback
             suggestedName: i18nStrings.messages.new_file_default_name || 'neue_datei.csv',
             types: [{
                 description: 'CSV Files',
@@ -4645,6 +4646,7 @@ async function showNewFileDialog() {
         
         if (!resp.ok) {
             const err = await resp.json();
+            // || guards against missing server error text, not an i18n fallback
             showErrorDialog(i18nStrings.common.error + ': ' + (err.error || 'Unknown error'));
             return;
         }
@@ -4717,7 +4719,7 @@ async function saveFile() {
                     headers: { 'Content-Type': 'application/json' }
                 });
                 
-                showNotification(`<strong>✓</strong> ${escapeHtml(newFilename)} gespeichert`, 'success');
+                showNotification(`<strong>✓</strong> ${escapeHtml(i18nStrings.messages.file_saved.replace('{filename}', newFilename))}`, 'success');
             } else {
                 const result = await response.json();
                 showErrorDialog(i18nStrings.common.error + ': ' + result.error);
@@ -4736,17 +4738,16 @@ async function saveFile() {
 
 // Authentication modal for HALO server login
 async function showAuthenticationModal(onSuccess, cloudServerUrl) {
-    // Load observers, fixed observer, and saved password
+    // Load observers, fixed observer, and saved observer_kk
     let observers = [];
     let fixedObserver = '';
-    let savedPassword = '';
     let savedObserverKK = '';
     
     try {
-        const [obsResponse, configResponse, passwordResponse] = await Promise.all([
+        const [obsResponse, configResponse, kkResponse] = await Promise.all([
             fetch('/api/observers'),
             fetch('/api/config/fixed_observer'),
-            fetch('/api/config/upload_password')
+            fetch('/api/config/upload_observer_kk')
         ]);
         
         if (obsResponse.ok) {
@@ -4759,10 +4760,9 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
             fixedObserver = config.observer || '';
         }
         
-        if (passwordResponse.ok) {
-            const passwordData = await passwordResponse.json();
-            savedPassword = passwordData.password || '';
-            savedObserverKK = passwordData.observer_kk || '';
+        if (kkResponse.ok) {
+            const kkData = await kkResponse.json();
+            savedObserverKK = kkData.observer_kk || '';
         }
     } catch (error) {}
     
@@ -4781,7 +4781,7 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
                         <div class="mb-3">
                             <label for="auth-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
                             <div class="position-relative">
-                                <input type="password" class="form-control pe-5" id="auth-password" autocomplete="current-password" value="${savedPassword}">
+                                <input type="password" class="form-control pe-5" id="auth-password" autocomplete="current-password">
                                 <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-password" style="z-index: 10;">
                                     <i class="bi bi-eye text-secondary" id="password-icon"></i>
                                 </button>
@@ -4865,12 +4865,12 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         // Local Mode: No separate login call - credentials will be sent with upload/download request
         // Just collect credentials and pass to callback
         
-        // Save password AND observer_kk to halo.cfg (obfuscated) for convenience
+        // Save observer_kk to halo.cfg for convenience
         try {
-            await fetch('/api/config/upload_password', {
+            await fetch('/api/config/upload_observer_kk', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password, observer_kk: observerKK })
+                body: JSON.stringify({ observer_kk: observerKK })
             });
         } catch (error) {}
         
@@ -4934,16 +4934,15 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
     // Load data for Local Mode auth fields
     let observers = [];
     let fixedObserver = '';
-    let savedPassword = '';
     let savedObserverKK = '';
     let startupFilePath = '';
     
     if (!isCloudMode) {
         try {
-            const [obsResponse, configResponse, passwordResponse, startupResponse] = await Promise.all([
+            const [obsResponse, configResponse, kkResponse, startupResponse] = await Promise.all([
                 fetch('/api/observers'),
                 fetch('/api/config/fixed_observer'),
-                fetch('/api/config/upload_password'),
+                fetch('/api/config/upload_observer_kk'),
                 fetch('/api/config/startup_file')
             ]);
             
@@ -4957,10 +4956,9 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 fixedObserver = config.observer || '';
             }
             
-            if (passwordResponse.ok) {
-                const passwordData = await passwordResponse.json();
-                savedPassword = passwordData.password || '';
-                savedObserverKK = passwordData.observer_kk || '';
+            if (kkResponse.ok) {
+                const kkData = await kkResponse.json();
+                savedObserverKK = kkData.observer_kk || '';
             }
             
             if (startupResponse.ok) {
@@ -4983,7 +4981,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
         <div class="mb-3">
             <label for="upload-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
             <div class="position-relative">
-                <input type="password" class="form-control pe-5" id="upload-password" autocomplete="current-password" value="${savedPassword}">
+                <input type="password" class="form-control pe-5" id="upload-password" autocomplete="current-password">
                 <button class="btn position-absolute end-0 top-50 translate-middle-y border-0 bg-transparent" type="button" id="toggle-upload-password" style="z-index: 10;">
                     <i class="bi bi-eye text-secondary" id="upload-password-icon"></i>
                 </button>
@@ -5100,12 +5098,12 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 return;
             }
             
-            // Save password AND observer_kk to config for convenience
+            // Save observer_kk to config for convenience
             try {
-                await fetch('/api/config/upload_password', {
+                await fetch('/api/config/upload_observer_kk', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: password, observer_kk: observerKK })
+                    body: JSON.stringify({ observer_kk: observerKK })
                 });
             } catch (error) {}
         }
@@ -5248,6 +5246,7 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 
                 // Upload modal already closed - DON'T try to close it again
                 // Translate error code to user-friendly message
+                // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
                 const errorKey = error.error || 'unknown_error';
                 const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
                 showErrorDialog(errorMsg);
@@ -5285,15 +5284,14 @@ async function showDownloadDialog() {
     // Load data for Local Mode auth fields
     let observers = [];
     let fixedObserver = '';
-    let savedPassword = '';
     let savedObserverKK = '';
     
     if (!isCloudMode) {
         try {
-            const [obsResponse, configResp, passwordResp] = await Promise.all([
+            const [obsResponse, configResp, kkResp] = await Promise.all([
                 fetch('/api/observers'),
                 fetch('/api/config/fixed_observer'),
-                fetch('/api/config/upload_password')
+                fetch('/api/config/upload_observer_kk')
             ]);
             
             if (obsResponse.ok) {
@@ -5306,10 +5304,9 @@ async function showDownloadDialog() {
                 fixedObserver = configData.observer || '';
             }
             
-            if (passwordResp.ok) {
-                const passwordData = await passwordResp.json();
-                savedPassword = passwordData.password || '';
-                savedObserverKK = passwordData.observer_kk || '';
+            if (kkResp.ok) {
+                const kkData = await kkResp.json();
+                savedObserverKK = kkData.observer_kk || '';
             }
         } catch (error) {}
     }
@@ -5324,7 +5321,7 @@ async function showDownloadDialog() {
         </div>
         <div class="mb-3">
             <label for="download-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
-            <input type="password" class="form-control" id="download-password" autocomplete="new-password" value="${savedPassword}">
+            <input type="password" class="form-control" id="download-password" autocomplete="current-password">
         </div>
     ` : '';
     
@@ -5509,13 +5506,13 @@ async function showDownloadDialog() {
             const result = await response.json();
             
             if (response.ok && result.success) {
-                // Save credentials for convenience (Local Mode only)
+                // Save observer_kk for convenience (Local Mode only)
                 if (!isCloudMode) {
                     try {
-                        const response = await fetch('/api/config/upload_password', {
+                        await fetch('/api/config/upload_observer_kk', {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ password: password, observer_kk: observerKK })
+                            body: JSON.stringify({ observer_kk: observerKK })
                         });
                     } catch (error) {
                         // Silent fail - not critical if settings save fails
@@ -5734,6 +5731,7 @@ async function showObserverUploadDialog() {
                     showNotification(i18nStrings.upload_download.upload_success_observer, 'success', 5000);
                 } else {
                     const error = await response.json();
+                    // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
                     const errorKey = error.error || 'unknown_error';
                     const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
                     showErrorDialog(errorMsg);
@@ -5826,13 +5824,13 @@ async function showObserverUploadDialog() {
                     authModalInstance.hide();
                     // Wait for modal to close before showing error
                     setTimeout(() => {
-                        // Translate error code to user-friendly message
+                        // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
                         const errorKey = error.error || 'unknown_error';
                         const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
                         showErrorDialog(errorMsg);
                     }, 300);
                 } else {
-                    // If no modal found, show error immediately
+                    // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
                     const errorKey = error.error || 'unknown_error';
                     const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
                     showErrorDialog(errorMsg);
@@ -5959,15 +5957,14 @@ async function showObserverDownloadDialog() {
     // Load data for Local Mode auth fields
     let observers = [];
     let fixedObserver = '';
-    let savedPassword = '';
     let savedObserverKK = '';
     
     if (!isCloudMode) {
         try {
-            const [obsResponse, configResp, passwordResp] = await Promise.all([
+            const [obsResponse, configResp, kkResp] = await Promise.all([
                 fetch('/api/observers'),
                 fetch('/api/config/fixed_observer'),
-                fetch('/api/config/upload_password')
+                fetch('/api/config/upload_observer_kk')
             ]);
             
             if (obsResponse.ok) {
@@ -5980,10 +5977,9 @@ async function showObserverDownloadDialog() {
                 fixedObserver = configData.observer || '';
             }
             
-            if (passwordResp.ok) {
-                const passwordData = await passwordResp.json();
-                savedPassword = passwordData.password || '';
-                savedObserverKK = passwordData.observer_kk || '';
+            if (kkResp.ok) {
+                const kkData = await kkResp.json();
+                savedObserverKK = kkData.observer_kk || '';
             }
         } catch (error) {}
     }
@@ -5998,7 +5994,7 @@ async function showObserverDownloadDialog() {
         </div>
         <div class="mb-3">
             <label for="download-observer-password" class="form-label">${i18nStrings.upload_download.upload_auth_password}</label>
-            <input type="password" class="form-control" id="download-observer-password" autocomplete="new-password" value="${savedPassword}">
+            <input type="password" class="form-control" id="download-observer-password" autocomplete="current-password">
         </div>
     ` : '';
     
@@ -6100,12 +6096,12 @@ async function showObserverDownloadDialog() {
                 return;
             }
             
-            // Save password AND observer_kk to halo.cfg for convenience
+            // Save observer_kk to halo.cfg for convenience
             try {
-                await fetch('/api/config/upload_password', {
+                await fetch('/api/config/upload_observer_kk', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: password, observer_kk: observerKK })
+                    body: JSON.stringify({ observer_kk: observerKK })
                 });
             } catch (error) {
             }
@@ -6229,6 +6225,7 @@ async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, 
                     window.location.reload();
                 }
             } else {
+                // || guards against missing server error text, not an i18n fallback
                 showErrorDialog(i18nStrings.common.error + ': ' + (saveResult.error || 'save_failed'));
             }
         } else {
@@ -6238,7 +6235,7 @@ async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, 
                 setTimeout(() => spinner.modalEl.remove(), 300);
             }
             
-            // Show specific error message from server
+            // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
             const errorKey = result.error || 'unknown_error';
             const errorMessage = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
             showErrorDialog(errorMessage);

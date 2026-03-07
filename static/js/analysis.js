@@ -329,7 +329,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             case 'ZZ':
                 const hours = [];
                 for (let i = 0; i <= 23; i++) {
-                    hours.push({ value: i, display: `${i} Uhr` });
+                    hours.push({ value: i, display: i18nStrings.fields.hour_display.replace('{h}', i) });
                 }
                 return hours;
             
@@ -1032,14 +1032,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     param1DayFromSelect.addEventListener('change', validateDayRange);
     param1DayToSelect.addEventListener('change', validateDayRange);
 
-    // Range validation
-    param1FromSelect.addEventListener('change', validateParam1Range);
-    param1ToSelect.addEventListener('change', validateParam1Range);
-
-    // Day range validation
-    param1DayFromSelect.addEventListener('change', validateDayRange);
-    param1DayToSelect.addEventListener('change', validateDayRange);
-
     // Range validation for param2
     param2FromSelect.addEventListener('change', validateParam2Range);
     param2ToSelect.addEventListener('change', validateParam2Range);
@@ -1564,12 +1556,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             selectedParams.percentage_mode = percentageMode ? percentageMode.value : 'global';
         }
         
-        // Add percentage mode for two-parameter analysis
-        if (selectedParams.param2) {
-            const percentageMode = document.querySelector('input[name="percentage-mode"]:checked');
-            selectedParams.percentage_mode = percentageMode ? percentageMode.value : 'global';
-        }
-        
         // Log configuration
 
         
@@ -1588,7 +1574,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
             
             if (!response.ok) {
-                showWarningModal('Fehler bei der Auswertung');
+                showWarningModal(i18nStrings.analysis_results.error_analysis);
                 return;
             }
             
@@ -2742,7 +2728,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `
                 <tr>
                     <td>${displayKey}</td>
-                    <td cass="text-end">${count} ${i18nStrings.analysis_results.observation_s} - ${percentage}%</td>
+                    <td class="text-end">${count} ${i18nStrings.analysis_results.observation_s} - ${percentage}%</td>
                 </tr>
             `;
         }

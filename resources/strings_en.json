@@ -171,6 +171,7 @@
     "chart_print_failed": "Error printing chart",
     "chart_save_failed": "Error saving chart",
     "markdown_save_failed": "Error saving markdown file",
+    "file_saved": "{filename} saved",
     "unknown_error": "Unknown error"
   },
   "filter_dialog": {
@@ -434,6 +435,7 @@
     "total": "Total",
     "title_one_param": "Analysis with one parameter",
     "title_two_params": "Analysis with two parameters",
+    "error_analysis": "Analysis error",
     "and": "and"
   },
   "output": {
@@ -478,7 +480,7 @@
     "table_month": "Month",
     "table_sun": "Sun",
     "table_moon": "Moon",
-    "table_total": "total",
+    "table_totals": "Total",
     "table_activity": "Activity",
     "table_ee": "EE",
     "table_days": "Days",
@@ -829,6 +831,9 @@
     "region": "Region",
     "ho": "upper light pillar",
     "hu": "lower light pillar",
+    "ho_label": "8HO (upper light pillar)",
+    "hu_label": "HU (lower light pillar)",
+    "hour_display": "{h} h",
     "sectors": "Sectors",
     "remarks": "Remarks",
     "select": "-- Please select --",

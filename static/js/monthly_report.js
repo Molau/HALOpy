@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Validate observer selection
         if (!selectedKK) {
             showWarningAndGoHome(i18nStrings.monthly_report.error_no_observer);
-            observerSelect.focus;
+            observerSelect.focus();
             return;
         }
 
