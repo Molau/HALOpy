@@ -116,7 +116,6 @@ async function showAddObservationDialogNumeric() {
     const config = await configResponse.json();
     
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
-    // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
     if (!isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
@@ -191,7 +190,8 @@ async function showAddObservationDialogNumeric() {
     // If date default is available, append MM and JJ after KK and O (positions 2-3)
     if (dateDefault && eing.length >= 4) {
         // Keep KK (2 chars) + O (1 char) + JJ (2 chars) + MM (2 chars)
-        eing = eing.substring(0, 3) + dateDefault.jj + dateDefault.mm + eing.substring(5);
+        const jj2 = String(parseInt(dateDefault.jj) % 100).padStart(2, '0');
+        eing = eing.substring(0, 3) + jj2 + dateDefault.mm + eing.substring(5);
     }
 
     const ensureNumericInputFocus = () => {
@@ -610,8 +610,9 @@ async function showAddObservationDialogNumeric() {
                 ev.preventDefault();
                 return;
             }
-            // Auto-fill JJ and MM
-            candidate = candidate + dateDefault.jj + dateDefault.mm;
+            // Auto-fill JJ (2-digit for eing format) and MM
+            const jj2 = String(parseInt(dateDefault.jj) % 100).padStart(2, '0');
+            candidate = candidate + jj2 + dateDefault.mm;
             eing = candidate;
             input.value = eing;
             errEl.style.display = 'none';
@@ -1051,7 +1052,6 @@ async function showAddObservationDialogMenu() {
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
     
-    // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
     if (!isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
@@ -1510,7 +1510,7 @@ function parseNumericObservation(s) {
     const obs = {
         KK: parseInt(s.slice(0,2),10),
         O: parseInt(s.slice(2,3),10),
-        JJ: parseInt(s.slice(3,5),10),
+        JJ: (() => { const jjRaw = parseInt(s.slice(3,5),10); return jjRaw < (YEAR_MIN - 1900) ? 2000 + jjRaw : 1900 + jjRaw; })(),
         MM: parseInt(s.slice(5,7),10),
         TT: parseInt(s.slice(7,9),10),
         g: parseInt(s.slice(9,10),10),

@@ -373,8 +373,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Year dropdown (1986-2099)
         yearSelect.innerHTML = `<option value="">${i18nStrings.fields.any}</option>`;
         for (let i = 1986; i <= 2099; i++) {
-            const yy = i % 100;
-            yearSelect.innerHTML += `<option value="${yy}">${i}</option>`;
+            yearSelect.innerHTML += `<option value="${i}">${i}</option>`;
         }
     }
     

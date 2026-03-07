@@ -339,6 +339,10 @@ def get_observers() -> Dict[str, Any]:
             jj = int(jj_param)
             mm = int(mm_param)
             
+            # Normalize 4-digit year to 2-digit for seit comparison
+            if jj >= 100:
+                jj = jj % 100
+            
             # Use database filtering for date-based observer lookup
             if is_cloud_mode():
                 kk_records = observer_db.load_filtered(kk=kk_param, jj=jj, mm=mm)
@@ -833,7 +837,7 @@ def get_observer_sites(kk):
         
         seit_parts = obs['seit'].split('/')
         seit_month = int(seit_parts[0])
-        seit_year = int(seit_parts[1])
+        seit_year = jj_to_full_year(int(seit_parts[1]))
         
         sites.append({
             'KK': obs['KK'],

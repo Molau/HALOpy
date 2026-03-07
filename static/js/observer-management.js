@@ -59,8 +59,7 @@ async function showAddObserverDialog(formData = null) {
     // Build year options (YEAR_MIN to YEAR_MAX)
     const yearOptions = Array.from({length: 100}, (_, i) => {
         const year = YEAR_MIN + i;
-        const yearShort = year % 100;
-        return `<option value="${yearShort}">${year}</option>`;
+        return `<option value="${year}">${year}</option>`;
     }).join('');
     
     // Build region options with real names (1-39)
@@ -540,9 +539,8 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
     // Build table rows
     const tableRows = sites.map(site => {
         const yearNum = parseInt(site.seit_year);
-        const fullYear = yearNum < (YEAR_MIN-1900) ? 2000 + yearNum : 1900 + yearNum;
         const monthName = i18nStrings.months[site.seit_month];
-        const seitDisplay = `${String(site.seit_month).padStart(2, '0')}/${String(yearNum).padStart(2, '0')}`;
+        const seitDisplay = `${String(site.seit_month).padStart(2, '0')}/${String(yearNum % 100).padStart(2, '0')}`;
         const aktivDisplay = site.active === 1 ? i18nStrings.common.yes : i18nStrings.common.no;
         
         return `
@@ -1090,10 +1088,9 @@ function generateSiteFormFields(prefix, options, { disabled = false, showRequire
 // Populate a site form with data from a site object
 function populateSiteForm(prefix, site) {
     const yearNum = parseInt(site.seit_year);
-    const fullYear = yearNum < (YEAR_MIN - 1900) ? 2000 + yearNum : 1900 + yearNum;
     
     document.getElementById(`${prefix}seit-month`).value = site.seit_month;
-    document.getElementById(`${prefix}seit-year`).value = fullYear;
+    document.getElementById(`${prefix}seit-year`).value = yearNum;
     document.getElementById(`${prefix}active`).value = site.active;
     document.getElementById(`${prefix}hb-ort`).value = site.HbOrt;
     document.getElementById(`${prefix}gh`).value = String(site.GH).padStart(2, '0');

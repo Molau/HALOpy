@@ -57,12 +57,10 @@ def get_annual_stats() -> Dict[str, Any]:
     try:
         jj_int = int(jj)
 
-        # Accept both 2-digit and 4-digit years (YEAR_MIN-YEAR_MAX) and normalize to 2-digit
-        if YEAR_MIN <= jj_int <= 1999:
-            jj_int -= 1900
-        elif 2000 <= jj_int <= YEAR_MAX:
-            jj_int -= 2000
-        elif jj_int < 0 or jj_int > 99:
+        # Accept both 2-digit and 4-digit years, normalize to 4-digit
+        if 0 <= jj_int <= 99:
+            jj_int = jj_to_full_year(jj_int)
+        elif jj_int < YEAR_MIN or jj_int > YEAR_MAX:
             return jsonify({'error': f'Invalid year (0-99 or {YEAR_MIN}-{YEAR_MAX})'}), 400
 
     except ValueError:
@@ -86,10 +84,11 @@ def get_annual_stats() -> Dict[str, Any]:
     
     # Get all active observers up to end of year
     # Use December of the year as reference (month 12)
-    # Handle century boundary: years 00-79 are 2000-2079, must add 100 (same as _parse_seit)
-    jj_adjusted = jj_int
-    if jj_int < (YEAR_MIN - 1900):
-        jj_adjusted = jj_int + 100
+    # Convert 4-digit year to seit-compatible format for comparison
+    jj_2digit = jj_int % 100
+    jj_adjusted = jj_2digit
+    if jj_2digit < (YEAR_MIN - 1900):
+        jj_adjusted = jj_2digit + 100
     month_year_value = 12 + 13 * jj_adjusted
     
     # Get unique active observers up to this year
@@ -398,8 +397,8 @@ def get_annual_stats() -> Dict[str, Any]:
         # JSON format and HTML format both return data; HTML is formatted client-side
         return jsonify(data)
     elif output_format in ['text', 'markdown']:
-        # Get formatted year for display
-        year = str(jj_to_full_year(jj_int))
+        # Get formatted year for display (jj_int is already 4-digit)
+        year = str(jj_int)
         if output_format == 'text':
             content = _format_annual_stats_text(data, year, i18n)
             return Response(content, mimetype='text/plain; charset=utf-8')
@@ -788,13 +787,13 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         try:
             month = int(month)
             year = int(year)
-            # Convert 4-digit year to 2-digit if needed
-            if year >= 1900:
-                year = year % 100
+            # Accept both 2-digit and 4-digit, normalize to 4-digit
+            if year < 100:
+                year = jj_to_full_year(year)
         except (ValueError, TypeError):
             return observations
         
-        # Filter by month and year first
+        # Filter by month and year first (obs['JJ'] is 4-digit)
         filtered = []
         for obs in observations:
             if _int(obs, 'MM') == month and _int(obs, 'JJ') == year:
@@ -840,13 +839,13 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
             from_val = float(from_val)
             to_val = float(to_val)
         elif param_name == 'JJ':
-            # Year - convert 4-digit to 2-digit (1988 -> 88)
+            # Year - accept both 2-digit and 4-digit, normalize to 4-digit
             from_val = int(from_val)
             to_val = int(to_val)
-            if from_val >= 1900:
-                from_val = from_val % 100
-            if to_val >= 1900:
-                to_val = to_val % 100
+            if from_val < 100:
+                from_val = jj_to_full_year(from_val)
+            if to_val < 100:
+                to_val = jj_to_full_year(to_val)
         else:
             # Most parameters are integers
             from_val = int(from_val)
@@ -859,18 +858,18 @@ def _apply_param_range_filter(observations, param_name, all_params, prefix):
         # Day parameter - requires month/year context
         return _apply_tt_range_filter(observations, all_params, prefix)
     elif param_name == 'JJ':
-        # Year parameter - special handling for century boundary
+        # Year parameter - obs['JJ'] is 4-digit, from_val/to_val are 4-digit
         result = []
         
         # Handle year ranges that cross century boundary
         if from_val > to_val:
-            # Range crosses century (e.g., (YEAR_MIN-1900)-1 wrap across 19xx/20xx)
+            # Range wraps (e.g., 2070-2079 then 1980-1990)
             for obs in observations:
                 val = _int(obs, param_name, -1)
-                if val != -1 and (from_val <= val <= 99 or 0 <= val <= to_val):
+                if val != -1 and (from_val <= val <= YEAR_MAX or YEAR_MIN <= val <= to_val):
                     result.append(obs)
         else:
-            # Normal range within same century
+            # Normal range
             for obs in observations:
                 val = _int(obs, param_name, -1)
                 if val != -1 and from_val <= val <= to_val:
@@ -1250,12 +1249,6 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
         else:
             value = obs.get(param_name)
         
-        # Convert 2-digit years to 4-digit years for JJ parameter
-        if param_name == 'JJ' and value is not None:
-            year = int(value) if isinstance(value, (int, str)) else value
-            # Year < (YEAR_MIN-1900) = 20xx, Year >= (YEAR_MIN-1900) = 19xx
-            value = jj_to_full_year(year)
-        
         # Use unformatted key for grouping to avoid duplicates
         if value is None:
             if param_name in ['C', 'EE', 'HO_HU']:
@@ -1317,14 +1310,11 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
                                 # No month/year context, generate 1-31
                                 range_values = list(range(1, 32))
                         elif param_name == 'JJ':
-                            # Year - convert 2-digit to 4-digit, then handle range
-                            # Year < (YEAR_MIN-1900) = 20xx, Year >= (YEAR_MIN-1900) = 19xx
-                            from_year = from_val
-                            to_year = to_val
-                            from_year = jj_to_full_year(from_year)
-                            to_year = jj_to_full_year(to_year)
+                            # Year - from_val/to_val are already 4-digit
+                            from_year = jj_to_full_year(from_val)
+                            to_year = jj_to_full_year(to_val)
                             
-                            # Now generate range with 4-digit years
+                            # Generate range with 4-digit years
                             if from_year > to_year:
                                 # Century boundary case (wrap across YEAR_MAX/YEAR_MIN)
                                 range_values = list(range(from_year, YEAR_MAX + 1)) + list(range(YEAR_MIN, to_year + 1))
@@ -1617,11 +1607,13 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 
                 if from_val is not None and to_val is not None:
                     if param1_name == 'JJ':
-                        # Year - handle century boundary
-                        if from_val > to_val:
-                            param1_range_values = list(range(from_val, 100)) + list(range(0, to_val + 1))
+                        # Year - values are already 4-digit (jj_to_full_year is a safe no-op)
+                        from_year = jj_to_full_year(from_val)
+                        to_year = jj_to_full_year(to_val)
+                        if from_year > to_year:
+                            param1_range_values = list(range(from_year, YEAR_MAX + 1)) + list(range(YEAR_MIN, to_year + 1))
                         else:
-                            param1_range_values = list(range(from_val, to_val + 1))
+                            param1_range_values = list(range(from_year, to_year + 1))
                     elif param1_name == 'EE':
                         # Halo types - only those defined in i18n
                         valid_ee = set(int(k) for k in i18n.strings['halo_types'].keys())
@@ -1665,11 +1657,13 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 
                 if from_val is not None and to_val is not None:
                     if param2_name == 'JJ':
-                        # Year - handle century boundary
-                        if from_val > to_val:
-                            param2_range_values = list(range(from_val, 100)) + list(range(0, to_val + 1))
+                        # Year - values are already 4-digit (jj_to_full_year is a safe no-op)
+                        from_year = jj_to_full_year(from_val)
+                        to_year = jj_to_full_year(to_val)
+                        if from_year > to_year:
+                            param2_range_values = list(range(from_year, YEAR_MAX + 1)) + list(range(YEAR_MIN, to_year + 1))
                         else:
-                            param2_range_values = list(range(from_val, to_val + 1))
+                            param2_range_values = list(range(from_year, to_year + 1))
                     elif param2_name == 'EE':
                         # Halo types - only those defined in i18n
                         valid_ee = set(int(k) for k in i18n.strings['halo_types'].keys())
@@ -1703,7 +1697,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
     # Convert param1_range_values to string keys for display
     param1_values_to_show = []
     if param1_range_values:
-        param1_values_to_show = [str(v % 100) if param1_name == 'JJ' else str(v) for v in param1_range_values]
+        param1_values_to_show = [str(v) for v in param1_range_values]
     else:
         # Use all param1 values that appear in observations
         param1_values_to_show = sorted(groups.keys())
@@ -1716,7 +1710,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
     # Determine param2 values to show
     param2_values_to_show = []
     if param2_range_values:
-        param2_values_to_show = [str(v % 100) if param2_name == 'JJ' else str(v) for v in param2_range_values]
+        param2_values_to_show = [str(v) for v in param2_range_values]
     else:
         # Use all param2 values that appear in observations
         param2_values_to_show = sorted(param2_from_observations)

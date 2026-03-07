@@ -209,11 +209,10 @@ class ObservationForm {
             return `<option value="${obs.KK}" ${selected}>${obs.KK} - ${escapeHtml(obs.VName || '')} ${escapeHtml(obs.NName || '')}</option>`;
         }).join('');
         
-        // Build year options (0-99: 80-99=1980-1999, 0-79=2000-2079)
-        const yearOptions = Array.from({length: 100}, (_, i) => {
-            const jj = (YEAR_MIN - 1900 + i) % 100;  // 0-99
-            const displayYear = jj < (YEAR_MIN - 1900) ? 2000 + jj : 1900 + jj;
-            return `<option value="${jj}">${displayYear}</option>`;
+        // Build year options (4-digit: 1980-2079)
+        const yearOptions = Array.from({length: YEAR_MAX - YEAR_MIN + 1}, (_, i) => {
+            const year = YEAR_MIN + i;
+            return `<option value="${year}">${year}</option>`;
         }).join('');
         
         const modalHtml = `
@@ -827,7 +826,7 @@ class ObservationForm {
                 // g=0 (Hauptbeobachtungsort): GG = HBOrt (auto-filled from observer)
                 
                 const kk = this.fields.kk.value;
-                const jj = this.fields.jj.value ? parseInt(this.fields.jj.value) % 100 : null;
+                const jj = this.fields.jj.value ? parseInt(this.fields.jj.value) : null;
                 const mm = this.fields.mm.value ? parseInt(this.fields.mm.value) : null;
                 
                 if (kk) {
@@ -871,7 +870,7 @@ class ObservationForm {
                 // g=2 (Nebenbeobachtungsort): GG = NBOrt (auto-filled from observer)
                 
                 const kk = this.fields.kk.value;
-                const jj = this.fields.jj.value ? parseInt(this.fields.jj.value) % 100 : null;
+                const jj = this.fields.jj.value ? parseInt(this.fields.jj.value) : null;
                 const mm = this.fields.mm.value ? parseInt(this.fields.mm.value) : null;
                 
                 if (kk) {
@@ -1516,10 +1515,10 @@ class ObservationForm {
         // Convert KK to 2-digit string with leading zero to match option values
         this.fields.kk.value = obs.KK !== undefined && obs.KK !== null && obs.KK !== '' ? String(obs.KK).padStart(2, '0') : '';
         this.fields.o.value = obs.O || '';
-        // Year: CSV stores 0-99, form displays 0-99
+        // Year: obs['JJ'] is 4-digit, dropdown values are 4-digit
         if (obs.JJ !== undefined && obs.JJ !== null && obs.JJ !== '') {
             const jj = parseInt(obs.JJ);
-            this.fields.jj.value = jj;  // Use JJ directly (0-99)
+            this.fields.jj.value = jj;  // Use JJ directly (4-digit)
         } else {
             this.fields.jj.value = '';
         }
@@ -1567,12 +1566,8 @@ class ObservationForm {
             throw new Error('Invalid observer code (KK)');
         }
         
-        // Year: Convert dropdown value (80-179) back to CSV format (0-99)
+        // Year: dropdown value is 4-digit, use directly
         let jj = parseInt(this.fields.jj.value);
-        if (jj >= 100) {
-            jj = jj - 100;  // 105 -> 5 (2005), 149 -> 49 (2049)
-        }
-        // else: 80-99 stays as is (1980-1999)
         
         return {
             KK: kk,

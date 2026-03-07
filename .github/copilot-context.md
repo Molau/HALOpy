@@ -1600,6 +1600,48 @@ updateOkState();
 
 ---
 
+## Consistent 4-Digit Year (JJ) Handling - Decision #035
+
+- **Date**: 2026-03-08
+- **Status**: ✓ Approved
+- **Scope**: All modules handling the JJ (year) field
+
+### Problem
+
+JJ was stored as 2-digit internally (matching CSV/DB format), requiring scattered manual century-boundary conversions (`jj < 80 ? 2000 + jj : 1900 + jj`) across ~14 files. This was error-prone, inconsistent, and caused sorting issues.
+
+### Decision
+
+**Store JJ as 4-digit (e.g., 1988, 2025) internally everywhere.** Convert only at storage boundaries:
+
+| Boundary | Direction | Conversion |
+|---|---|---|
+| CSV read | 2-digit → 4-digit | `jj_to_full_year()` in `_parse_observation_parts()` |
+| CSV write | 4-digit → 2-digit | `int(obs['JJ']) % 100` in `write_observations()` / `write_to_buffer()` |
+| DB read | 2-digit → 4-digit | `jj_to_full_year()` in `_tuple_to_observation()` |
+| DB write | 4-digit → 2-digit | `to_int_or_none(...) % 100` in `_observation_to_tuple()` |
+| Eing string | 4-digit → 2-digit | `parseInt(jj) % 100` at positions 3-4 |
+| Observer seit | 2-digit in MM/YY format | API normalizes on read/write |
+
+### Helper Functions (constants.py)
+
+- `jj_to_full_year(jj)`: 2-digit → 4-digit (safe no-op for ≥100)
+- `full_year_to_jj(year)`: 4-digit → 2-digit (`year % 100`)
+
+### Benefits
+
+- **Natural sorting**: 4-digit years sort correctly without `CASE WHEN` hacks
+- **No scattered conversions**: Century boundary logic eliminated from UI and business code
+- **Consistent API**: All endpoints send/receive 4-digit years
+- **All dropdowns**: Year selectors show and store 4-digit values (1980–2079)
+
+### Files Modified
+
+Backend: `constants.py`, `csv_handler.py`, `observations.py`, `observations_db.py`, `observers_db.py`, `analysis.py`, `observers.py`
+Frontend: `main.js`, `observation-form.js`, `observation-dialogs.js`, `observation-entry.js`, `annual_stats.js`, `field-constraints.js`, `observer-management.js`, `observations.js`
+
+---
+
 ## Deferred Features
 
 ### Features NOT Yet Approved for Modification

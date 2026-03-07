@@ -219,11 +219,8 @@ def sort_observations(collection: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
     def sort_key(obs: Dict[str, str]) -> Tuple:
         """Generate sort key matching HALO standard."""
-        # Convert 2-digit year to 4-digit for proper sorting
-        jj_full = jj_to_full_year(_int(obs, 'JJ'))
-        
         return (
-            jj_full,              # Year (4-digit)
+            _int(obs, 'JJ'),      # Year (already 4-digit)
             _int(obs, 'MM'),      # Month
             _int(obs, 'TT'),      # Day
             _int(obs, 'ZS'),      # Sun hour
@@ -387,9 +384,9 @@ def filter_observations(collection: List[Dict[str, str]], **criteria) -> List[Di
         if isinstance(year, tuple):
             min_year, max_year = year
             filtered = [obs for obs in filtered
-                       if min_year <= jj_to_full_year(_int(obs, 'JJ')) <= max_year]
+                       if min_year <= _int(obs, 'JJ') <= max_year]
         else:
-            filtered = [obs for obs in filtered if jj_to_full_year(_int(obs, 'JJ')) == year]
+            filtered = [obs for obs in filtered if _int(obs, 'JJ') == year]
     
     # Month filter
     if 'month' in criteria:

@@ -29,9 +29,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!yearSelect) return;
         yearSelect.innerHTML = `<option value="">-- ${i18nStrings.messages.select_prompt} --</option>`;
         for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
-            const yy = String(year % 100).padStart(2, '0');
             const option = document.createElement('option');
-            option.value = yy;
+            option.value = year;
             option.textContent = year;
             yearSelect.appendChild(option);
         }
@@ -80,7 +79,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             return null;
         }
 
-        return { jj: String(parseInt(jj)).padStart(2, '0') };
+        return { jj: String(parseInt(jj)) };
     }
 
     // Apply filter and generate statistics
@@ -159,8 +158,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         // Format year
-        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
-                 `20${data.jj.toString().padStart(2, '0')}`;
+        const year = String(data.jj);
         
         // Set title
         const resultsTitle = document.getElementById('results-modal-title');
@@ -614,8 +612,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!currentStatsData) return;
         
         // Format year
-        const year = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
-                 `20${currentStatsData.jj.toString().padStart(2, '0')}`;
+        const year = String(currentStatsData.jj);
         
         // Set chart title
         const chartTitle = document.getElementById('chart-printable-title-line');
@@ -738,8 +735,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         chartModalLine.show();
         if (!currentStatsData) return;
         
-        const year2 = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
-               `20${currentStatsData.jj.toString().padStart(2, '0')}`;
+        const year2 = String(currentStatsData.jj);
         
         // Set chart title
         const chartTitle2 = document.getElementById('chart-printable-title-bar');
@@ -892,8 +888,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnChartSaveLine.onclick = async () => {
                 if (!window.chartData) return;
                 try {
-                    const year = window.chartData.jj >= (YEAR_MIN-1900) ? `19${window.chartData.jj.toString().padStart(2, '0')}` : 
-                                 `20${window.chartData.jj.toString().padStart(2, '0')}`;
+                    const year = String(window.chartData.jj);
                     const filename = `Jahresstatistik_${year}.png`;
                     
                     const response = await fetch(`/api/annual-stats?jj=${window.chartData.jj}&format=linegraph`);
@@ -947,8 +942,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnChartSaveBar.onclick = async () => {
                 if (!window.chartData) return;
                 try {
-                    const year = window.chartData.jj >= (YEAR_MIN-1900) ? `19${window.chartData.jj.toString().padStart(2, '0')}` : 
-                                 `20${window.chartData.jj.toString().padStart(2, '0')}`;
+                    const year = String(window.chartData.jj);
                     const filename = `Jahresstatistik_${year}_Balken.png`;
                     
                     const response = await fetch(`/api/annual-stats?jj=${window.chartData.jj}&format=bargraph`);
@@ -982,8 +976,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function saveStatistics() {
         if (!currentStatsData) return;
         
-        const year = currentStatsData.jj >= (YEAR_MIN-1900) ? `19${currentStatsData.jj.toString().padStart(2, '0')}` : 
-                 `20${currentStatsData.jj.toString().padStart(2, '0')}`;
+        const year = String(currentStatsData.jj);
         
         // Check output mode
         const modeResponse = await fetch('/api/config/outputmode');

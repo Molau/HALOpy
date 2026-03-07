@@ -346,6 +346,8 @@ async function showUploadDialog() {
         showErrorDialog(i18nStrings.common.error + ': ' + error.message, () => {
             window.navigateInternal('/');
         });
+    } finally {
+        clearMenuHighlights();
     }
 }
 
@@ -831,38 +833,13 @@ async function showDownloadDialog() {
         
         // Close dialog
         modal.hide();
+        clearMenuHighlights();
         
         // Show spinner
         const spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
         
-        // CRITICAL: Get file handle IMMEDIATELY to preserve user activation (both modes!)
-        let fileHandle = null;
-        const useFilePicker = 'showSaveFilePicker' in window;
-        
-        if (useFilePicker) {
-            try {
-                const defaultFilename = downloadAll ? 'halobeo.csv' : 'observations.csv';
-                fileHandle = await window.showSaveFilePicker({
-                    suggestedName: defaultFilename,
-                    types: [{
-                        description: 'CSV files',
-                        accept: {'text/csv': ['.csv']},
-                    }],
-                });
-            } catch (err) {
-                if (err.name === 'AbortError') {
-                    // User cancelled - hide spinner and exit completely
-                    spinner.modal.hide();
-                    setTimeout(() => spinner.modalEl.remove(), 300);
-                    return;
-                }
-                // API error - will fall back to download method
-                fileHandle = null;
-            }
-        }
-        
         try {
-            // Build request
+            // Download first, show file picker only on success
             const downloadUrl = `${cloudServerUrl}/api/file/download`;
             const requestBody = isCloudMode 
                 ? {
@@ -899,49 +876,30 @@ async function showDownloadDialog() {
                     }
                 }
                 
-                // Handle file saving
+                // Hide spinner before file picker
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+                
+                // Handle file saving - show file picker only after successful download
                 const csvContent = result.csv_content;
                 const defaultFilename = result.is_admin && downloadAll
                     ? 'halobeo.csv'
                     : 'observations.csv';
                 
-                if (fileHandle) {
-                    // File handle acquired - write directly (both Cloud and Local Mode)
-                    try {
-                        const writable = await fileHandle.createWritable();
-                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                        await writable.write(blob);
-                        await writable.close();
-                        
-                        // Hide spinner
-                        spinner.modal.hide();
-                        setTimeout(() => spinner.modalEl.remove(), 300);
-                        
-                        // Success notification
-                        const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
-                        showNotification(successMessage, 'success');
-                    } catch (err) {
-                        // Fall back to download method
-                        triggerFileSaveDialog(csvContent, defaultFilename, spinner);
-                        
-                        // Success notification
-                        const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
-                        showNotification(successMessage, 'success');
-                    }
-                } else {
-                    // Local Mode or Cloud Mode fallback - use standard method
-                    triggerFileSaveDialog(csvContent, defaultFilename, spinner);
-                    
-                    // Success notification
-                    const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
-                    showNotification(successMessage, 'success');
-                }
+                triggerFileSaveDialog(csvContent, defaultFilename);
+                
+                // Success notification
+                const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
+                showNotification(successMessage, 'success');
             } else {
                 // Hide spinner on error
                 spinner.modal.hide();
                 setTimeout(() => spinner.modalEl.remove(), 300);
                 
-                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
+                // Dynamic key lookup with i18n fallback
+                const errorKey = result.error || 'unknown_error';
+                const errorMessage = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                showErrorDialog(errorMessage);
             }
         } catch (error) {
             // Hide spinner
@@ -963,6 +921,9 @@ async function showDownloadDialog() {
 
     // Decision #033: setupModalKeyboard for Enter key → OK button
     setupModalKeyboard(modalEl, document.getElementById('btn-download-file'));
+
+    // clearMenuHighlights on close (file menu)
+    modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
 
     // Decision #033: setupModalCleanup for DOM cleanup
     setupModalCleanup(modalEl);
@@ -1789,7 +1750,8 @@ async function showLoadFileDialog() {
         showConfirmDialog(
             i18nStrings.messages.unsaved_changes_title,
             message,
-            () => continueLoadFile()
+            () => continueLoadFile(),
+            () => clearMenuHighlights()
         );
         return;
     }
@@ -1924,6 +1886,7 @@ async function showMergeFileDialog() {
     // Check if a file is loaded (Local Mode only - Cloud Mode doesn't support file merge)
     if (!isCloudMode && !window.haloData.fileName) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
+        clearMenuHighlights();
         return;
     }
     
@@ -1933,7 +1896,8 @@ async function showMergeFileDialog() {
         showConfirmDialog(
             i18nStrings.messages.unsaved_changes_title,
             message,
-            () => continueMergeFile()
+            () => continueMergeFile(),
+            () => clearMenuHighlights()
         );
         return;
     }

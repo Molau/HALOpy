@@ -269,11 +269,10 @@ async function showGroupModifyDialogMenu(filteredObs) {
         return `<option value="${obs.KK}"${selected}>${obs.KK} - ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`;
     }).join('');
     
-    // Build year options (0-99: 80-99=1980-1999, 0-79=2000-2079)
-    const yearOptions = Array.from({length: 100}, (_, i) => {
-        const jj = (YEAR_MIN-1900 + i) % 100;  // 0-99
-        const displayYear = jj < (YEAR_MIN-1900) ? 2000 + jj : 1900 + jj;
-        return `<option value="${jj}">${displayYear}</option>`;
+    // Build year options (4-digit: 1980-2079)
+    const yearOptions = Array.from({length: YEAR_MAX - YEAR_MIN + 1}, (_, i) => {
+        const year = YEAR_MIN + i;
+        return `<option value="${year}">${year}</option>`;
     }).join('');
     
     const modalHtml = `
@@ -1178,8 +1177,9 @@ function kurzausgabe(obs) {
     // O - object type
     first += String(obs.O);
     
-    // JJ - year (2 digits)
-    first += String(Math.floor(obs.JJ / 10)) + String(obs.JJ % 10);
+    // JJ - year (2 digits for eing format)
+    const jj2 = parseInt(obs.JJ) % 100;
+    first += String(Math.floor(jj2 / 10)) + String(jj2 % 10);
     
     // MM - month
     first += String(Math.floor(obs.MM / 10)) + String(obs.MM % 10);
@@ -1828,8 +1828,8 @@ async function showSelectDialog() {
                 
                 // Check for leap year in February
                 if (month === 2) {
-                    const fullYear = year < (YEAR_MIN-1900) ? 2000 + year : 1900 + year;
-                    if (fullYear % 4 === 0) {
+                    // year from dropdown is already 4-digit
+                    if (year % 4 === 0) {
                         maxDay = 29;
                     }
                 }

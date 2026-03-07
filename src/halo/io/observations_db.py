@@ -79,7 +79,8 @@ def _observation_to_tuple(obs: Dict[str, str]) -> Tuple:
     return (
         to_int_or_none(obs.get('KK', '')),
         to_int_or_none(obs.get('O', '')),
-        to_int_or_none(obs.get('JJ', '')),
+        # Convert 4-digit year back to 2-digit for DB storage
+        to_int_or_none(obs.get('JJ', '')) % 100 if to_int_or_none(obs.get('JJ', '')) is not None else None,
         to_int_or_none(obs.get('MM', '')),
         to_int_or_none(obs.get('TT', '')),
         to_int_or_none(obs.get('g', '')),
@@ -151,7 +152,8 @@ def _tuple_to_observation(row: Tuple) -> Dict[str, str]:
     return {
         'KK': to_str(row[0]),
         'O': to_str(row[1]),
-        'JJ': to_str(row[2]),
+        # Convert 2-digit DB year to 4-digit for internal use
+        'JJ': str(jj_to_full_year(int(row[2]))) if row[2] is not None else '',
         'MM': to_str(row[3]),
         'TT': to_str(row[4]),
         'g': to_str(row[5]),
@@ -256,6 +258,14 @@ def load_filtered(**filters) -> List[Dict[str, str]]:
                 else:
                     # All other HALO fields: uppercase with quotes
                     db_field = f'"{field.upper()}"'
+                
+                # Convert 4-digit years to 2-digit for DB comparison
+                if field == 'jj':
+                    if isinstance(value, tuple) and len(value) == 2:
+                        value = (value[0] % 100 if value[0] >= 100 else value[0],
+                                 value[1] % 100 if value[1] >= 100 else value[1])
+                    elif isinstance(value, int) and value >= 100:
+                        value = value % 100
                 
                 if isinstance(value, tuple) and len(value) == 2:
                     # Range filter: (min, max)

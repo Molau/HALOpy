@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from halo.models.constants import jj_to_full_year
+
 
 # Canonical field order for observation CSV files.
 # CSV column order: 23 columns. Note: 8HHHH is a combined field in CSV,
@@ -157,7 +159,9 @@ class ObservationCSV:
         obs = {}
         obs['KK'] = _n(parts[0])
         obs['O'] = _n(parts[1])
-        obs['JJ'] = _n(parts[2])
+        # Convert 2-digit CSV year to 4-digit for internal use
+        jj_raw = _n(parts[2])
+        obs['JJ'] = str(jj_to_full_year(int(jj_raw))) if jj_raw else ''
         obs['MM'] = _n(parts[3])
         obs['TT'] = _n(parts[4])
         obs['g'] = _n(parts[5])
@@ -249,10 +253,13 @@ class ObservationCSV:
                 
                 ho_hu_field = f'8{ho_str}{hu_str}'
                 
+                # Convert 4-digit year back to 2-digit for CSV storage
+                jj_csv = str(int(obs.get('JJ', '0')) % 100) if obs.get('JJ', '') else ''
+                
                 fields = [
                     obs.get('KK', ''),
                     obs.get('O', ''),
-                    obs.get('JJ', ''),
+                    jj_csv,
                     obs.get('MM', ''),
                     obs.get('TT', ''),
                     obs.get('g', ''),
@@ -309,10 +316,13 @@ class ObservationCSV:
             
             ho_hu_field = f'8{ho_str}{hu_str}'
             
+            # Convert 4-digit year back to 2-digit for CSV storage
+            jj_csv = str(int(obs.get('JJ', '0')) % 100) if obs.get('JJ', '') else ''
+            
             fields = [
                 obs.get('KK', ''),
                 obs.get('O', ''),
-                obs.get('JJ', ''),
+                jj_csv,
                 obs.get('MM', ''),
                 obs.get('TT', ''),
                 obs.get('g', ''),

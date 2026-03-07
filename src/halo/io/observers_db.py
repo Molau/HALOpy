@@ -164,8 +164,9 @@ def load_filtered(**filters) -> List[Dict[str, Any]]:
             if jj is not None and mm is not None:
                 # Calculate seit value for observation date
                 # Handle century boundary (YEAR_MIN = 1980, so YEAR_MIN-1900 = 80)
-                year = jj
-                if jj < (YEAR_MIN - 1900):  # Years 00-79 are 2000-2079
+                # Normalize 4-digit year to 2-digit for seit comparison
+                year = jj % 100 if jj >= 100 else jj
+                if year < (YEAR_MIN - 1900):  # Years 00-79 are 2000-2079
                     year += 100
                 obs_seit = mm + 13 * year
                 

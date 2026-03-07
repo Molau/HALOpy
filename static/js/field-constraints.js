@@ -14,7 +14,7 @@
  * 
  * @param {string} kk - Observer code (e.g., '44')
  * @param {number} mm - Month (1-12)
- * @param {number} jj - Year (2-digit: 86 = 1986, 26 = 2026)
+ * @param {number} jj - Year (4-digit: 1986, 2026, etc.)
  * @returns {Promise<boolean>} - True if observer was active at that date
  */
 async function isObserverActive(kk, mm, jj) {
@@ -153,7 +153,7 @@ function calculateFieldConstraints(fieldKey, context) {
                 maxDay = 30;
             } else if (mm === 2) {
                 // February - check for leap year
-                const year = jj > -1 ? (jj < (YEAR_MIN - 1900) ? 2000 + jj : 1900 + jj) : YEAR_MIN;
+                const year = jj > -1 ? jj : YEAR_MIN;
                 maxDay = new Date(year, 2, 0).getDate();  // Days in February
             } else {
                 return [''];

@@ -27,7 +27,7 @@ def jj_to_full_year(jj: int) -> int:
     Convert 2-digit year to 4-digit year using YEAR_MIN cutoff.
 
     Args:
-        jj: 2-digit year (0-99)
+        jj: 2-digit year (0-99), or already 4-digit (passed through unchanged)
 
     Returns:
         4-digit year (e.g., 79 → 2079 if cutoff=80, 80 → 1980)
@@ -35,6 +35,19 @@ def jj_to_full_year(jj: int) -> int:
     if (jj>=100):
         return jj  # Already a full year
     return (2000 + jj) if jj < YEAR_CUTOFF else (1900 + jj)
+
+
+def full_year_to_jj(year: int) -> int:
+    """
+    Convert 4-digit year back to 2-digit year for CSV storage.
+
+    Args:
+        year: 4-digit year (e.g., 1988, 2025)
+
+    Returns:
+        2-digit year (0-99)
+    """
+    return year % 100
 
 # Geographic regions (available region numbers in HALO system)
 # Germany: 1-11, International: 16-17, 19-39
