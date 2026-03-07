@@ -57,7 +57,7 @@ class I18n:
         
         # Inject version info from single source of truth (halo/__init__.py)
         if 'app' in self.strings:
-            self.strings['app']['version'] = __version__
+            self.strings['app']['version'] = '.'.join(__version__.split('.')[:2])
             self.strings['app']['version_date'] = __version_date__
             self.strings['app']['window_title'] = f"HALO {'.'.join(__version__.split('.')[:2])}"
         
