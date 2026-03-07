@@ -116,6 +116,7 @@ async function showAddObservationDialogNumeric() {
     const config = await configResponse.json();
     
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
+    // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
     if (!isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);
         return;
@@ -1050,6 +1051,7 @@ async function showAddObservationDialogMenu() {
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
     
+    // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
     // Check if a file is loaded (Local Mode only - Cloud Mode has database always available)
     if (!isCloudMode && !window.haloData.isLoaded) {
         showWarningModal(i18nStrings.observations.no_file_loaded);

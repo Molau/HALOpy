@@ -12,21 +12,24 @@
   // Expose update repo to frontend
   window.UPDATE_REPO = "{{ update_repo }}";
 
-  // Auto-inject CSRF token into all mutating fetch requests
+  // Auto-inject CSRF token into all mutating fetch requests (same-origin only)
   (function() {
       const originalFetch = window.fetch;
       window.fetch = function(url, options) {
           options = options || {};
           const method = (options.method || 'GET').toUpperCase();
           if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-              const token = document.querySelector('meta[name="csrf-token"]');
-              if (token) {
-                  options.headers = options.headers || {};
-                  // Support both Headers object and plain object
-                  if (options.headers instanceof Headers) {
-                      options.headers.set('X-CSRFToken', token.content);
-                  } else {
-                      options.headers['X-CSRFToken'] = token.content;
+              // Only inject CSRF token for same-origin requests (not cross-origin to cloud server)
+              const requestUrl = new URL(url, window.location.origin);
+              if (requestUrl.origin === window.location.origin) {
+                  const token = document.querySelector('meta[name="csrf-token"]');
+                  if (token) {
+                      options.headers = options.headers || {};
+                      if (options.headers instanceof Headers) {
+                          options.headers.set('X-CSRFToken', token.content);
+                      } else {
+                          options.headers['X-CSRFToken'] = token.content;
+                      }
                   }
               }
           }

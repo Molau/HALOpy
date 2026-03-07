@@ -67,32 +67,36 @@ async function showNewFileDialog() {
         
         if (!resp.ok) {
             const err = await resp.json();
-            // || guards against missing server error text, not an i18n fallback
             showErrorDialog(i18nStrings.common.error + ': ' + (err.error || 'Unknown error'));
             return;
         }
-        
-        // Get the server-created file content (header only) and write to local file
-        const saveResp = await fetch('/api/file/save', { method: 'POST' });
-        if (saveResp.ok) {
-            const blob = await saveResp.blob();
-            const writable = await fileHandle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-        }
-        
-        // Update application state (empty observations list)
-        // Sync state from server (count=0, dirty=false)
-        await refreshFileStatus();
-        
-        showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', escapeHtml(filename))}`, 'success');
+        await finishNewFile(fileHandle, filename);
     } catch (err) {
         if (err.name === 'AbortError') {
             // User cancelled the file picker
             return;
         }
         showErrorDialog(i18nStrings.common.error + ': ' + err.message);
+    } finally {
+        clearMenuHighlights();
     }
+}
+
+async function finishNewFile(fileHandle, filename) {
+    // Get the server-created file content (header only) and write to local file
+    const saveResp = await fetch('/api/file/save', { method: 'POST' });
+    if (saveResp.ok) {
+        const blob = await saveResp.blob();
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+    }
+    
+    // Update application state (empty observations list)
+    // Sync state from server (count=0, dirty=false)
+    await refreshFileStatus();
+    
+    showNotification(`<strong>✓</strong> ${i18nStrings.messages.new_file_created.replace('{0}', escapeHtml(filename))}`, 'success');
 }
 
 // Save file
@@ -154,6 +158,8 @@ async function saveFile() {
         }
     } catch (error) {
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);
+    } finally {
+        clearMenuHighlights();
     }
 }
 
@@ -631,9 +637,11 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 setTimeout(() => uploadSpinner.modalEl.remove(), 300);
             }
             
-            // Upload modal already closed - DON'T try to close it again
-            const errorMsg = i18nStrings.common.error;
-            showErrorDialog(errorMsg + ': ' + error.message);
+            // "Failed to fetch" = cloud server unreachable (CORS or network error)
+            const errorMsg = error.message === 'Failed to fetch'
+                ? i18nStrings.upload_download.server_unreachable_details.replace('{0}', cloudServerUrl)
+                : i18nStrings.common.error + ': ' + error.message;
+            showErrorDialog(errorMsg);
         }
     });
     
@@ -1220,8 +1228,10 @@ async function showObserverUploadDialog() {
                 authModalInstance.hide();
             }
             
-            const errorMsg = i18nStrings.common.error;
-            showErrorDialog(errorMsg + ': ' + error.message);
+            const errorMsg = error.message === 'Failed to fetch'
+                ? i18nStrings.upload_download.server_unreachable_details.replace('{0}', cloudServerUrl)
+                : i18nStrings.common.error + ': ' + error.message;
+            showErrorDialog(errorMsg);
         }
     });
 }

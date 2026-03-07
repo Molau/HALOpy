@@ -92,6 +92,11 @@ function createStandardFooter(cancelText, okText, okType = 'primary', okId = nul
  * @param {HTMLElement} modalEl - The .modal element to auto-cleanup
  */
 function setupModalCleanup(modalEl) {
+    // Blur focused element before hiding to prevent aria-hidden warning
+    modalEl.addEventListener('hide.bs.modal', () => {
+        if (modalEl.contains(document.activeElement)) document.activeElement.blur();
+    }, { once: true });
+
     modalEl.addEventListener('hidden.bs.modal', function cleanup() {
         modalEl.removeEventListener('hidden.bs.modal', cleanup);
         modalEl.remove();

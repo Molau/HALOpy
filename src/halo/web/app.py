@@ -6,7 +6,10 @@ Licensed under MIT License - see LICENSE file for details.
 
 # Standard library imports
 import os
+import socket
+import threading
 import time
+import webbrowser
 from pathlib import Path
 
 # Third-party imports
@@ -278,10 +281,6 @@ def create_app(config=None):
 
 def main():
     """Run development server."""
-    import os as _os
-    import threading
-    import webbrowser
-
     app = create_app()
     print("=" * 60)
     print("HALO Web Application")
@@ -293,8 +292,13 @@ def main():
 
     # Open default browser after a short delay (server needs time to start)
     # Only on first run (debug=True spawns a reloader child process)
-    if _os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
-        threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000')).start()
+    # Skip if a browser is already connected (server was already running)
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        already_running = False
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            already_running = s.connect_ex(('127.0.0.1', 5000)) == 0
+        if not already_running:
+            threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000')).start()
 
     app.run(host='0.0.0.0', port=5000, debug=True)
 

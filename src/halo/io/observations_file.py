@@ -143,9 +143,6 @@ def new_file(filename: str, base_dir: Optional[Path] = None) -> Path:
     """
     filepath = resolve_path(filename, base_dir)
     
-    if filepath.exists():
-        raise FileExistsError(f"File already exists: {filepath}")
-    
     # Create parent directory if needed
     filepath.parent.mkdir(parents=True, exist_ok=True)
     

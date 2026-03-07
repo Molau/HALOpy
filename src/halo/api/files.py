@@ -71,9 +71,6 @@ def new_file() -> Dict[str, Any]:
     
     filepath = obs_file.get_data_path(filename)
     
-    if filepath.exists():
-        return jsonify({'error': 'file_already_exists'}), 400
-    
     try:
         obs_file.new_file(filename)
         
