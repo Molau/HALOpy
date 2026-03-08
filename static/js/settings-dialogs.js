@@ -502,22 +502,15 @@ async function showAusgabeartDialog() {
 // Show change password dialog (cloud mode only)
 window.showChangePasswordDialog = async function showChangePasswordDialog() {
     try {
-        console.debug('[HALO][PW] showChangePasswordDialog entered');
         const i18n = i18nStrings.settings;
         if (!i18n) {
             throw new Error('Missing i18nStrings.settings');
         }
         
         // Check if user is admin
-        console.debug('[HALO][PW] fetching /api/config for password dialog');
         const configResponse = await fetch('/api/config');
-        console.debug('[HALO][PW] /api/config status:', configResponse.status);
         const config = await configResponse.json();
         const isAdmin = config.is_admin || false;
-        console.debug('[HALO][PW] config loaded', {
-            cloud_mode: config.cloud_mode,
-            is_admin: isAdmin
-        });
         
         let modalHtml;
         
@@ -528,7 +521,6 @@ window.showChangePasswordDialog = async function showChangePasswordDialog() {
             const observers = Array.isArray(observersPayload)
                 ? observersPayload
                 : (observersPayload && Array.isArray(observersPayload.observers) ? observersPayload.observers : []);
-            console.debug('[HALO][PW] observers loaded for admin dialog:', observers.length);
             
             const observerOptions = observers.map(obs => 
                 `<option value="${obs.KK}">${obs.KK} - ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`
@@ -604,16 +596,10 @@ window.showChangePasswordDialog = async function showChangePasswordDialog() {
             `;
         }
         
-        console.debug('[HALO][PW] inserting change-password modal HTML');
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         const modalEl = document.getElementById('change-password-modal');
-        console.debug('[HALO][PW] modal element found:', !!modalEl);
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
-        console.debug('[HALO][PW] calling modal.show()');
         modal.show();
-        modalEl.addEventListener('shown.bs.modal', () => {
-            console.debug('[HALO][PW] change-password modal shown');
-        }, { once: true });
         
         setupModalKeyboard(modalEl, document.getElementById('btn-change-password'));
         
@@ -765,10 +751,7 @@ window.showChangePasswordDialog = async function showChangePasswordDialog() {
     } catch (error) {
         console.error('showChangePasswordDialog failed:', error);
         if (typeof showErrorDialog === 'function') {
-            const msg = (i18nStrings && i18nStrings.messages && i18nStrings.messages.error_loading)
-                ? i18nStrings.messages.error_loading
-                : 'Fehler beim Oeffnen des Passwort-Dialogs.';
-            showErrorDialog(msg);
+            showErrorDialog(i18nStrings.messages.error_loading);
         }
     }
 };

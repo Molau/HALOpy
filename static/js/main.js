@@ -642,9 +642,7 @@ function handleMenuAction(action) {
             break;
         case 'settings-change-password':
             highlightMenu('settings');
-            console.debug('[HALO][PW] settings-change-password action triggered');
             if (typeof window.showChangePasswordDialog === 'function') {
-                console.debug('[HALO][PW] showChangePasswordDialog is available, calling');
                 window.showChangePasswordDialog();
             } else {
                 console.error('showChangePasswordDialog is not available');
