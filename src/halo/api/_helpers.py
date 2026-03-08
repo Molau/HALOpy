@@ -10,10 +10,33 @@ Licensed under MIT License - see LICENSE file for details.
 import math
 from typing import Dict, Any
 
-from flask import jsonify, session
+from flask import jsonify, session, Response
 
 from halo.config import is_cloud_mode
 from halo.models.constants import YEAR_MIN, jj_to_full_year
+
+
+def dispatch_format_response(data, output_format: str, formatters: dict):
+    """Dispatch API response based on requested output format.
+
+    Args:
+        data: The data dict to return as JSON for 'json'/'html' formats.
+        output_format: Requested format string (e.g. 'json', 'text', 'markdown', 'linegraph').
+        formatters: Dict mapping format names to callables returning (content, mimetype).
+            The keys 'json' and 'html' are handled automatically.
+
+    Returns:
+        Flask Response object.
+    """
+    if output_format in ('json', 'html'):
+        return jsonify(data)
+
+    if output_format in formatters:
+        content, mimetype = formatters[output_format]()
+        return Response(content, mimetype=mimetype)
+
+    supported = ['json', 'html'] + sorted(formatters.keys())
+    return jsonify({'error': f'Invalid format: {output_format}. Use {", ".join(supported)}.'}), 400
 
 
 def _check_cloud_write_auth(target_kk) -> tuple:

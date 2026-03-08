@@ -16,7 +16,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-from flask import jsonify, request, current_app, Response, g
+from flask import jsonify, request, current_app, g
 
 from halo.api import api_blueprint
 from halo.config import is_cloud_mode
@@ -24,7 +24,7 @@ from halo.models.constants import YEAR_MIN, YEAR_MAX, jj_to_full_year, resolve_h
 from halo.resources.i18n import get_i18n
 import halo.io.observations_db as obs_db
 import halo.io.observers_db as observer_db
-from ._helpers import _int, _obs_to_json, _kurzausgabe, _parse_seit, get_days_in_month
+from ._helpers import _int, _obs_to_json, _kurzausgabe, _parse_seit, dispatch_format_response, get_days_in_month
 
 
 def _format_monthly_report_text(data: Dict[str, Any], i18n) -> str:
@@ -287,22 +287,12 @@ def get_monthly_report() -> Dict[str, Any]:
     
     # Check requested format
     output_format = request.args.get('format', 'json').lower()
-    
-    if output_format in ['json', 'html']:
-        # JSON format and HTML format both return data; HTML is formatted client-side
-        return jsonify(data)
-    elif output_format in ['text', 'markdown']:
-        # Get i18n for formatting
-        i18n = get_i18n()
-        
-        if output_format == 'text':
-            content = _format_monthly_report_text(data, i18n)
-            return Response(content, mimetype='text/plain; charset=utf-8')
-        elif output_format == 'markdown':
-            content = _format_monthly_report_markdown(data, i18n)
-            return Response(content, mimetype='text/markdown; charset=utf-8')
-    else:
-        return jsonify({'error': f'Invalid format: {output_format}. Use json, text, or markdown.'}), 400
+    i18n = get_i18n()
+
+    return dispatch_format_response(data, output_format, {
+        'text': lambda: (_format_monthly_report_text(data, i18n), 'text/plain; charset=utf-8'),
+        'markdown': lambda: (_format_monthly_report_markdown(data, i18n), 'text/markdown; charset=utf-8'),
+    })
 
 
 
@@ -1075,34 +1065,16 @@ def get_monthly_stats() -> Dict[str, Any]:
     
     # Check requested format
     output_format = request.args.get('format', 'json').lower()
-    
-    if output_format in ['json', 'html']:
-        # JSON format and HTML format both return data; HTML is formatted client-side
-        return jsonify(data)
-    elif output_format in ['text', 'markdown']:
-        # Get month name and formatted year for display
-        i18n = get_i18n()
-        month_name = i18n.get(f'months.{mm_int}')
-        year = str(jj_to_full_year(jj_int))
-        
-        if output_format == 'text':
-            content = _format_monthly_stats_text(data, month_name, year, i18n)
-            return Response(content, mimetype='text/plain; charset=utf-8')
-        elif output_format == 'markdown':
-            content = _format_monthly_stats_markdown(data, month_name, year, i18n)
-            return Response(content, mimetype='text/markdown; charset=utf-8')
-    elif output_format == 'linegraph':
-        # Generate PNG line chart
-        i18n = get_i18n()
-        img_data = _generate_monthly_stats_chart(data, mm_int, jj_int, i18n)
-        return Response(img_data, mimetype='image/png')
-    elif output_format == 'bargraph':
-        # Generate PNG bar chart
-        i18n = get_i18n()
-        img_data = _generate_monthly_stats_bar_chart(data, mm_int, jj_int, i18n)
-        return Response(img_data, mimetype='image/png')
-    else:
-        return jsonify({'error': f'Invalid format: {output_format}. Use json, text, markdown, linegraph, or bargraph.'}), 400
+    i18n = get_i18n()
+    month_name = i18n.get(f'months.{mm_int}')
+    year = str(jj_to_full_year(jj_int))
+
+    return dispatch_format_response(data, output_format, {
+        'text': lambda: (_format_monthly_stats_text(data, month_name, year, i18n), 'text/plain; charset=utf-8'),
+        'markdown': lambda: (_format_monthly_stats_markdown(data, month_name, year, i18n), 'text/markdown; charset=utf-8'),
+        'linegraph': lambda: (_generate_monthly_stats_chart(data, mm_int, jj_int, i18n), 'image/png'),
+        'bargraph': lambda: (_generate_monthly_stats_bar_chart(data, mm_int, jj_int, i18n), 'image/png'),
+    })
 
 
 def _generate_monthly_stats_chart(data: Dict[str, Any], mm: int, jj: int, i18n) -> bytes:

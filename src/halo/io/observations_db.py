@@ -17,24 +17,10 @@ except ImportError:
     psycopg2 = None  # type: ignore
 
 from typing import Dict, List, Optional, Tuple
-from halo.models.constants import YEAR_CUTOFF, jj_to_full_year
+from halo.models.constants import YEAR_CUTOFF, ZEITZONE, get_timezone_offset, jj_to_full_year
 from halo.io.db_connection import get_connection
 
 logger = logging.getLogger(__name__)
-
-
-# ========================================
-# Constants
-# ========================================
-
-# Timezone offsets by geographic region (from H_TYPES.PAS)
-# Index 0 = Region 1, Index 1 = Region 2, etc.
-# Values: hour offset to add to CET to get local time
-ZEITZONE = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    2, 10, 0, 0, 1, 1, 0, 0, 0, 0, 0, -1, 0, 0, 0,
-    1, -1, 0, -8, 9
-]
 
 
 # ========================================
@@ -519,25 +505,6 @@ def save_many(observations: List[Dict[str, str]]) -> int:
 # ========================================
 # ANALYSIS Operations
 # ========================================
-
-def _get_timezone_offset(region_code: int) -> int:
-    """
-    Calculate timezone offset (in hours) for a geographic region.
-    
-    Uses the exact Zeitzone array from H_TYPES.PAS (via analysis.js).
-    
-    Args:
-        region_code: Geographic region code (GG field, 1-39)
-    
-    Returns:
-        Hour offset to add to CET to get local time
-    """
-    # Validate region code and return corresponding offset
-    if 1 <= region_code <= 38:
-        return ZEITZONE[region_code - 1]  # Array is 0-indexed, regions are 1-indexed
-    else:
-        return 0  # Default to CET for invalid/missing region codes
-
 
 def build_analysis_sql(params: dict) -> Tuple[str, List]:
     """

@@ -13,7 +13,7 @@ import traceback
 from collections import defaultdict
 from typing import Dict, Any
 
-from flask import jsonify, request, current_app, Response, session, g
+from flask import jsonify, request, current_app, session, g
 
 from halo.api import api_blueprint
 from halo.config import is_cloud_mode
@@ -23,6 +23,7 @@ from halo.models.constants import (
     YEAR_CUTOFF,
     YEAR_MIN,
     YEAR_MAX,
+    get_timezone_offset,
     jj_to_full_year,
     resolve_halo_type,
     calculate_halo_activity,
@@ -38,7 +39,7 @@ import halo.io.observations_db as obs_db
 import halo.io.observers_db as observer_db
 from ._helpers import (
     _int, _parse_seit, calculate_solar_altitude,
-    get_observer_coordinates, get_days_in_month,
+    dispatch_format_response, get_observer_coordinates, get_days_in_month,
 )
 
 
@@ -398,29 +399,14 @@ def get_annual_stats() -> Dict[str, Any]:
     # Check requested format
     output_format = request.args.get('format', 'json').lower()
     i18n = get_i18n()
-    
-    if output_format in ['json', 'html']:
-        # JSON format and HTML format both return data; HTML is formatted client-side
-        return jsonify(data)
-    elif output_format in ['text', 'markdown']:
-        # Get formatted year for display (jj_int is already 4-digit)
-        year = str(jj_int)
-        if output_format == 'text':
-            content = _format_annual_stats_text(data, year, i18n)
-            return Response(content, mimetype='text/plain; charset=utf-8')
-        elif output_format == 'markdown':
-            content = _format_annual_stats_markdown(data, year, i18n)
-            return Response(content, mimetype='text/markdown; charset=utf-8')
-    elif output_format == 'linegraph':
-        # Generate PNG line chart
-        img_data = _generate_annual_stats_chart(data, jj_int, i18n)
-        return Response(img_data, mimetype='image/png')
-    elif output_format == 'bargraph':
-        # Generate PNG bar chart
-        img_data = _generate_annual_stats_bar_chart(data, jj_int, i18n)
-        return Response(img_data, mimetype='image/png')
-    else:
-        return jsonify({'error': f'Invalid format: {output_format}. Use json, text, markdown, linegraph, or bargraph.'}), 400
+    year = str(jj_int)
+
+    return dispatch_format_response(data, output_format, {
+        'text': lambda: (_format_annual_stats_text(data, year, i18n), 'text/plain; charset=utf-8'),
+        'markdown': lambda: (_format_annual_stats_markdown(data, year, i18n), 'text/markdown; charset=utf-8'),
+        'linegraph': lambda: (_generate_annual_stats_chart(data, jj_int, i18n), 'image/png'),
+        'bargraph': lambda: (_generate_annual_stats_bar_chart(data, jj_int, i18n), 'image/png'),
+    })
 
 
 
@@ -649,35 +635,41 @@ def _apply_filter(observations, param_name, param_value, all_params, prefix):
     return result
 
 
-def _get_timezone_offset(region_code):
-    """Calculate timezone offset (in hours) for a geographic region.
-    
-    Args:
-        region_code: Geographic region code (GG field, 1-39)
-    
-    Returns:
-        Hour offset to add to CET to get local time
+def _expand_c_type(c_value) -> list[str]:
+    """Expand combined cirrus types C4-C7 into individual component types.
+
+    C4 (Ci+Cc)→[1,2], C5 (Ci+Cs)→[1,3], C6 (Cc+Cs)→[2,3], C7 (Ci+Cc+Cs)→[1,2,3].
+    Other values are returned unchanged as a single-element list.
     """
-    try:
-        region = int(region_code)
-    except (ValueError, TypeError):
-        return 0
-    
-    # Asia regions (15-26)
-    if 15 <= region <= 20:
-        return 4
-    elif 21 <= region <= 26:
-        return 7
-    
-    # Americas regions (27-34)
-    elif 27 <= region <= 30:
-        return -6
-    elif 31 <= region <= 34:
-        return -4
-    
-    # Europe and other regions (1-14, 35-39)
-    else:
-        return 0
+    c_value = int(c_value) if isinstance(c_value, (int, str)) else c_value
+    if c_value == 4:
+        return ['1', '2']
+    elif c_value == 5:
+        return ['1', '3']
+    elif c_value == 6:
+        return ['2', '3']
+    elif c_value == 7:
+        return ['1', '2', '3']
+    return [str(c_value)]
+
+
+def _resolve_sector_list(obs: dict) -> list[str]:
+    """Resolve sector octant letters for an observation.
+
+    V=2 + circular halo type: all 8 segments a-h are visible.
+    V=1 + circular halo type: parse sectors field.
+    Non-circular or other V values: empty list.
+    """
+    v = _int(obs, 'V', -1)
+    ee = _int(obs, 'EE', -1)
+    is_circular = ee in CIRCULAR_HALOS if ee != -1 else False
+    if is_circular:
+        if v == 2:
+            return ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+        elif v == 1:
+            letters = _extract_sector_letters(obs.get('sectors', ''))
+            return letters if letters else []
+    return []
 
 
 def _extract_sector_letters(sector_str: str) -> list[str]:
@@ -1043,7 +1035,7 @@ def _matches_parameter(obs, param_name, param_value, all_params, prefix):
             use_local = all_params.get(timezone_key) == 'local'
             if use_local:
                 region_code = _int(obs, 'GG')
-                offset = _get_timezone_offset(region_code)
+                offset = get_timezone_offset(region_code)
                 obs_value = (obs_value + offset) % 24
     elif param_name == 'SH':
         # Solar altitude - must be calculated (only for sun observations at known locations)
@@ -1173,7 +1165,7 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
             # Apply timezone conversion if needed
             if value is not None and use_local:
                 region_code = _int(obs, 'GG')
-                offset = _get_timezone_offset(region_code)
+                offset = get_timezone_offset(region_code)
                 value = (value + offset) % 24
         elif param_name == 'SH':
             # Solar altitude - must be calculated (only for sun observations at known locations)
@@ -1200,24 +1192,9 @@ def _group_by_parameter(observations, param_name, all_params, prefix):
             split_key = f'{prefix}_c_split'
             if value is not None and all_params.get(split_key):
                 # When split is enabled, expand C4/C5/C6/C7 into components
-                c_value = int(value) if isinstance(value, (int, str)) else value
-                if c_value == 4:  # C4 (Ci + Cc) → count as both C1 and C2
-                    groups['1'] += 1
-                    groups['2'] += 1
-                    value = None  # Don't count again below
-                elif c_value == 5:  # C5 (Ci + Cs) → count as both C1 and C3
-                    groups['1'] += 1
-                    groups['3'] += 1
-                    value = None  # Don't count again below
-                elif c_value == 6:  # C6 (Cc + Cs) → count as both C2 and C3
-                    groups['2'] += 1
-                    groups['3'] += 1
-                    value = None  # Don't count again below
-                elif c_value == 7:  # C7 (Ci + Cc + Cs) → count as C1, C2, and C3
-                    groups['1'] += 1
-                    groups['2'] += 1
-                    groups['3'] += 1
-                    value = None  # Don't count again below
+                for comp in _expand_c_type(value):
+                    groups[comp] += 1
+                value = None  # Don't count again below
         elif param_name == 'EE':
             # Halo type with split option
             value = obs.get('EE')
@@ -1438,14 +1415,14 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             use_local = all_params.get('param1_timezone') == 'local'
             if use_local:
                 region_code = _int(obs, 'GG')
-                offset = _get_timezone_offset(region_code)
+                offset = get_timezone_offset(region_code)
                 val1 = (val1 + offset) % 24
         
         if param2_name == 'ZZ' and val2 is not None:
             use_local = all_params.get('param2_timezone') == 'local'
             if use_local:
                 region_code = _int(obs, 'GG')
-                offset = _get_timezone_offset(region_code)
+                offset = get_timezone_offset(region_code)
                 val2 = (val2 + offset) % 24
         
         # Handle C (cirrus) splitting for param1
@@ -1454,31 +1431,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
             # bei Sektoren-Zählung (z.B. 'c': 66197 vs 66193, Differenz: 4 Beobachtungen)
             # Vermutlich unterschiedliches Whitespace-Handling zwischen Python regex
             # und PostgreSQL regexp_split_to_table. Muss später untersucht werden.
-            # 
-            # Sectors: count octants present or visible
-            # V=2 + circular halo type: all 8 segments a-h are visible
-            # V=1 + circular halo type: parse sectors field
-            # Non-circular halos: should NOT have sectors (would be error)
-            v = _int(obs, 'V', -1)
-            ee = _int(obs, 'EE', -1)
-            
-            # Check if this is a circular halo type
-            is_circular = ee in CIRCULAR_HALOS if ee != -1 else False
-            
-            if is_circular:
-                if v == 2:
-                    # V=2 + circular: all 8 segments visible
-                    val1_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-                elif v == 1:
-                    # V=1 + circular: parse sectors field
-                    sector_letters = _extract_sector_letters(obs.get('sectors', ''))
-                    val1_list = sector_letters if sector_letters else []
-                else:
-                    # Other V values: skip
-                    val1_list = []
-            else:
-                # Non-circular halos: no sectors
-                val1_list = []
+            val1_list = _resolve_sector_list(obs)
         elif param1_name == 'HO_HU':
             ho = _int(obs, 'HO', -1)
             hu = _int(obs, 'HU', -1)
@@ -1493,17 +1446,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 hohu_debug['samples'].append({'obs': obs.get('KK'), 'ho': ho, 'hu': hu, 'val1_list': list(val1_list)})
             hohu_debug['processed'] += 1
         elif param1_name == 'C' and val1 is not None and all_params.get('param1_c_split'):
-            c_value = int(val1) if isinstance(val1, (int, str)) else val1
-            if c_value == 4:  # C4 (Ci + Cc) → count as both C1 and C2
-                val1_list = ['1', '2']
-            elif c_value == 5:  # C5 (Ci + Cs) → count as both C1 and C3
-                val1_list = ['1', '3']
-            elif c_value == 6:  # C6 (Cc + Cs) → count as both C2 and C3
-                val1_list = ['2', '3']
-            elif c_value == 7:  # C7 (Ci + Cc + Cs) → count as C1, C2, and C3
-                val1_list = ['1', '2', '3']
-            else:
-                val1_list = [str(c_value)]
+            val1_list = _expand_c_type(val1)
         # Handle EE (halo) splitting for param1
         elif param1_name == 'EE' and val1 is not None and all_params.get('param1_ee_split'):
             ee_value = int(val1) if isinstance(val1, (int, str)) else val1
@@ -1517,30 +1460,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
         
         # Handle C (cirrus) splitting for param2
         if param2_name == 'SE':
-            # Sectors: count octants present or visible
-            # V=2 + circular halo type: all 8 segments a-h are visible
-            # V=1 + circular halo type: parse sectors field
-            # Non-circular halos: should NOT have sectors (would be error)
-            v = _int(obs, 'V', -1)
-            ee = _int(obs, 'EE', -1)
-            
-            # Check if this is a circular halo type
-            is_circular = ee in CIRCULAR_HALOS if ee != -1 else False
-            
-            if is_circular:
-                if v == 2:
-                    # V=2 + circular: all 8 segments visible
-                    val2_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-                elif v == 1:
-                    # V=1 + circular: parse sectors field
-                    sector_letters = _extract_sector_letters(obs.get('sectors', ''))
-                    val2_list = sector_letters if sector_letters else []
-                else:
-                    # Other V values: skip
-                    val2_list = []
-            else:
-                # Non-circular halos: no sectors
-                val2_list = []
+            val2_list = _resolve_sector_list(obs)
         elif param2_name == 'HO_HU':
             ho = _int(obs, 'HO', -1)
             hu = _int(obs, 'HU', -1)
@@ -1555,17 +1475,7 @@ def _group_by_two_parameters(observations, param1_name, param2_name, all_params)
                 hohu_debug['samples'].append({'obs': obs.get('KK'), 'ho': ho, 'hu': hu, 'val2_list': list(val2_list)})
             hohu_debug['processed'] += 1
         elif param2_name == 'C' and val2 is not None and all_params.get('param2_c_split'):
-            c_value = int(val2) if isinstance(val2, (int, str)) else val2
-            if c_value == 4:  # C4 (Ci + Cc) → count as both C1 and C2
-                val2_list = ['1', '2']
-            elif c_value == 5:  # C5 (Ci + Cs) → count as both C1 and C3
-                val2_list = ['1', '3']
-            elif c_value == 6:  # C6 (Cc + Cs) → count as both C2 and C3
-                val2_list = ['2', '3']
-            elif c_value == 7:  # C7 (Ci + Cc + Cs) → count as C1, C2, and C3
-                val2_list = ['1', '2', '3']
-            else:
-                val2_list = [str(c_value)]
+            val2_list = _expand_c_type(val2)
         # Handle EE (halo) splitting for param2
         elif param2_name == 'EE' and val2 is not None and all_params.get('param2_ee_split'):
             ee_value = int(val2) if isinstance(val2, (int, str)) else val2
