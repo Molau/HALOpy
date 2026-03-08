@@ -167,7 +167,7 @@ This menu provides the current settings. All changes are saved immediately and t
 
   * 'Fixed Observer': Default observer setting for input and output masks (e.g., monthly report).
   * 'Active Observers': Lists and analyses optionally limited to active observers or showing all.
-  * 'File': Optionally load a specific CSV file automatically at program startup.
+  * 'Fixed File': Optionally load a specific CSV file automatically at program startup.
   * 'Date': Choose default for date prompts: none, current month, previous month, or constant month (with month/year selection).
   * 'Input Mode': Preset menu entries (guided forms) or numeric entries (key line) for observation dialogs.
   * 'Output Mode': Choose text format for monthly report/statistics, annual statistics, and analysis: HTML tables, pseudographics, or Markdown (CSV/TXT/MD accordingly).

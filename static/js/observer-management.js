@@ -1263,7 +1263,6 @@ async function showEditSiteDialog(observer) {
 }
 
 async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
-    const site = sites[currentIndex];
     const options = generateSiteFormOptions();
     
     const modalHtml = `
@@ -1279,7 +1278,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
                         <form id="edit-site-confirm-form">
                             ${generateSiteFormFields('confirm-edit-site-', options, { disabled: true, showRequired: false })}
                         </form>
-                        <p class="text-muted small mt-2">${i18nStrings.observers.delete_site_info.replace('{0}', currentIndex + 1).replace('{1}', sites.length)}</p>
+                        <p class="text-muted small mt-2" id="edit-site-confirm-counter">${i18nStrings.observers.delete_site_info.replace('{0}', currentIndex + 1).replace('{1}', sites.length)}</p>
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
@@ -1294,8 +1293,20 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     const modalEl = document.getElementById('edit-site-confirm-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
+    const renderCurrentSite = () => {
+        const site = sites[currentIndex];
+        populateSiteForm('confirm-edit-site-', site);
+
+        const counterEl = document.getElementById('edit-site-confirm-counter');
+        if (counterEl) {
+            counterEl.textContent = i18nStrings.observers.delete_site_info
+                .replace('{0}', currentIndex + 1)
+                .replace('{1}', sites.length);
+        }
+    };
+
     // Pre-fill form with existing values (disabled)
-    populateSiteForm('confirm-edit-site-', site);
+    renderCurrentSite();
     
     modal.show();
     
@@ -1305,14 +1316,12 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     
     // Handle "No" button - show next site or close
     document.getElementById('btn-edit-site-no').addEventListener('click', () => {
+        if (currentIndex < sites.length - 1) {
+            currentIndex += 1;
+            renderCurrentSite();
+            return;
+        }
         modal.hide();
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            modalEl.remove();
-            if (currentIndex < sites.length - 1) {
-                // Show next site
-                showEditSiteConfirmDialog(observer, sites, currentIndex + 1);
-            }
-        });
     });
     
     // Handle "Yes" button - show editable form
@@ -1447,7 +1456,6 @@ async function showDeleteSiteDialog(observer) {
 }
 
 async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
-    const site = sites[currentIndex];
     const options = generateSiteFormOptions();
     
     const modalHtml = `
@@ -1476,8 +1484,13 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     const modalEl = document.getElementById('delete-site-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
+    const renderCurrentSite = () => {
+        const site = sites[currentIndex];
+        populateSiteForm('delete-site-', site);
+    };
+
     // Pre-fill form with existing values (disabled)
-    populateSiteForm('delete-site-', site);
+    renderCurrentSite();
     
     modal.show();
     
@@ -1487,19 +1500,18 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     
     // Handle "No" button - show next site or close
     document.getElementById('btn-delete-site-no').addEventListener('click', () => {
+        if (currentIndex < sites.length - 1) {
+            currentIndex += 1;
+            renderCurrentSite();
+            return;
+        }
         modal.hide();
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            modalEl.remove();
-            if (currentIndex < sites.length - 1) {
-                // Show next site
-                showDeleteSiteConfirmDialog(observer, sites, currentIndex + 1);
-            }
-        });
     });
     
     // Handle "Yes" button - delete the site
     document.getElementById('btn-delete-site-yes').addEventListener('click', async () => {
         try {
+            const site = sites[currentIndex];
             const resp = await fetch(`/api/observers/${observer.KK}/sites`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },

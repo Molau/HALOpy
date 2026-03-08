@@ -167,7 +167,7 @@ Dieses Menü stellt die aktuellen Voreinstellungen bereit. Alle Änderungen werd
 
   * 'fester Beobachter': Voreinstellung des Beobachters für Eingabe- und Ausgabemasken (z.B. Monatsmeldung).
   * 'aktive Beobachter': Listen und Auswertungen wahlweise auf aktive Beobachter beschränken oder alle anzeigen.
-  * 'Datei': Optional eine bestimmte CSV-Datei beim Programmstart automatisch laden.
+  * 'feste Datei': Optional eine bestimmte CSV-Datei beim Programmstart automatisch laden.
   * 'Datum': Voreinstellung für Datumsprompts wählen: keine, aktueller Monat, Vormonat oder konstanter Monat (mit Monat/Jahr-Auswahl).
   * 'Eingabeart': Menüeingaben (geführte Formulare) oder Zahleneingaben (Schlüsselzeile) für Beobachtungsdialoge voreinstellen.
   * 'Ausgabeart': Textformat für Monatsmeldung/‑statistik/Jahresstatistik und Analyse wählen: HTML-Tabellen, Pseudografik oder Markdown (entsprechend werden CSV/TXT/MD erzeugt).

@@ -16,6 +16,7 @@ Python web application for maintenance of halo observations, modernized from the
 - Responsive web interface
 - Multi-language support (German/English)
 - Works on desktop, tablet, and mobile
+- Settings menu path for startup-file configuration: `Einstellungen -> feste Datei` (EN: `Settings -> Fixed File`)
 
 ### MCP Integration
 HALOpy provides **MCP-ready API endpoints** for generating statistics charts programmatically:

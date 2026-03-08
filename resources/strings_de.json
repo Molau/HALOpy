@@ -535,7 +535,7 @@
     "no_fixed_observer": "-- kein fester Beobachter --",
     "active_observers": "Aktive Beobachter",
     "active_observers_question": "Sollen nur aktive Beobachter angezeigt werden?",
-    "startup_file": "Datei",
+    "startup_file": "feste Datei",
     "startup_file_title": "Datei beim Start laden",
     "startup_file_question": "Soll beim Programmstart automatisch eine Datei geladen werden?",
     "startup_file_no_file": "Keine Datei laden",

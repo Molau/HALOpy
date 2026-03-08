@@ -245,13 +245,7 @@ async function showAddObservationDialogNumeric() {
         document.removeEventListener('click', handleDocumentClick);
     });
 
-    // Enter key triggers OK button
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('btn-add-obs-ok').click();
-        }
-    });
+    // Enter handling is centralized via setupModalKeyboard(modalEl, okButton)
 
     function renderNumericGuide(s) {
         const enteredEl = document.getElementById('obs-guide-entered');
@@ -982,12 +976,19 @@ async function showAddObservationDialogNumeric() {
         ev.preventDefault();
     } // End of handleKeydownEvent function
 
+    let isSubmittingObservation = false;
+
     document.getElementById('btn-add-obs-ok').addEventListener('click', async () => {
+        if (isSubmittingObservation) {
+            return;
+        }
+        isSubmittingObservation = true;
         try {
             const obs = parseNumericObservation(eing);
             if (!obs) {
                 errEl.textContent = i18nStrings.observations.input_incomplete;
                 errEl.style.display = 'block';
+                isSubmittingObservation = false;
                 return;
             }
             const resp = await fetch('/api/observations', {
@@ -1000,6 +1001,7 @@ async function showAddObservationDialogNumeric() {
                 // Duplicate observation
                 errEl.textContent = i18nStrings.observations.error_observation_exists;
                 errEl.style.display = 'block';
+                isSubmittingObservation = false;
                 return;
             }
             
@@ -1034,6 +1036,7 @@ async function showAddObservationDialogNumeric() {
         } catch (e) {
             errEl.textContent = e.message;
             errEl.style.display = 'block';
+            isSubmittingObservation = false;
         }
     });
 

@@ -1127,6 +1127,8 @@ These are NOT decisions - they are fixed requirements from the HALO key observat
 1. Cancel/No button (if present)
 2. OK/Yes button (rightmost, primary action)
 3. Additional secondary buttons (Print, Save, etc.) go between Cancel and OK
+4. Navigation buttons (e.g., Previous/Next) MUST be placed after Cancel
+5. Required navigation order example: `Cancel, Previous, Next` (never `Previous, Cancel, Next`)
 
 **Example HTML**:
 ```html

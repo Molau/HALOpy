@@ -164,6 +164,66 @@ class ObservationForm {
         }
         setupModalKeyboard(this.modalElement, confirmBtn);
     }
+
+    /**
+     * Fast in-place navigation for view/edit/delete sequences.
+     * Reuses the already visible modal and only refreshes content/state.
+     */
+    navigateTo(observation, currentNum, totalNum) {
+        if (!this.modalElement || !document.body.contains(this.modalElement)) {
+            return;
+        }
+        if (!observation || !['view', 'edit', 'delete'].includes(this.mode)) {
+            return;
+        }
+
+        this.originalObservation = observation;
+        this.currentNum = currentNum;
+        this.totalNum = totalNum;
+        this.saved = false;
+        this.skipped = false;
+        this.navigating = false;
+        this.noButtonPressed = false;
+        this.isEditingMode = false;
+
+        const titleEl = this.modalElement.querySelector('.modal-title');
+        if (titleEl) {
+            const baseTitle = this.customTitle ||
+                (this.mode === 'edit' ? i18nStrings.observations.modify_question :
+                 this.mode === 'delete' ? i18nStrings.observations.delete_question :
+                 i18nStrings.observations.display_title);
+            titleEl.textContent = `${baseTitle} (${currentNum}/${totalNum})`;
+        }
+
+        this.populateFields(observation);
+        this.disableAllFields();
+
+        const errEl = document.getElementById('obs-form-error');
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+
+        const yesBtn = document.getElementById('btn-obs-form-yes');
+        const okBtn = document.getElementById('btn-obs-form-ok');
+        const prevBtn = document.getElementById('btn-obs-form-prev');
+        const nextBtn = document.getElementById('btn-obs-form-next');
+
+        if (yesBtn) {
+            yesBtn.style.display = '';
+        }
+        if (okBtn) {
+            okBtn.style.display = 'none';
+        }
+        if (prevBtn) {
+            prevBtn.style.display = '';
+            prevBtn.disabled = currentNum <= 1;
+        }
+        if (nextBtn) {
+            nextBtn.style.display = '';
+            nextBtn.disabled = currentNum >= totalNum;
+        }
+    }
     
     /**
      * Helper method to hide the modal without aria-hidden warnings
@@ -231,22 +291,22 @@ class ObservationForm {
                         </div>
                         <div class="modal-footer py-1">
                             ${this.mode === 'view' ? `
-                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
                             ` : ''}
                             ${this.mode === 'edit' ? `
-                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" style="display:none;" disabled>${i18nStrings.common.ok}</button>
                             ` : ''}
                             ${this.mode === 'delete' ? `
+                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-cancel" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>
-                                <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-cancel" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" style="display:none;" disabled>${i18nStrings.common.ok}</button>
                             ` : ''}
                             ${this.mode === 'add' ? `
@@ -1325,8 +1385,6 @@ class ObservationForm {
         // Next button - works in view, edit, and delete modes
         if (nextBtn) {
             nextBtn.addEventListener('click', () => {
-                this.navigating = true;
-                this.hideModal();
                 if (this.mode === 'view' && this.onYes) {
                     this.onYes(); // Next in view mode
                 } else if (this.mode === 'delete' && this.onNo) {
@@ -1350,8 +1408,6 @@ class ObservationForm {
         // Previous button - works in view, edit, and delete modes
         if (prevBtn) {
             prevBtn.addEventListener('click', () => {
-                this.navigating = true;
-                this.hideModal();
                 if (this.mode === 'view' && this.onNo) {
                     this.onNo(); // Previous in view mode
                 } else if ((this.mode === 'edit' || this.mode === 'delete') && this.onNo) {

@@ -535,7 +535,7 @@
     "no_fixed_observer": "-- no fixed observer --",
     "active_observers": "Active Observers",
     "active_observers_question": "Shall only active observers be displayed?",
-    "startup_file": "File",
+    "startup_file": "Fixed File",
     "startup_file_title": "Load File on Startup",
     "startup_file_question": "Shall a file be loaded automatically on program start?",
     "startup_file_no_file": "No file",

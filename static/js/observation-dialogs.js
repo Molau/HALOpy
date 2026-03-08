@@ -148,21 +148,10 @@ async function showModifySingleObservations(filterState) {
     
     // Show observations one by one in edit form
     let currentIndex = 0;
-    
-    const showObservationAt = async (index) => {
-        if (index < 0) {
-            index = 0;
-        }
-        if (index >= filteredObs.length) {
-            // All observations processed - return to main menu
-            window.navigateInternal('/');
-            return;
-        }
-        
-        currentIndex = index;
-        const obs = filteredObs[currentIndex];
-        
-        form.show('edit', obs, async (modifiedObs) => {
+    let isFormShown = false;
+
+    const onSave = async (modifiedObs) => {
+            const obs = filteredObs[currentIndex];
             // Delete the old observation and insert the modified one
             try {
                 // First, delete the old observation from server
@@ -204,22 +193,43 @@ async function showModifySingleObservations(filterState) {
                 window.navigateInternal('/');
             } catch (e) {showErrorDialog(i18nStrings.common.error + ': ' + e.message);
             }
-        }, () => {
-            // Cancel - return to main
+    };
+
+    const onNext = () => {
+        currentIndex += 1;
+        showObservationAt(currentIndex);
+    };
+
+    const onPrev = () => {
+        currentIndex -= 1;
+        showObservationAt(currentIndex);
+    };
+
+    const onCancel = () => {
+        window.navigateInternal('/');
+    };
+
+    const showObservationAt = async (index) => {
+        if (index < 0) {
+            index = 0;
+        }
+        if (index >= filteredObs.length) {
+            // All observations processed - return to main menu
+            form.navigating = true;
+            form.hideModal();
             window.navigateInternal('/');
-        }, currentIndex + 1, filteredObs.length, null, 
-        () => {
-            // Next button pressed - skip to next observation
-            showObservationAt(currentIndex + 1);
-        },
-        () => {
-            // Previous button pressed - go to previous observation
-            showObservationAt(currentIndex - 1);
-        },
-        () => {
-            // Cancel button - return to main
-            window.navigateInternal('/');
-        });
+            return;
+        }
+
+        currentIndex = index;
+        const obs = filteredObs[currentIndex];
+
+        if (!isFormShown) {
+            form.show('edit', obs, onSave, onCancel, currentIndex + 1, filteredObs.length, null, onNext, onPrev, onCancel);
+            isFormShown = true;
+        } else {
+            form.navigateTo(obs, currentIndex + 1, filteredObs.length);
+        }
     };
     
     showObservationAt(0);
@@ -660,16 +670,20 @@ async function showDeleteSingleObservations(filterState) {
     await form.initialize('delete');
 
     let currentIndex = 0;
+    let isFormShown = false;
 
     const showNextObservation = async () => {
         if (currentIndex >= filteredObs.length) {
+            form.navigating = true;
+            form.hideModal();
             window.navigateInternal('/');
             return;
         }
 
         const obs = filteredObs[currentIndex];
 
-        form.show('delete', obs, null, null, currentIndex + 1, filteredObs.length, i18nStrings.observations.delete_question, async () => {
+        if (!isFormShown) {
+            form.show('delete', obs, null, null, currentIndex + 1, filteredObs.length, i18nStrings.observations.delete_question, async () => {
             // Yes -> delete
             try {
                 // Delete on server
@@ -700,6 +714,9 @@ async function showDeleteSingleObservations(filterState) {
                 
                 // Continue to next observation (longer delay to let message show)
                 currentIndex += 1;
+                // Modal is closed by ObservationForm after Yes callback returns.
+                // Re-open fresh for the next observation.
+                isFormShown = false;
                 setTimeout(() => showNextObservation(), 2500);
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
                 window.navigateInternal('/');
@@ -712,6 +729,10 @@ async function showDeleteSingleObservations(filterState) {
             // Cancel -> return to main
             window.navigateInternal('/');
         });
+            isFormShown = true;
+        } else {
+            form.navigateTo(obs, currentIndex + 1, filteredObs.length);
+        }
     };
 
     showNextObservation();
@@ -1350,28 +1371,37 @@ async function showDisplaySingleObservations(filterState) {
     await form.initialize('view');
     
     let currentIndex = 0;
-    
+    let isFormShown = false;
+
     const showNext = () => {
         if (currentIndex >= filteredObs.length) {
+            form.navigating = true;
+            form.hideModal();
             window.navigateInternal('/');
             return;
         }
         
         const obs = filteredObs[currentIndex];
-        form.show('view', obs, null, null, currentIndex + 1, filteredObs.length, null, () => {
-            // Next button
-            currentIndex++;
-            showNext();
-        }, () => {
-            // Previous button
-            if (currentIndex > 0) {
-                currentIndex--;
+
+        if (!isFormShown) {
+            form.show('view', obs, null, null, currentIndex + 1, filteredObs.length, null, () => {
+                // Next button
+                currentIndex++;
                 showNext();
-            }
-        }, () => {
-            // Cancel/Close - return to main
-            window.navigateInternal('/');
-        });
+            }, () => {
+                // Previous button
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    showNext();
+                }
+            }, () => {
+                // Cancel/Close - return to main
+                window.navigateInternal('/');
+            });
+            isFormShown = true;
+        } else {
+            form.navigateTo(obs, currentIndex + 1, filteredObs.length);
+        }
     };
     
     showNext();
