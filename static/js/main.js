@@ -502,11 +502,17 @@ async function getDateDefault() {
 
 // Setup hover dropdowns
 function setupHoverDropdowns() {
+    // On touch devices, hover interactions cause a two-tap UX (first tap = hover state).
+    // Keep Bootstrap's default tap-to-open behavior there.
+    const supportsHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (!supportsHover) {
+        return;
+    }
+
     const dropdowns = document.querySelectorAll('.nav-item.dropdown');
     
     dropdowns.forEach(dropdown => {
         const toggle = dropdown.querySelector('.dropdown-toggle');
-        const menu = dropdown.querySelector('.dropdown-menu');
         let timeoutId;
         
         dropdown.addEventListener('mouseenter', () => {
