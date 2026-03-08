@@ -205,7 +205,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupLanguageSwitcher();
     setupMenuHandlers();
     setupHoverDropdowns();
-    setupMenuHoverHighlightBehavior();
     
     // Clear menu highlights if on main page
     if (window.location.pathname === '/') {
@@ -352,6 +351,8 @@ function setupMenuHoverHighlightBehavior() {
     if (!nav) return;
 
     const deactivateOtherMenuHighlights = (currentTitle = null) => {
+        const currentItem = currentTitle ? currentTitle.closest('.nav-item') : null;
+
         nav.querySelectorAll('.menu-title').forEach(title => {
             if (title !== currentTitle) {
                 title.classList.remove('active', 'hover-active', 'show');
@@ -365,8 +366,35 @@ function setupMenuHoverHighlightBehavior() {
                 if (instance) {
                     instance.hide();
                 }
+
+                // Defensive cleanup: remove residual Bootstrap classes immediately.
+                toggle.setAttribute('aria-expanded', 'false');
+                const toggleItem = toggle.closest('.nav-item');
+                if (toggleItem) {
+                    toggleItem.classList.remove('show');
+                    const menu = toggleItem.querySelector('.dropdown-menu');
+                    if (menu) {
+                        menu.classList.remove('show');
+                    }
+                }
             }
         });
+
+        // Also clear any stale show state on non-current dropdown items.
+        nav.querySelectorAll('.nav-item.dropdown').forEach(item => {
+            if (item !== currentItem) {
+                item.classList.remove('show');
+                const menu = item.querySelector('.dropdown-menu');
+                if (menu) {
+                    menu.classList.remove('show');
+                }
+                const toggle = item.querySelector('.dropdown-toggle');
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+            }
+        });
+
     };
 
     const clearHoverState = () => {
@@ -382,6 +410,19 @@ function setupMenuHoverHighlightBehavior() {
 
         // Attach to the full nav-item so dropdown menus keep the hovered title highlighted.
         item.addEventListener('mouseenter', () => {
+            // Hard reset: remove all existing menu highlight states first.
+            // This guarantees there is never more than one highlighted top menu.
+            nav.querySelectorAll('.menu-title').forEach(el => {
+                el.classList.remove('active', 'hover-active', 'show');
+            });
+            nav.querySelectorAll('.nav-item.dropdown').forEach(dropItem => {
+                dropItem.classList.remove('show');
+                const menu = dropItem.querySelector('.dropdown-menu');
+                if (menu) menu.classList.remove('show');
+                const toggle = dropItem.querySelector('.dropdown-toggle');
+                if (toggle) toggle.setAttribute('aria-expanded', 'false');
+            });
+
             document.body.classList.add('menu-hover-active');
             deactivateOtherMenuHighlights(title);
             title.classList.add('hover-active');
@@ -853,15 +894,16 @@ function updateDropdownItem(action, text) {
 
 // Clear all menu highlights (called when returning to main page or closing dialogs)
 function clearMenuHighlights() {
-    document.body.classList.remove('menu-hover-active');
-    document.querySelectorAll('.menu-title').forEach(menu => menu.classList.remove('active', 'hover-active', 'show'));
+    document.querySelectorAll('.menu-title').forEach(menu => menu.classList.remove('active'));
 }
 
 // Highlight a specific menu by its data-page attribute
 function highlightMenu(page) {
     clearMenuHighlights();
     const menu = document.querySelector(`.menu-title[data-page="${page}"]`);
-    if (menu) menu.classList.add('active');
+    if (menu) {
+        menu.classList.add('active');
+    }
 }
 
 // Fetch observers from /api/observers, dedup by KK (keep latest seit), sort by KK.

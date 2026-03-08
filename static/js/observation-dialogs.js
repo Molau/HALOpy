@@ -963,21 +963,25 @@ async function showDisplayObservationsDialog() {
                 const statusResponse = await fetch('/api/file/status');
                 if (!statusResponse.ok) {
                     await showWarningModal(i18nStrings.messages.no_data);
+                    clearMenuHighlights();
                     return;
                 }
 
                 const status = await statusResponse.json();
                 if (!status.filename) {
                     await showWarningModal(i18nStrings.observations.no_file_loaded);
+                    clearMenuHighlights();
                     return;
                 }
 
                 if (!status.count || status.count === 0) {
                     await showWarningModal(i18nStrings.messages.no_data);
+                    clearMenuHighlights();
                     return;
                 }
             } catch (error) {
                 await showWarningModal(i18nStrings.messages.no_data);
+                clearMenuHighlights();
                 return;
             }
         }
@@ -1025,6 +1029,7 @@ async function showDisplayObservationsDialog() {
     );
     } catch (error) {
         showErrorDialog(i18nStrings.messages.error_loading_data);
+        clearMenuHighlights();
     }
 }
 

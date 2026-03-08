@@ -71,27 +71,23 @@ select option:disabled {
 
 /* Consistent top-menu hover/focus feedback for items with and without dropdown */
 .menu-title:hover,
-.menu-title:focus,
 .menu-title.show,
-.menu-title.hover-active {
+.navbar-nav .nav-item:hover > .menu-title,
+.navbar-nav .nav-item.dropdown.show > .menu-title {
     color: #0d6efd !important;
     background-color: rgba(13, 110, 253, 0.1) !important;
     border-radius: 0.25rem;
 }
 
 .menu-title:focus {
-    box-shadow: none;
-}
-
-/* While hovering the menu bar, suppress stale active highlight on other entries. */
-body.menu-hover-active .menu-title.active:not(.hover-active) {
-    color: var(--bs-nav-link-color) !important;
+    color: inherit !important;
     background-color: transparent !important;
-    font-weight: normal;
+    box-shadow: none;
+    outline: none;
 }
 
-/* Same suppression for Bootstrap-open dropdown toggles (.show). */
-body.menu-hover-active .menu-title.show:not(.hover-active) {
+/* While pointer is over the menu bar, only the currently hovered item should look active. */
+.navbar-nav:hover .menu-title.active:not(:hover) {
     color: var(--bs-nav-link-color) !important;
     background-color: transparent !important;
     font-weight: normal;
