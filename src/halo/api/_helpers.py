@@ -328,9 +328,10 @@ def _kurzausgabe(obs) -> str:
     else:
         first += chr((KK // 10) + 55) + str(KK % 10)
     
-    # O, JJ, MM, TT, g
+    # O, JJ (2-digit), MM, TT, g
     first += str(O)
-    first += str(JJ // 10) + str(JJ % 10)
+    jj2 = JJ % 100
+    first += str(jj2 // 10) + str(jj2 % 10)
     first += str(MM // 10) + str(MM % 10)
     first += str(TT // 10) + str(TT % 10)
     first += str(g)

@@ -28,6 +28,12 @@ from halo.models.constants import (
     calculate_halo_activity,
 )
 from halo.resources.i18n import get_i18n
+from halo.api.statistics import (
+    _format_annual_stats_text,
+    _format_annual_stats_markdown,
+    _generate_annual_stats_chart,
+    _generate_annual_stats_bar_chart,
+)
 import halo.io.observations_db as obs_db
 import halo.io.observers_db as observer_db
 from ._helpers import (

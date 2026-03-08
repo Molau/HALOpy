@@ -271,8 +271,11 @@ def delete_observation() -> Dict[str, Any]:
     try:
         if is_cloud_mode():
             # Cloud Mode: Delete from database (Layer 3b)
+            # Convert 4-digit JJ to 2-digit for DB matching
+            jj_raw = data.get('JJ')
+            jj_db = int(jj_raw) % 100 if jj_raw is not None else None
             key = (
-                data.get('KK'), data.get('O'), data.get('JJ'),
+                data.get('KK'), data.get('O'), jj_db,
                 data.get('MM'), data.get('TT'), data.get('g'),
                 data.get('ZS'), data.get('ZM'), data.get('EE')
             )

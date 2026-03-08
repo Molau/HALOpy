@@ -389,6 +389,9 @@ def update_one(key: Tuple, obs: Dict[str, str]) -> bool:
         with conn.cursor() as cursor:
             values = _observation_to_tuple(obs)
             KK, O, JJ, MM, TT, g, ZS, ZM, EE = key
+            # Defensive: convert 4-digit JJ to 2-digit for DB
+            if JJ is not None and isinstance(JJ, (int, str)):
+                JJ = int(JJ) % 100
             
             cursor.execute("""
                 UPDATE observations SET
@@ -426,6 +429,9 @@ def delete_one(key: Tuple) -> bool:
     with get_connection() as conn:
         with conn.cursor() as cursor:
             KK, O, JJ, MM, TT, g, ZS, ZM, EE = key
+            # Defensive: convert 4-digit JJ to 2-digit for DB
+            if JJ is not None and isinstance(JJ, (int, str)):
+                JJ = int(JJ) % 100
             
             cursor.execute("""
                 DELETE FROM observations
