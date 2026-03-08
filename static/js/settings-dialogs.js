@@ -524,7 +524,11 @@ window.showChangePasswordDialog = async function showChangePasswordDialog() {
         if (isAdmin) {
             // Admin mode: Select user + password
             const observersResponse = await fetch('/api/observers/list');
-            const observers = await observersResponse.json();
+            const observersPayload = await observersResponse.json();
+            const observers = Array.isArray(observersPayload)
+                ? observersPayload
+                : (observersPayload && Array.isArray(observersPayload.observers) ? observersPayload.observers : []);
+            console.debug('[HALO][PW] observers loaded for admin dialog:', observers.length);
             
             const observerOptions = observers.map(obs => 
                 `<option value="${obs.KK}">${obs.KK} - ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`

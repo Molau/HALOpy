@@ -14,7 +14,7 @@ Der lokale Modus (dateibasierter Betrieb) bleibt vollständig erhalten und funkt
 Version 3.0 ist eine komplette Neuprogrammierung des ursprünglichen DOS-Programms. Es wurde sich dabei so eng wie möglich das bewährte Original-Programm gehalten und Änderungen nur dort vorgenommen, wo sie technisch zwingend erforderlich waren (z.B. DOS-abhängige Funktionen durch Web-Äquivalente ersetzen).
 
 - Web-Umstieg und OS-Unabhängigkeit: Web-Applikation, Bedienung komplett im Browser; nicht mehr an DOS gebunden (kein DOS-Drucker-/Farbschalter).
-- Datenhandling: Nur noch CSV – sowohl Beobachtungsdateien (*.NAL) als auch Beobachterdatei (HALO.BEO) sind auf CSV umgestellt; kein Anpassen/Transfer/Export alter HAL-Dateien im Programm, kein Verzeichniswechsel nötig.
+- Datenhandling: Nur noch CSV – sowohl Beobachtungsdateien (*.HAL) als auch Beobachterdatei (HALO.BEO) sind auf CSV umgestellt; kein Anpassen/Transfer/Export alter HAL-Dateien im Programm, kein Verzeichniswechsel nötig.
 - Anzeige/Analyse: Auswertung im Browser mit drei Textformaten (HTML-Tabellen, Pseudografik wie DOS, Markdown), Speichern als CSV/TXT/MD, Grafiken als PNG.
 - Ausgabe: Monatsmeldung, Monats- und Jahresstatistik als Browser-Seiten, gleiches Textformat wie oben wählbar; Ausgabeziel (Bildschirm/Druck/Datei) wird erst in der Ergebnisansicht gewählt, Drucken läuft über den Browser.
 - Filterdialoge: Alle Filter- und Parameterabfragen laufen gebündelt in einem Fenster statt in mehreren nacheinander geöffneten Dialogen.
