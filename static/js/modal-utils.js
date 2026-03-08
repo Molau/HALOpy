@@ -35,9 +35,22 @@ function escapeHtml(text) {
  * @param {HTMLElement|null} confirmBtn - The primary action button (Enter triggers click on this)
  */
 function setupModalKeyboard(modalEl, confirmBtn) {
+    function isTopmostVisibleModal() {
+        const visibleModals = Array.from(document.querySelectorAll('.modal.show'));
+        if (visibleModals.length === 0) {
+            return false;
+        }
+        return visibleModals[visibleModals.length - 1] === modalEl;
+    }
+
     function onKeydown(e) {
         // Only react while this modal is visible
         if (!modalEl.classList.contains('show')) {
+            return;
+        }
+
+        // With stacked modals, only the frontmost modal should react to keyboard actions.
+        if (!isTopmostVisibleModal()) {
             return;
         }
 
