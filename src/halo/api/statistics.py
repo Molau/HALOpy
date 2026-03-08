@@ -177,6 +177,9 @@ def get_monthly_report() -> Dict[str, Any]:
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameters'}), 400
     
+    # Normalize to 4-digit year (observations store 4-digit JJ internally)
+    jj_int = jj_to_full_year(jj_int)
+    
     # Load observations - CLOUD MODE: Filter in SQL, LOCAL MODE: Filter in memory
     if is_cloud_mode():
         # Layer 3b: Direct database query with SQL filtering
@@ -735,6 +738,9 @@ def get_monthly_stats() -> Dict[str, Any]:
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameters'}), 400
     
+    # Normalize to 4-digit year (observations store 4-digit JJ internally)
+    jj_int = jj_to_full_year(jj_int)
+    
     # Load observations - CLOUD MODE: Filter in SQL, LOCAL MODE: Filter in memory
     if is_cloud_mode():
         # Layer 3b: Direct database query with SQL filtering
@@ -755,9 +761,10 @@ def get_monthly_stats() -> Dict[str, Any]:
     # Get all active observers at the end of this month/year (SEIT <= MMJJ)
     # Build SEIT value for comparison using same formula as _parse_seit: mm + 13 * jj
     # Handle century boundary: years 00-79 are 2000-2079, must add 100 (same as _parse_seit)
-    jj_adjusted = jj_int
-    if jj_int < (YEAR_MIN - 1900):
-        jj_adjusted = jj_int + 100
+    jj_2digit = jj_int % 100
+    jj_adjusted = jj_2digit
+    if jj_2digit < (YEAR_MIN - 1900):
+        jj_adjusted = jj_2digit + 100
     month_year_value = mm_int + 13 * jj_adjusted
     
     # Get unique active observers up to this month/year

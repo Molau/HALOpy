@@ -171,6 +171,9 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
     """
     logger = logging.getLogger(__name__)
     
+    # Normalize jj to 4-digit (observations store 4-digit JJ internally)
+    jj = jj_to_full_year(jj)
+    
     # Initialize activity arrays
     real_activity = {day: 0.0 for day in range(1, 32)}
     relative_activity = {day: 0.0 for day in range(1, 32)}

@@ -50,13 +50,15 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Check if observations are loaded (same approach as monthly_report.js)
     async function checkDataLoaded() {
+        // Cloud Mode: Database is always available, no need to query
+        if (window.isCloudMode) return true;
+
         try {
             const response = await fetch('/api/observations?limit=1');
             if (response.ok) {
                 const data = await response.json();
-                // Cloud Mode: Data always available from DB, no file check needed
                 // Local Mode: Check both data.total > 0 AND data.file exists
-                const hasData = data.total > 0 && (window.isCloudMode || data.file);
+                const hasData = data.total > 0 && data.file;
                 if (hasData) {
                     return true;
                 }
