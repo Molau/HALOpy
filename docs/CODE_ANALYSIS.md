@@ -247,13 +247,15 @@ Diese Information gehört ins Backend. Ein Angreifer sieht die exakten Komplexit
 - Footer-Padding: `py-2` bei den meisten, fehlt bei observers.html und analysis.html
 - Button-IDs: `cancel-filter` vs. `btn-cancel-filter` (inkonsistente Namensgebung)
 
-### 7.4 Option-Generierung
+### ~~7.4 Option-Generierung~~ ✅ behoben 2026-03-08
 
-Zwei verschiedene Patterns für Monats-Auswahl:
-- `Array.from({length: 12}, ...)` (main.js:7584)
-- `Object.keys(i18nStrings.months).map(...)` (main.js:8454)
+~~Zwei verschiedene Patterns für Monats-Auswahl:~~
+~~- `Array.from({length: 12}, ...)` (main.js:7584)~~
+~~- `Object.keys(i18nStrings.months).map(...)` (main.js:8454)~~
 
-Jahr-Werte als 2-Digit vs. 4-Digit inkonsistent zwischen Dialogen.
+~~Jahr-Werte als 2-Digit vs. 4-Digit inkonsistent zwischen Dialogen.~~
+
+**Status:** Behoben. Monats-Optionen einheitlich auf `Array.from({length: 12})` normalisiert (observer-management.js). Jahr-Werte in monthly_report.js + monthly_stats.js von 2-Digit auf 4-Digit umgestellt; `validateMonthYear()` jj-Padding entfernt. Bugfix: dateDefault-Vorauswahl funktionierte nicht (4-stelliges jj matchte nicht 2-stelligen Dropdown-Wert).
 
 ### ~~7.5 Region-Listen~~ ✅ behoben 2026-03-07
 

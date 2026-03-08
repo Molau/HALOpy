@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         return { 
             mm: String(parseInt(mm)).padStart(2, '0'), 
-            jj: String(parseInt(jj)).padStart(2, '0')
+            jj: String(parseInt(jj))
         };
     }
 
@@ -52,9 +52,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     function populateYears() {
         
         for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
-            const yy = String(year % 100).padStart(2, '0');
             const option = document.createElement('option');
-            option.value = yy;
+            option.value = year;
             option.textContent = year;
             yearSelect.appendChild(option);
         }

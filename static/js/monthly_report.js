@@ -29,8 +29,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (yearSelect) {
             yearSelect.innerHTML = '<option value="">-- ' + i18nStrings.messages.select_prompt + ' --</option>';
             for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
-                const yy = String(year % 100).padStart(2, '0');
-                yearSelect.innerHTML += `<option value="${yy}">${year}</option>`;
+                yearSelect.innerHTML += `<option value="${year}">${year}</option>`;
             }
         }
     }
@@ -84,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         return { 
             mm: String(parseInt(mm)).padStart(2, '0'), 
-            jj: String(parseInt(jj)).padStart(2, '0')
+            jj: String(parseInt(jj))
         };
     }
 

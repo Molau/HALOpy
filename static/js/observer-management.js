@@ -918,9 +918,9 @@ function showEditBaseDataDialog(observer) {
 
 // Generate option lists for observer site forms (shared across all site dialogs)
 function generateSiteFormOptions() {
-    const monthOptions = Object.keys(i18nStrings.months).map(m => {
-        const monthNum = parseInt(m);
-        const monthName = i18nStrings.months[m];
+    const monthOptions = Array.from({length: 12}, (_, i) => {
+        const monthNum = i + 1;
+        const monthName = i18nStrings.months[monthNum];
         return `<option value="${monthNum}">${monthName}</option>`;
     }).join('');
     
