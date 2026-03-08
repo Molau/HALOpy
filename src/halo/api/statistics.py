@@ -20,7 +20,7 @@ from flask import jsonify, request, current_app, Response, g
 
 from halo.api import api_blueprint
 from halo.config import is_cloud_mode
-from halo.models.constants import YEAR_MIN, jj_to_full_year, resolve_halo_type, calculate_halo_activity
+from halo.models.constants import YEAR_MIN, YEAR_MAX, jj_to_full_year, resolve_halo_type, calculate_halo_activity
 from halo.resources.i18n import get_i18n
 import halo.io.observations_db as obs_db
 import halo.io.observers_db as observer_db
