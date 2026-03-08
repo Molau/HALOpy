@@ -733,6 +733,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         setupModalKeyboard(chartModalElementLine, document.getElementById('btn-chart-close-line'));
         
         chartModalLine.show();
+    }
+    
+    function showBarChart() {
         if (!currentStatsData) return;
         
         const year2 = String(currentStatsData.jj);
@@ -1167,10 +1170,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Initialize UI
     populateYears();
-    await loadDateDefault();
     
-    // Check if data is loaded
-    const dataLoaded = await checkDataLoaded();
+    // Load date default and check data in parallel
+    const [, dataLoaded] = await Promise.all([loadDateDefault(), checkDataLoaded()]);
     if (!dataLoaded) {
         return; // Warning modal will redirect to main
     }

@@ -666,10 +666,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     // Update UI text to populate dropdowns
                     updateUIText();
                     
-                    // Load observers and show filter dialog
-                    await loadFixedObserver();
-                    await loadDateDefault();
-                    await loadObservers();
+                    // Load observers, fixed observer and date default in parallel
+                    await Promise.all([loadFixedObserver(), loadDateDefault(), loadObservers()]);
 
                     // Show filter dialog with explicit backdrop configuration
                     const modal = new bootstrap.Modal(filterDialog, {

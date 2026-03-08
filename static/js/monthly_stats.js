@@ -1286,12 +1286,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Populate year dropdown
         populateYears();
         
-        // Check if data is already loaded on the server
-        const dataLoaded = await checkDataLoaded();
+        // Check data and load date default in parallel
+        const [dataLoaded] = await Promise.all([checkDataLoaded(), loadDateDefault()]);
         
         if (dataLoaded) {
-            // Load date default and pre-fill month/year dropdowns
-            await loadDateDefault();
             
             // Show filter dialog automatically with explicit backdrop configuration
             const modal = new bootstrap.Modal(filterDialog, {
