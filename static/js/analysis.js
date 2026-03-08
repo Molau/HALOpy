@@ -160,50 +160,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // Show warning modal (same style as other pages)
-    function showWarningModal(message) {
-        const modalHtml = `
-            <div class="modal fade" id="warning-modal" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">${i18nStrings.common.warning}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>${message}</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        const modalEl = document.getElementById('warning-modal');
-        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
-        
-        // Wait for modal to be fully shown before allowing focus
-        modalEl.addEventListener('shown.bs.modal', () => {
-            modalEl.removeAttribute('aria-hidden');
-        }, { once: true });
-        
-        modal.show();
-
-        // Decision #033: setupModalKeyboard for Enter key (OK has data-bs-dismiss)
-        const okBtn = modalEl.querySelector('.modal-footer .btn-primary');
-        setupModalKeyboard(modalEl, okBtn);
-
-        // Navigate home when modal closes
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            window.navigateInternal('/');
-        }, { once: true });
-
-        // Decision #033: setupModalCleanup for DOM cleanup
-        setupModalCleanup(modalEl);
-    }
-
     // Populate parameter dropdowns with all available parameters
     function populateParameterSelects() {
         const params = [
@@ -285,177 +241,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
-    // Get range values for a parameter
-    function getParameterRange(paramCode) {
-        // Helper function to get month name - check actual type
-        function getMonthName(monthNum) {
-            if (Array.isArray(i18nStrings.months)) {
-                // Array (0-indexed): ["Januar", "Februar", ...]
-                return i18nStrings.months[monthNum - 1];
-            } else {
-                // Object with string keys: {"1": "Januar", "2": "Februar", ...}
-                return i18nStrings.months[String(monthNum)];
-            }
-        }
-        
-        switch (paramCode) {
-            case 'JJ':
-                const years = [];
-                for (let i = YEAR_MIN; i <= YEAR_MAX; i++) {
-                    years.push({ value: i, display: String(i) });
-                }
-                return years;
-            
-            case 'MM':
-                // Format: "01 - Januar", "02 - Februar", etc.
-                const months = [];
-                for (let i = 1; i <= 12; i++) {
-                    const monthName = getMonthName(i);
-                    months.push({ value: i, display: `${String(i).padStart(2, '0')} - ${monthName}` });
-                }
-                return months;
-            
-            case 'TT':
-                const days = [];
-                for (let i = 1; i <= 31; i++) {
-                    days.push({ value: i, display: String(i).padStart(2, '0') });
-                }
-                return days;
-            
-            case 'ZZ':
-                const hours = [];
-                for (let i = 0; i <= 23; i++) {
-                    hours.push({ value: i, display: i18nStrings.fields.hour_display.replace('{h}', i) });
-                }
-                return hours;
-            
-            case 'SH':
-                // Solar altitude: all degrees from -10 to 90
-                const altitudes = [];
-                for (let i = -10; i <= 90; i++) {
-                    altitudes.push({ value: i, display: String(i) + '°' });
-                }
-                return altitudes;
-            
-            case 'KK':
-                // Format: "44 - Hans Mustermann"
-                return observers.map(obs => ({
-                    value: obs.KK,
-                    display: `${String(obs.KK).padStart(2, '0')} - ${obs.VName} ${obs.NName}`
-                }));
-            
-            case 'GG':
-                // Use region list from backend constants
-                return GEOGRAPHIC_REGIONS.map(gg => {
-                    const regionName = i18nStrings.geographic_regions[String(gg)];
-                    return { value: gg, display: `${String(gg).padStart(2, '0')} - ${regionName}` };
-                });
-            
-            case 'O':
-                const objects = [];
-                for (let i = 1; i <= 5; i++) {
-                    const objName = i18nStrings.object_types[String(i)];
-                    objects.push({ value: i, display: `${i} - ${objName}` });
-                }
-                return objects;
-            
-            case 'f':
-                // Weather front with text names
-                const fronts = [];
-                for (let i = 0; i <= 8; i++) {
-                    const frontName = i18nStrings.weather_front[String(i)];
-                    fronts.push({ value: i, display: `${i} - ${frontName}` });
-                }
-                return fronts;
-            
-            case 'C':
-                // Cirrus type with text names
-                const cirrus = [];
-                for (let i = 0; i <= 7; i++) {
-                    const cirrusName = i18nStrings.cirrus_types[String(i)];
-                    cirrus.push({ value: i, display: `${i} - ${cirrusName}` });
-                }
-                return cirrus;
-            
-            case 'd':
-                // Cirrus density - use exact format from observation form
-                return [
-                    { value: 0, display: `0 - ${i18nStrings.cirrus_density['0']}` },
-                    { value: 1, display: `1 - ${i18nStrings.cirrus_density['1']}` },
-                    { value: 2, display: `2 - ${i18nStrings.cirrus_density['2']}` },
-                    { value: 4, display: `4 - ${i18nStrings.cirrus_density['4']}` },
-                    { value: 5, display: `5 - ${i18nStrings.cirrus_density['5']}` },
-                    { value: 6, display: `6 - ${i18nStrings.cirrus_density['6']}` },
-                    { value: 7, display: `7 - ${i18nStrings.cirrus_density['7']}` }
-                ];
-            
-            case 'EE':
-                // Use valid halo types from backend constants
-                return VALID_HALO_TYPES.map(i => {
-                    const haloName = i18nStrings.halo_types[String(i)];
-                    return { value: i, display: `${String(i).padStart(2, '0')} - ${haloName}` };
-                });
-            
-            case 'DD':
-                // Duration: display key values 0, 10, 20, 30, etc.
-                const durations = [];
-                const minuteText = i18nStrings.observations.detail_labels.minutes.trim();
-                for (let i = 0; i <= 99; i += 10) {
-                    durations.push({ value: i, display: `${i} ${minuteText}` });
-                }
-                return durations;
-            
-            case 'H':
-                // Brightness with text values
-                const brightness = [];
-                for (let i = 0; i <= 3; i++) {
-                    const brightName = i18nStrings.brightness[String(i)];
-                    brightness.push({ value: i, display: `${i} - ${brightName}` });
-                }
-                return brightness;
-            
-            case 'F':
-                // Color with text values
-                const colours = [];
-                for (let i = 0; i <= 5; i++) {
-                    const colorName = i18nStrings.color[String(i)];
-                    colours.push({ value: i, display: `${i} - ${colorName}` });
-                }
-                return colours;
-            
-            case 'V':
-                // Completeness with text values
-                return [
-                    { value: 1, display: `1 - ${i18nStrings.completeness['1']}` },
-                    { value: 2, display: `2 - ${i18nStrings.completeness['2']}` }
-                ];
-            
-            case 'zz':
-                // Zeit bis Niederschlag (hours): 0 hours, 1 hours, etc.
-                const zzTimes = [];
-                const hourText = i18nStrings.observations.detail_labels.hours.trim();
-                for (let i = 0; i <= 99; i++) {
-                    zzTimes.push({ value: i, display: `${i} ${hourText}` });
-                }
-                return zzTimes;
-            
-            case 'HO_HU':
-                // Lichtäulenhöhe (pillar height): limited to 30 degrees
-                const heights = [];
-                for (let i = 0; i <= 30; i++) {
-                    heights.push({ value: i, display: String(i) + '°' });
-                }
-                return heights;
-            
-            case 'SE':
-                // Sectors (octants a-h)
-                return ['a','b','c','d','e','f','g','h'].map(letter => ({ value: letter, display: letter }));
-            
-            default:
-                return [];
-        }
-    }
-
     // Map raw parameter value to its display label using the same data used for dropdowns
     const valueLabelCache = {};
     function formatParamValue(paramCode, rawValue) {
@@ -520,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         if (!valueLabelCache[paramCode]) {
-            valueLabelCache[paramCode] = getParameterRange(paramCode).reduce((acc, item) => {
+            valueLabelCache[paramCode] = getParameterRange(paramCode, observers).reduce((acc, item) => {
                 acc[String(item.value)] = item.display;
                 return acc;
             }, {});
@@ -530,26 +315,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         return cache && cache[key] ? cache[key] : rawValue;
     }
 
-    // Populate month and year fields for day (TT) parameter
-    function populateDayFields() {
+    // Populate month, year, and day range fields for day (TT) parameter
+    function populateDayFields(monthSel, yearSel, dayFromSel, dayToSel) {
         // Populate months
-        param1MonthSelect.innerHTML = '';
+        monthSel.innerHTML = '';
         const months = getParameterRange('MM');
         months.forEach(item => {
             const option = document.createElement('option');
             option.value = item.value;
             option.textContent = item.display;
-            param1MonthSelect.appendChild(option);
+            monthSel.appendChild(option);
         });
         
         // Populate years
-        param1YearSelect.innerHTML = '';
+        yearSel.innerHTML = '';
         const years = getParameterRange('JJ');
         years.forEach(item => {
             const option = document.createElement('option');
             option.value = item.value;
             option.textContent = item.display;
-            param1YearSelect.appendChild(option);
+            yearSel.appendChild(option);
         });
 
         // Populate day range dropdowns (days 1-31)
@@ -558,139 +343,57 @@ document.addEventListener('DOMContentLoaded', async function() {
             days.push({ value: i, display: String(i) });
         }
 
-        param1DayFromSelect.innerHTML = '';
-        param1DayToSelect.innerHTML = '';
+        dayFromSel.innerHTML = '';
+        dayToSel.innerHTML = '';
         
         days.forEach(item => {
             const fromOption = document.createElement('option');
             fromOption.value = item.value;
             fromOption.textContent = item.display;
-            param1DayFromSelect.appendChild(fromOption);
+            dayFromSel.appendChild(fromOption);
             
             const toOption = document.createElement('option');
             toOption.value = item.value;
             toOption.textContent = item.display;
-            param1DayToSelect.appendChild(toOption);
+            dayToSel.appendChild(toOption);
         });
 
         // Set "to" day to 31 by default (last day)
-        param1DayToSelect.selectedIndex = 30; // 31st day
+        dayToSel.selectedIndex = 30; // 31st day
     }
 
-    // Populate month and year fields for day (TT) parameter - param2
-    function populateDayFields2() {
+    // Populate month and year fields for filter day (TT) parameter
+    function populateFilterDayFields(monthSel, yearSel) {
         // Populate months
-        param2MonthSelect.innerHTML = '';
+        monthSel.innerHTML = '';
         const months = getParameterRange('MM');
         months.forEach(item => {
             const option = document.createElement('option');
             option.value = item.value;
             option.textContent = item.display;
-            param2MonthSelect.appendChild(option);
+            monthSel.appendChild(option);
         });
         
         // Populate years
-        param2YearSelect.innerHTML = '';
+        yearSel.innerHTML = '';
         const years = getParameterRange('JJ');
         years.forEach(item => {
             const option = document.createElement('option');
             option.value = item.value;
             option.textContent = item.display;
-            param2YearSelect.appendChild(option);
-        });
-
-        // Populate day range dropdowns (days 1-31)
-        const days = [];
-        for (let i = 1; i <= 31; i++) {
-            days.push({ value: i, display: String(i) });
-        }
-
-        param2DayFromSelect.innerHTML = '';
-        param2DayToSelect.innerHTML = '';
-        
-        days.forEach(item => {
-            const fromOption = document.createElement('option');
-            fromOption.value = item.value;
-            fromOption.textContent = item.display;
-            param2DayFromSelect.appendChild(fromOption);
-            
-            const toOption = document.createElement('option');
-            toOption.value = item.value;
-            toOption.textContent = item.display;
-            param2DayToSelect.appendChild(toOption);
-        });
-
-        // Set "to" day to 31 by default (last day)
-        param2DayToSelect.selectedIndex = 30; // 31st day
-    }
-
-    // Populate month and year fields for day (TT) parameter - filter1
-    function populateFilter1DayFields() {
-        // Populate months
-        filter1MonthSelect.innerHTML = '';
-        const months = getParameterRange('MM');
-        months.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.value;
-            option.textContent = item.display;
-            filter1MonthSelect.appendChild(option);
-        });
-        
-        // Populate years
-        filter1YearSelect.innerHTML = '';
-        const years = getParameterRange('JJ');
-        years.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.value;
-            option.textContent = item.display;
-            filter1YearSelect.appendChild(option);
+            yearSel.appendChild(option);
         });
     }
 
-    // Populate month and year fields for day (TT) parameter - filter2
-    function populateFilter2DayFields() {
-        // Populate months
-        filter2MonthSelect.innerHTML = '';
-        const months = getParameterRange('MM');
-        months.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.value;
-            option.textContent = item.display;
-            filter2MonthSelect.appendChild(option);
-        });
-        
-        // Populate years
-        filter2YearSelect.innerHTML = '';
-        const years = getParameterRange('JJ');
-        years.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.value;
-            option.textContent = item.display;
-            filter2YearSelect.appendChild(option);
-        });
-    }
-
-    // Populate value dropdown for filter1 (single value, not range)
-    function populateFilter1Value(paramCode) {
-        const range = getParameterRange(paramCode);
-        filter1ValueSelect.innerHTML = '';
+    // Populate value dropdown for filter (single value, not range)
+    function populateFilterValue(paramCode, valueSel) {
+        const range = getParameterRange(paramCode, observers);
+        valueSel.innerHTML = '';
         range.forEach(item => {
             const option = document.createElement('option');
             option.value = item.value;
             option.textContent = item.display;
-            filter1ValueSelect.appendChild(option);
-        });
-    }
-
-    // Populate value dropdown for filter2 (single value, not range)
-    function populateFilter2Value(paramCode) {
-        const range = getParameterRange(paramCode);
-        filter2ValueSelect.innerHTML = '';
-        range.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.value;
-            option.textContent = item.display;
-            filter2ValueSelect.appendChild(option);
+            valueSel.appendChild(option);
         });
     }
 
@@ -733,7 +436,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Populate range dropdowns for first parameter
     function populateParam1Range(paramCode) {
-        const range = getParameterRange(paramCode);
+        const range = getParameterRange(paramCode, observers);
         
         param1FromSelect.innerHTML = '';
         param1ToSelect.innerHTML = '';
@@ -781,7 +484,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Populate range dropdowns for second parameter
     function populateParam2Range(paramCode) {
-        const range = getParameterRange(paramCode);
+        const range = getParameterRange(paramCode, observers);
         
         param2FromSelect.innerHTML = '';
         param2ToSelect.innerHTML = '';
@@ -819,7 +522,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Populate range dropdowns for special parameters (SH, C, EE, DD)
     function populateSpecialRangeSelects(paramCode, fromSelect, toSelect) {
-        const range = getParameterRange(paramCode);
+        const range = getParameterRange(paramCode, observers);
         // Use abbreviated minutes label for duration (DD)
         const minuteSuffix = ' min';
         
@@ -874,7 +577,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 param1CFieldsDiv.style.display = 'none';
                 param1DdFieldsDiv.style.display = 'none';
                 param1DayFieldsDiv.style.display = 'block';
-                populateDayFields();
+                populateDayFields(param1MonthSelect, param1YearSelect, param1DayFromSelect, param1DayToSelect);
             }
             // Check if this is the time (ZZ) parameter
             else if (param1Select.value === 'ZZ') {
@@ -1064,7 +767,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 param2CFieldsDiv.style.display = 'none';
                 param2DdFieldsDiv.style.display = 'none';
                 param2DayFieldsDiv.style.display = 'block';
-                populateDayFields2();
+                populateDayFields(param2MonthSelect, param2YearSelect, param2DayFromSelect, param2DayToSelect);
             }
             // Check if this is the time (ZZ) parameter
             else if (param2Select.value === 'ZZ') {
@@ -1171,10 +874,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1CFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'none';
                 filter1DayFieldsDiv.style.display = 'block';
-                populateFilter1DayFields();
+                populateFilterDayFields(filter1MonthSelect, filter1YearSelect);
                 // Also populate day values (1-31) in the main value dropdown
                 filter1ValueDiv.style.display = 'block';
-                populateFilter1Value('TT');
+                populateFilterValue('TT', filter1ValueSelect);
             }
             // Check if this is the time (ZZ) parameter
             else if (filter1Select.value === 'ZZ') {
@@ -1185,7 +888,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1CFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'none';
                 filter1TimeFieldsDiv.style.display = 'block';
-                populateFilter1Value('ZZ');
+                populateFilterValue('ZZ', filter1ValueSelect);
                 // Reset timezone to CET
                 document.getElementById('filter1-tz-cet').checked = true;
             }
@@ -1198,7 +901,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1CFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'none';
                 filter1ShFieldsDiv.style.display = 'block';
-                populateFilter1Value('SH');
+                populateFilterValue('SH', filter1ValueSelect);
                 // Reset to mean (default)
                 document.getElementById('filter1-sh-mean').checked = true;
             }
@@ -1211,7 +914,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1CFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'none';
                 filter1EeFieldsDiv.style.display = 'none';
-                populateFilter1Value('EE');
+                populateFilterValue('EE', filter1ValueSelect);
                 // Reset to split (default)
                 document.getElementById('filter1-ee-split-yes').checked = true;
                 // Show split option only for combined halo types
@@ -1226,7 +929,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1EeFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'none';
                 filter1CFieldsDiv.style.display = 'block';
-                populateFilter1Value('C');
+                populateFilterValue('C', filter1ValueSelect);
                 // Reset to split (default)
                 document.getElementById('filter1-c-split-yes').checked = true;
             }
@@ -1239,7 +942,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1EeFieldsDiv.style.display = 'none';
                 filter1CFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'block';
-                populateFilter1Value('DD');
+                populateFilterValue('DD', filter1ValueSelect);
                 // Reset to include (default)
                 document.getElementById('filter1-dd-include').checked = true;
             }
@@ -1252,7 +955,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter1EeFieldsDiv.style.display = 'none';
                 filter1CFieldsDiv.style.display = 'none';
                 filter1DdFieldsDiv.style.display = 'none';
-                populateFilter1Value(filter1Select.value);
+                populateFilterValue(filter1Select.value, filter1ValueSelect);
             }
             // Enable filter2 when filter1 has a value
             filter2Select.disabled = false;
@@ -1291,10 +994,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2CFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'none';
                 filter2DayFieldsDiv.style.display = 'block';
-                populateFilter2DayFields();
+                populateFilterDayFields(filter2MonthSelect, filter2YearSelect);
                 // Also populate day values (1-31) in the main value dropdown
                 filter2ValueDiv.style.display = 'block';
-                populateFilter2Value('TT');
+                populateFilterValue('TT', filter2ValueSelect);
             }
             // Check if this is the time (ZZ) parameter
             else if (filter2Select.value === 'ZZ') {
@@ -1305,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2CFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'none';
                 filter2TimeFieldsDiv.style.display = 'block';
-                populateFilter2Value('ZZ');
+                populateFilterValue('ZZ', filter2ValueSelect);
                 // Reset timezone to CET
                 document.getElementById('filter2-tz-cet').checked = true;
             }
@@ -1318,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2CFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'none';
                 filter2ShFieldsDiv.style.display = 'block';
-                populateFilter2Value('SH');
+                populateFilterValue('SH', filter2ValueSelect);
                 // Reset to mean (default)
                 document.getElementById('filter2-sh-mean').checked = true;
             }
@@ -1331,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2CFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'none';
                 filter2EeFieldsDiv.style.display = 'none';
-                populateFilter2Value('EE');
+                populateFilterValue('EE', filter2ValueSelect);
                 // Reset to split (default)
                 document.getElementById('filter2-ee-split-yes').checked = true;
                 // Show split option only for combined halo types
@@ -1346,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2EeFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'none';
                 filter2CFieldsDiv.style.display = 'block';
-                populateFilter2Value('C');
+                populateFilterValue('C', filter2ValueSelect);
                 // Reset to split (default)
                 document.getElementById('filter2-c-split-yes').checked = true;
             }
@@ -1359,7 +1062,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2EeFieldsDiv.style.display = 'none';
                 filter2CFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'block';
-                populateFilter2Value('DD');
+                populateFilterValue('DD', filter2ValueSelect);
                 // Reset to include (default)
                 document.getElementById('filter2-dd-include').checked = true;
             }
@@ -1372,7 +1075,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 filter2EeFieldsDiv.style.display = 'none';
                 filter2CFieldsDiv.style.display = 'none';
                 filter2DdFieldsDiv.style.display = 'none';
-                populateFilter2Value(filter2Select.value);
+                populateFilterValue(filter2Select.value, filter2ValueSelect);
             }
         } else {
             filter2ValueDiv.style.display = 'none';
@@ -1564,7 +1267,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
             
             if (!response.ok) {
-                showWarningModal(i18nStrings.analysis_results.error_analysis);
+                showWarningAndGoHome(i18nStrings.analysis_results.error_analysis);
                 return;
             }
             
@@ -1574,7 +1277,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             displayAnalysisResult(result, selectedParams);
         } catch (error) {
             console.error('Analysis error:', error);
-            showWarningModal('Fehler: ' + error.message);
+            showWarningAndGoHome('Fehler: ' + error.message);
         }
     });
 
@@ -1589,7 +1292,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Display analysis result as table
     async function displayAnalysisResult(result, params) {
         if (!result.success) {
-            showWarningModal(result.error);
+            showWarningAndGoHome(result.error);
             return;
         }
         

@@ -3,8 +3,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Wait for i18nStrings to be loaded (from main.js)
     await window.waitForI18n();
 
-    let allObservers = [];
-    let fixedObserver = '';
     let currentReportData = null; // Store current report data for save/print
 
     // Elements
@@ -16,16 +14,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     const btnCancel = document.getElementById('btn-cancel-filter');
     const btnApply = document.getElementById('btn-apply-filter');
     const applySpinner = document.getElementById('apply-spinner');
-
-    // Show warning modal and navigate to main on close
-    function showWarningAndGoHome(message) {
-        const modalEl = showWarningModal(message);
-        if (modalEl) {
-            modalEl.addEventListener('hidden.bs.modal', () => {
-                window.navigateInternal('/');
-            });
-        }
-    }
 
     // Update UI text from i18n
     function updateUIText() {
@@ -47,33 +35,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // Load observers
-    async function loadObservers() {
+    // Load observers and fixed observer into dropdown
+    async function loadObserverDropdown() {
+        let fixedObserver = '';
         try {
-            const response = await fetch('/api/observers');
-            if (response.ok) {
-                const data = await response.json();
-                allObservers = data.observers || [];
-
-                populateObserverSelect();
+            const resp = await fetch('/api/config/fixed_observer');
+            if (resp.ok) {
+                const cfg = await resp.json();
+                fixedObserver = cfg.observer || '';
             }
-        } catch (error) {
-            console.error('Error loading observers:', error);
-        }
-    }
+        } catch (e) { /* optional */ }
 
-    // Load fixed observer setting
-    async function loadFixedObserver() {
-        try {
-            const response = await fetch('/api/config/fixed_observer');
-            if (response.ok) {
-                const data = await response.json();
-                fixedObserver = data.observer || '';
-
-            }
-        } catch (error) {
-            console.error('Error loading fixed observer:', error);
-        }
+        await populateObserverDropdown(observerSelect, {
+            placeholder: '-- ' + i18nStrings.messages.select_prompt + ' --',
+            fixedObserver: fixedObserver || undefined
+        });
     }
 
     // Load date default and pre-fill month/year dropdowns
@@ -95,51 +71,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // Populate observer dropdown
-    function populateObserverSelect() {
-        const placeholder = '-- ' + i18nStrings.messages.select_prompt + ' --';
-        observerSelect.innerHTML = `<option value="">${placeholder}</option>`;
 
-        // Get unique observers (latest record per KK)
-        const observerMap = new Map();
-        
-        for (const obs of allObservers) {
-            // Observer data format from API: { KK, VName, NName, seit, aktiv, HbOrt, GH, ... }
-            const kk = parseInt(obs.KK);
-            const seit = obs.seit;
-            
-            if (!observerMap.has(kk) || seit > observerMap.get(kk).seit) {
-                observerMap.set(kk, {
-                    kk: kk,
-                    vname: obs.VName || '',
-                    nname: obs.NName || '',
-                    seit: seit
-                });
-            }
-        }
-
-        // Convert to array and sort by KK
-        const observers = Array.from(observerMap.values()).sort((a, b) => a.kk - b.kk);
-
-        // Add to select
-        for (const obs of observers) {
-            const option = document.createElement('option');
-            option.value = obs.kk;
-            option.textContent = `${String(obs.kk).padStart(2, '0')} - ${obs.vname} ${obs.nname}`;
-            observerSelect.appendChild(option);
-        }
-
-        // Pre-select fixed observer if configured
-        if (fixedObserver) {
-            const fixedKK = parseInt(fixedObserver);
-            if (observerMap.has(fixedKK)) {
-                observerSelect.value = fixedKK;
-                // In Cloud Mode: pre-select but allow changing observer
-                // In Local Mode: disable dropdown when fixed observer is set
-                observerSelect.disabled = !window.isCloudMode;
-            }
-        }
-    }
 
     // Validate month/year selection from dropdowns
     function validateMonthYear() {
@@ -677,7 +609,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     updateUIText();
                     
                     // Load observers, fixed observer and date default in parallel
-                    await Promise.all([loadFixedObserver(), loadDateDefault(), loadObservers()]);
+                    await Promise.all([loadObserverDropdown(), loadDateDefault()]);
 
                     // Show filter dialog with explicit backdrop configuration
                     const modal = new bootstrap.Modal(filterDialog, {

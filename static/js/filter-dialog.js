@@ -12,7 +12,7 @@ class FilterDialog {
     constructor(options = {}) {
         this.modalElement = null;
         this.modal = null;
-        this.observersData = null;
+        this.cachedObservers = null; // deduped observer list
         this.allowObserverChange = options.allowObserverChange || false;
         
         // Filter state
@@ -27,25 +27,10 @@ class FilterDialog {
     }
     
     async initialize() {
-        await this.loadObserversData();
-    }
-    
-    async loadObserversData() {
         try {
-
-            const response = await fetch('/api/observers');
-
-            if (response.ok) {
-                const data = await response.json();
-
-                this.observersData = data.observers || [];
-
-                if (this.observersData.length > 0) {
-
-                }
-            }
-        } catch (error) {
-            console.warn('Could not load observers:', error);
+            this.cachedObservers = await fetchObserversDeduped();
+        } catch (e) {
+            console.warn('Could not load observers:', e);
         }
     }
     
@@ -325,31 +310,12 @@ class FilterDialog {
         const filter1SelectElem = document.getElementById('filter-1-select');
         filter1SelectElem.innerHTML = '';
         
-        let observers = [];
-        
-        if (this.observersData && Array.isArray(this.observersData)) {
-
-            observers = this.observersData.map(obs => {
-
-                return {
-                    kk: parseInt(obs.KK || obs.kk),
-                    name: `${obs.VName || ''} ${obs.NName || ''}`.trim()
-                };
-            }).sort((a,b) => a.kk - b.kk);
-        } else if (window.haloData && window.haloData.observers) {
-
-            observers = window.haloData.observers.map(obs => ({
-                kk: parseInt(obs.KK || obs.kk),
-                name: `${obs.VName || ''} ${obs.NName || ''}`.trim()
-            })).sort((a,b) => a.kk - b.kk);
-        } else {
-
-        }
+        const observers = this.cachedObservers || [];
         
         observers.forEach(obs => {
             const option = document.createElement('option');
             option.value = obs.kk;
-            option.textContent = `${String(obs.kk).padStart(2, '0')} - ${obs.name}`;
+            option.textContent = `${String(obs.kk).padStart(2, '0')} - ${escapeHtml(obs.vname)} ${escapeHtml(obs.nname)}`;
             filter1SelectElem.appendChild(option);
         });
     }

@@ -1,7 +1,7 @@
-﻿// HALO Web Application JavaScript
+// HALO Web Application JavaScript
 
 // ============================================================================
-// GLOBAL CONSTANTS
+// GLOBAL CONSTANTS AND SHARED FUNCTIONS
 // ============================================================================
 // Year range for observer "seit" (since) dates and data ranges
 const YEAR_MIN = 1980;
@@ -76,7 +76,7 @@ window.waitForI18n = function() {
 // Global data store - metadata only, NO observation data
 // All observation data stays on the server (in-memory for local mode, DB for cloud mode).
 // Only the count is tracked client-side for display purposes.
-// isDirty is a cached mirror of the server's DIRTY flag â€” only set by refreshFileStatus().
+// isDirty is a cached mirror of the server's DIRTY flag — only set by refreshFileStatus().
 window.haloData = {
     count: 0,
     fileName: null,
@@ -86,7 +86,7 @@ window.haloData = {
 
 /**
  * Fetch current file status from server and sync client state.
- * This is the ONLY place that sets isDirty â€” server is the single source of truth.
+ * This is the ONLY place that sets isDirty — server is the single source of truth.
  */
 async function refreshFileStatus() {
     try {
@@ -96,7 +96,7 @@ async function refreshFileStatus() {
         window.haloData.count = status.count || 0;
         window.haloData.isDirty = status.dirty || false;
         if (status.filename) window.haloData.fileName = status.filename;
-        if (status.count > 0) window.haloData.isLoaded = true;
+        if (status.filename) window.haloData.isLoaded = true;
         saveHaloDataToSession();
         updateFileInfoDisplay(window.haloData.fileName, window.haloData.count);
     } catch (e) {
@@ -276,6 +276,28 @@ window.navigateInternal = function(url) {
     window.location.href = url;
 };
 
+// Check if observation data is loaded. Returns true when ready.
+// Cloud Mode: database is always available.
+// Local Mode: verifies data via API; shows warning and navigates home on failure.
+window.checkDataLoaded = async function() {
+    if (window.isCloudMode) return true;
+
+    try {
+        const response = await fetch('/api/observations?limit=1');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.total > 0 && data.file) {
+                return true;
+            }
+        }
+    } catch (error) {
+        console.error('Error checking server data:', error);
+    }
+
+    showWarningAndGoHome(i18nStrings.messages.no_data);
+    return false;
+};
+
 // Warn user before closing browser tab/window if unsaved changes exist
 // Only triggers for browser close/refresh or external navigation, not internal navigation
 window.addEventListener('beforeunload', (event) => {
@@ -381,9 +403,9 @@ async function getDateDefault() {
             year = config.year || now.getFullYear();
         }
         
-        // Convert to 2-digit format for consistency with HALO data format
+        // Use 4-digit year for consistency with internal format
         const mm = String(month).padStart(2, '0');
-        const jj = String(year % 100).padStart(2, '0'); // 2-digit year
+        const jj = String(year); // 4-digit year
         
         return { mm, jj, month, year };
     } catch (error) {return null;
@@ -610,7 +632,7 @@ async function checkForUpdates() {
                 const message = i18nStrings.update.message
                     .replace('{latest}', latest)
                     .replace('{latestDate}', latestDate)
-                    .replace('{current}', i18nStrings.app.version)
+                    .replace('{current}', i18nStrings.app.version_display)
                     .replace('{currentDate}', i18nStrings.app.version_date);
                 showConfirmDialog(i18nStrings.update.title, message, async () => {
                     try {
@@ -787,11 +809,249 @@ function highlightMenu(page) {
     if (menu) menu.classList.add('active');
 }
 
+// Fetch observers from /api/observers, dedup by KK (keep latest seit), sort by KK.
+// Returns array of { kk, vname, nname, seit }.
+async function fetchObserversDeduped() {
+    const response = await fetch('/api/observers');
+    if (!response.ok) throw new Error('Failed to load observers');
+    const data = await response.json();
+    const all = data.observers || [];
+
+    const map = new Map();
+    for (const obs of all) {
+        const kk = parseInt(obs.KK);
+        const seit = obs.seit;
+        if (!map.has(kk) || seit > map.get(kk).seit) {
+            map.set(kk, { kk, vname: obs.VName || '', nname: obs.NName || '', seit });
+        }
+    }
+    return Array.from(map.values()).sort((a, b) => a.kk - b.kk);
+}
+
+// Populate a <select> element with observer options (DOM approach).
+// @param {HTMLSelectElement} selectElement - The <select> to populate
+// @param {Object} [options]
+// @param {string} [options.placeholder] - Placeholder text (first option with value="")
+// @param {string} [options.fixedObserver] - KK of fixed observer (pre-select + disable)
+// @param {Array}  [options.observers] - Pre-loaded observer array; if null, fetches from API
+window.populateObserverDropdown = async function(selectElement, options = {}) {
+    let observers;
+    try {
+        observers = options.observers || await fetchObserversDeduped();
+    } catch (e) {
+        console.error('Error loading observers:', e);
+        return;
+    }
+
+    selectElement.innerHTML = '';
+    if (options.placeholder) {
+        const ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = options.placeholder;
+        selectElement.appendChild(ph);
+    }
+
+    for (const obs of observers) {
+        const option = document.createElement('option');
+        option.value = obs.kk;
+        option.textContent = `${String(obs.kk).padStart(2, '0')} - ${escapeHtml(obs.vname)} ${escapeHtml(obs.nname)}`;
+        selectElement.appendChild(option);
+    }
+
+    if (options.fixedObserver) {
+        const fixedKK = String(parseInt(options.fixedObserver));
+        selectElement.value = fixedKK;
+        // Cloud Mode: pre-select but allow changing; Local Mode: disable
+        selectElement.disabled = !window.isCloudMode;
+    }
+};
+
+// Build observer <option> elements as an HTML string (for inline HTML templates).
+// Uses escapeHtml, dedup, sort, KK padding. Returns joined HTML string.
+// @param {Array} observers - Raw observer array from API
+// @param {string} [fixedObserver] - KK to pre-select
+window.buildObserverOptionsHtml = function(observers, fixedObserver) {
+    // Dedup by KK (keep latest seit)
+    const map = new Map();
+    for (const obs of observers) {
+        const kk = parseInt(obs.KK);
+        const seit = obs.seit;
+        if (!map.has(kk) || seit > map.get(kk).seit) {
+            map.set(kk, obs);
+        }
+    }
+    const sorted = Array.from(map.values()).sort((a, b) => parseInt(a.KK) - parseInt(b.KK));
+
+    return sorted.map(obs => {
+        const kk = String(parseInt(obs.KK)).padStart(2, '0');
+        const selected = (fixedObserver && String(obs.KK) === String(fixedObserver)) ? ' selected' : '';
+        return `<option value="${obs.KK}"${selected}>${kk} - ${escapeHtml(obs.VName || '')} ${escapeHtml(obs.NName || '')}</option>`;
+    }).join('');
+};
+
+// Get range values for a parameter code. Used by analysis and observation dialogs.
+// @param {string} paramCode - Parameter code (JJ, MM, TT, ZZ, SH, KK, GG, O, f, C, d, EE, DD, H, F, V, zz, HO_HU, SE)
+// @param {Array} [observers=[]] - Observer array (needed for KK case, loaded from API)
+window.getParameterRange = function(paramCode, observers) {
+    if (!observers) observers = [];
+
+    function getMonthName(monthNum) {
+        if (Array.isArray(i18nStrings.months)) {
+            return i18nStrings.months[monthNum - 1];
+        } else {
+            return i18nStrings.months[String(monthNum)];
+        }
+    }
+
+    switch (paramCode) {
+        case 'JJ':
+            const years = [];
+            for (let i = YEAR_MIN; i <= YEAR_MAX; i++) {
+                years.push({ value: i, display: String(i) });
+            }
+            return years;
+
+        case 'MM':
+            const months = [];
+            for (let i = 1; i <= 12; i++) {
+                const monthName = getMonthName(i);
+                months.push({ value: i, display: `${String(i).padStart(2, '0')} - ${monthName}` });
+            }
+            return months;
+
+        case 'TT':
+            const days = [];
+            for (let i = 1; i <= 31; i++) {
+                days.push({ value: i, display: String(i).padStart(2, '0') });
+            }
+            return days;
+
+        case 'ZZ':
+            const hours = [];
+            for (let i = 0; i <= 23; i++) {
+                hours.push({ value: i, display: i18nStrings.fields.hour_display.replace('{h}', i) });
+            }
+            return hours;
+
+        case 'SH':
+            const altitudes = [];
+            for (let i = -10; i <= 90; i++) {
+                altitudes.push({ value: i, display: String(i) + '°' });
+            }
+            return altitudes;
+
+        case 'KK':
+            return observers.map(obs => ({
+                value: obs.KK,
+                display: `${String(obs.KK).padStart(2, '0')} - ${obs.VName} ${obs.NName}`
+            }));
+
+        case 'GG':
+            return GEOGRAPHIC_REGIONS.map(gg => {
+                const regionName = i18nStrings.geographic_regions[String(gg)];
+                return { value: gg, display: `${String(gg).padStart(2, '0')} - ${regionName}` };
+            });
+
+        case 'O':
+            const objects = [];
+            for (let i = 1; i <= 5; i++) {
+                const objName = i18nStrings.object_types[String(i)];
+                objects.push({ value: i, display: `${i} - ${objName}` });
+            }
+            return objects;
+
+        case 'f':
+            const fronts = [];
+            for (let i = 0; i <= 8; i++) {
+                const frontName = i18nStrings.weather_front[String(i)];
+                fronts.push({ value: i, display: `${i} - ${frontName}` });
+            }
+            return fronts;
+
+        case 'C':
+            const cirrus = [];
+            for (let i = 0; i <= 7; i++) {
+                const cirrusName = i18nStrings.cirrus_types[String(i)];
+                cirrus.push({ value: i, display: `${i} - ${cirrusName}` });
+            }
+            return cirrus;
+
+        case 'd':
+            return [
+                { value: 0, display: `0 - ${i18nStrings.cirrus_density['0']}` },
+                { value: 1, display: `1 - ${i18nStrings.cirrus_density['1']}` },
+                { value: 2, display: `2 - ${i18nStrings.cirrus_density['2']}` },
+                { value: 4, display: `4 - ${i18nStrings.cirrus_density['4']}` },
+                { value: 5, display: `5 - ${i18nStrings.cirrus_density['5']}` },
+                { value: 6, display: `6 - ${i18nStrings.cirrus_density['6']}` },
+                { value: 7, display: `7 - ${i18nStrings.cirrus_density['7']}` }
+            ];
+
+        case 'EE':
+            return VALID_HALO_TYPES.map(i => {
+                const haloName = i18nStrings.halo_types[String(i)];
+                return { value: i, display: `${String(i).padStart(2, '0')} - ${haloName}` };
+            });
+
+        case 'DD':
+            const durations = [];
+            const minuteText = i18nStrings.observations.detail_labels.minutes.trim();
+            for (let i = 0; i <= 99; i += 10) {
+                durations.push({ value: i, display: `${i} ${minuteText}` });
+            }
+            return durations;
+
+        case 'H':
+            const brightness = [];
+            for (let i = 0; i <= 3; i++) {
+                const brightName = i18nStrings.brightness[String(i)];
+                brightness.push({ value: i, display: `${i} - ${brightName}` });
+            }
+            return brightness;
+
+        case 'F':
+            const colours = [];
+            for (let i = 0; i <= 5; i++) {
+                const colorName = i18nStrings.color[String(i)];
+                colours.push({ value: i, display: `${i} - ${colorName}` });
+            }
+            return colours;
+
+        case 'V':
+            return [
+                { value: 1, display: `1 - ${i18nStrings.completeness['1']}` },
+                { value: 2, display: `2 - ${i18nStrings.completeness['2']}` }
+            ];
+
+        case 'zz':
+            const zzTimes = [];
+            const hourText = i18nStrings.observations.detail_labels.hours.trim();
+            for (let i = 0; i <= 99; i++) {
+                zzTimes.push({ value: i, display: `${i} ${hourText}` });
+            }
+            return zzTimes;
+
+        case 'HO_HU':
+            const heights = [];
+            for (let i = 0; i <= 30; i++) {
+                heights.push({ value: i, display: String(i) + '°' });
+            }
+            return heights;
+
+        case 'SE':
+            return ['a','b','c','d','e','f','g','h'].map(letter => ({ value: letter, display: letter }));
+
+        default:
+            return [];
+    }
+};
+
 // Show help
 function showHelp() {
     // Prefer rich markdown help dialog over alerts
     showHelpDialog();
 }
+
 
 // Show warning modal with custom message - defined in modal-utils.js
 
@@ -821,10 +1081,11 @@ function showNotification(message, type = 'success', duration = 3000) {
         setTimeout(() => notification.remove(), duration);
     }
 }
+
 // Show version information dialog
 function showVersionDialog() {
     const v = i18nStrings.app.version_dialog;
-    const versionNumber = i18nStrings.app.version;
+    const versionNumber = i18nStrings.app.version_display;
     const versionDate = i18nStrings.app.version_date;
     const versionTitle = `${i18nStrings.app.title} ${versionNumber}`;
 
@@ -926,6 +1187,7 @@ async function showWhatsNewDialog() {
         setupModalCleanup(modalEl);
         
     } catch (error) {
+        clearMenuHighlights();
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);
     }
 }
@@ -989,6 +1251,7 @@ async function showHelpDialog() {
         setupModalCleanup(modalEl);
         
     } catch (error) {
+        clearMenuHighlights();
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);
     }
 }

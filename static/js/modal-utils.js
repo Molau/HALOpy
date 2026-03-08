@@ -200,6 +200,16 @@ window.showWarningModal = function(message) {
     });
 };
 
+window.showWarningAndGoHome = function(message) {
+    const { modalEl } = showSimpleModal({
+        title: i18nStrings.common.warning,
+        body: `<p>${message}</p>`
+    });
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        window.navigateInternal('/');
+    }, { once: true });
+};
+
 window.showErrorDialog = function(message) {
     return new Promise(resolve => {
         const { modalEl } = showSimpleModal({

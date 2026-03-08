@@ -14,16 +14,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     const btnApply = document.getElementById('btn-apply-filter');
     const applySpinner = document.getElementById('apply-spinner');
     
-    // Show warning modal and navigate to main on close
-    function showWarningAndGoHome(message) {
-        const modalEl = showWarningModal(message);
-        if (modalEl) {
-            modalEl.addEventListener('hidden.bs.modal', () => {
-                window.navigateInternal('/');
-            });
-        }
-    }
-
     // Populate year dropdown (YEAR_MIN-YEAR_MAX)
     function populateYears() {
         if (!yearSelect) return;
@@ -46,32 +36,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         } catch (error) {
             console.error('Error loading date default:', error);
         }
-    }
-
-    // Check if observations are loaded (same approach as monthly_report.js)
-    async function checkDataLoaded() {
-        // Cloud Mode: Database is always available, no need to query
-        if (window.isCloudMode) return true;
-
-        try {
-            const response = await fetch('/api/observations?limit=1');
-            if (response.ok) {
-                const data = await response.json();
-                // Local Mode: Check both data.total > 0 AND data.file exists
-                const hasData = data.total > 0 && data.file;
-                if (hasData) {
-                    return true;
-                }
-            }
-        } catch (error) {
-            console.error('Error checking server data:', error);
-        }
-        
-        // No data loaded - show warning only in Local Mode
-        if (!window.isCloudMode) {
-            showWarningAndGoHome(i18nStrings.messages.no_data);
-        }
-        return false;
     }
 
     // Validate year selection

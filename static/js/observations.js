@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     let currentPageData = [];   // Observations for current page only (from server)
     let displayMode = 'kurz';  // Default to compact mode (Eingabeart = 'Z')
     let currentDetailIndex = 0;
+    let cachedObservers = null; // Deduped observer list for dropdown
     
     // Filter state (matching Pascal auswahl, auswahl2)
     let filterCriterion1 = 'none';  // auswahl: none, observer, region
@@ -166,13 +167,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     async function loadObserversData() {
         try {
-            const response = await fetch('/api/observers');
-            if (response.ok) {
-                const data = await response.json();
-                if (window.haloData) {
-                    window.haloData.observers = data.observers || [];
-                }
-            }
+            cachedObservers = await fetchObserversDeduped();
         } catch (error) {
             console.warn('Could not load observers:', error);
         }
@@ -378,28 +373,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     
     function populateObserverSelect() {
-        // Load from global observer data
         filter1SelectElem.innerHTML = '';
         
-        // Get observers from window.haloData if available, or extract from observations
-        let observers = [];
-        
-        if (window.haloData && window.haloData.observers && Array.isArray(window.haloData.observers)) {
-            observers = window.haloData.observers.map(obs => ({
-                KK: parseInt(obs.KK),
-                VName: obs.VName || '',
-                NName: obs.NName || ''
-            })).sort((a,b) => a.KK - b.KK);
-        } else {
-            // No observers loaded - empty list
-            observers = [];
-        }
+        const observers = cachedObservers || [];
         
         observers.forEach(obs => {
             const option = document.createElement('option');
-            option.value = obs.KK;
-            const name = `${obs.VName} ${obs.NName}`.trim();
-            option.textContent = `${String(obs.KK).padStart(2, '0')} - ${name}`;
+            option.value = obs.kk;
+            option.textContent = `${String(obs.kk).padStart(2, '0')} - ${escapeHtml(obs.vname)} ${escapeHtml(obs.nname)}`;
             filter1SelectElem.appendChild(option);
         });
     }

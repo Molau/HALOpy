@@ -242,32 +242,25 @@ async function showModifyGroupObservations(filterState) {
 }
 
 async function showGroupModifyDialogMenu(filteredObs) {
-    // Load observer codes
-    let observerCodes, observers, fixedObserver = null;
+    // Load observers and fixed observer configuration
+    let fixedObserver = null;
+    let observerOptions = '';
     try {
-        const data = await loadObserverCodes();
-        observerCodes = data.codeSet;
-        observers = data.observers;
-        
-        // Load fixed observer configuration
-        try {
-            const configResp = await fetch('/api/config/fixed_observer');
-            if (configResp.ok) {
-                const config = await configResp.json();
-                fixedObserver = config.observer || null;
-            }
-        } catch (e) {
-            // Silently ignore - fixed observer is optional
-        }
+        // Load fixed observer in parallel with observers
+        const [observers, configResp] = await Promise.all([
+            fetchObserversDeduped(),
+            fetch('/api/config/fixed_observer').then(r => r.ok ? r.json() : {}).catch(() => ({}))
+        ]);
+        fixedObserver = configResp.observer || null;
+
+        observerOptions = observers.map(obs => {
+            const kk = String(obs.kk).padStart(2, '0');
+            const selected = (fixedObserver && String(obs.kk) === String(fixedObserver)) ? ' selected' : '';
+            return `<option value="${obs.kk}"${selected}>${kk} - ${escapeHtml(obs.vname)} ${escapeHtml(obs.nname)}</option>`;
+        }).join('');
     } catch (e) {showWarningModal(i18nStrings.messages.error_loading_observers);
         return;
     }
-    
-    // Build observer options - pre-select fixed observer if set
-    const observerOptions = observers.map(obs => {
-        const selected = (fixedObserver && String(obs.KK) === String(fixedObserver)) ? ' selected' : '';
-        return `<option value="${obs.KK}"${selected}>${obs.KK} - ${escapeHtml(obs.VName)} ${escapeHtml(obs.NName)}</option>`;
-    }).join('');
     
     // Build year options (4-digit: 1980-2079)
     const yearOptions = Array.from({length: YEAR_MAX - YEAR_MIN + 1}, (_, i) => {
@@ -1621,139 +1614,6 @@ async function showSelectDialog() {
     const selectValue = document.getElementById('select-value');
     const btnOk = document.getElementById('btn-select-ok');
 
-    // Reuse getParameterRange function from analysis.js
-    function getParameterRange(paramCode) {
-        function getMonthName(monthNum) {
-            if (i18nStrings.months && typeof i18nStrings.months === 'object') {
-                return i18nStrings.months[String(monthNum)];
-            }
-            const monthArray = i18nStrings.months;
-            return monthArray[monthNum - 1];
-        }
-        
-        switch (paramCode) {
-            case 'JJ':
-                const years = [];
-                for (let i = YEAR_MIN; i <= YEAR_MAX; i++) {
-                    years.push({ value: i, display: String(i) });
-                }
-                return years;
-            
-            case 'MM':
-                const months = [];
-                for (let i = 1; i <= 12; i++) {
-                    const monthName = getMonthName(i);
-                    months.push({ value: i, display: `${String(i).padStart(2, '0')} - ${monthName}` });
-                }
-                return months;
-            
-            case 'TT':
-                const days = [];
-                for (let i = 1; i <= 31; i++) {
-                    days.push({ value: i, display: String(i).padStart(2, '0') });
-                }
-                return days;
-            
-            case 'ZZ':
-                const hours = [];
-                for (let i = 0; i <= 23; i++) {
-                    hours.push({ value: i, display: i18nStrings.fields.hour_display.replace('{h}', i) });
-                }
-                return hours;
-            
-            case 'SH':
-                const altitudes = [];
-                for (let i = -10; i <= 90; i++) {
-                    altitudes.push({ value: i, display: String(i) + '?' });
-                }
-                return altitudes;
-            
-            case 'KK':
-                // Load observers from API
-                const observers = [];
-                // Will be populated from server data
-                return observers;
-            
-            case 'GG':
-                const regionNumbers = [1,2,3,4,5,6,7,8,9,10,11,16,17,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39];
-                return regionNumbers.map(gg => {
-                    const regionName = i18nStrings.geographic_regions[String(gg)];
-                    return { value: gg, display: `${String(gg).padStart(2, '0')} - ${regionName}` };
-                });
-            
-            case 'O':
-                const objects = [];
-                for (let i = 1; i <= 5; i++) {
-                    const objName = i18nStrings.object_types[String(i)];
-                    objects.push({ value: i, display: `${i} - ${objName}` });
-                }
-                return objects;
-            
-            case 'EE':
-                const haloTypes = [];
-                for (let i = 1; i <= 77; i++) {
-                    const haloName = i18nStrings.halo_types[String(i)];
-                    haloTypes.push({ value: i, display: `${String(i).padStart(2, '0')} - ${haloName}` });
-                }
-                haloTypes.push({ value: 99, display: `99 - ${i18nStrings.halo_types['99']}` });
-                return haloTypes;
-            
-            case 'DD':
-                const densities = [];
-                densities.push({ value: 0, display: `0 - ${i18nStrings.cirrus_density['0']}` });
-                densities.push({ value: 1, display: `1 - ${i18nStrings.cirrus_density['1']}` });
-                densities.push({ value: 2, display: `2 - ${i18nStrings.cirrus_density['2']}` });
-                densities.push({ value: 4, display: `4 - ${i18nStrings.cirrus_density['4']}` });
-                densities.push({ value: 5, display: `5 - ${i18nStrings.cirrus_density['5']}` });
-                densities.push({ value: 6, display: `6 - ${i18nStrings.cirrus_density['6']}` });
-                densities.push({ value: 7, display: `7 - ${i18nStrings.cirrus_density['7']}` });
-                return densities;
-            
-            case 'N':
-                const coverages = [];
-                for (let i = 0; i <= 9; i++) {
-                    const coverageName = i18nStrings.cloud_cover[String(i)];
-                    coverages.push({ value: i, display: `${i} - ${coverageName}` });
-                }
-                return coverages;
-            
-            case 'C':
-                const cirrus = [];
-                for (let i = 0; i <= 7; i++) {
-                    const cirrusName = i18nStrings.cirrus_types[String(i)];
-                    cirrus.push({ value: i, display: `${i} - ${cirrusName}` });
-                }
-                return cirrus;
-            
-            case 'H':
-                const brightness = [];
-                for (let i = 0; i <= 3; i++) {
-                    const brightName = i18nStrings.brightness[String(i)];
-                    brightness.push({ value: i, display: `${i} - ${brightName}` });
-                }
-                return brightness;
-            
-            case 'F':
-                const colors = [];
-                for (let i = 0; i <= 5; i++) {
-                    const colorName = i18nStrings.color[String(i)];
-                    colors.push({ value: i, display: `${i} - ${colorName}` });
-                }
-                return colors;
-            
-            case 'V':
-                const completeness = [];
-                for (let i = 1; i <= 2; i++) {
-                    const complName = i18nStrings.completeness[String(i)];
-                    completeness.push({ value: i, display: `${i} - ${complName}` });
-                }
-                return completeness;
-            
-            default:
-                return [];
-        }
-    }
-
     // Handle filter selection change - populate value dropdown or show special fields
     selectFilter.addEventListener('change', async () => {
         const filterType = selectFilter.value;
@@ -1942,20 +1802,16 @@ async function showSelectDialog() {
             }
             
         } else if (filterType === 'KK') {
-            // Observer selection - fetch from API and populate dropdown
+            // Observer selection - use global dropdown population
             selectValueDiv.style.display = 'block';
             
             try {
-                const response = await fetch('/api/observers');
-                const data = await response.json();
-                const observers = data.observers || [];
-                
+                const observers = await fetchObserversDeduped();
                 selectValue.innerHTML = '';
-                observers.forEach(observer => {
+                observers.forEach(obs => {
                     const option = document.createElement('option');
-                    option.value = observer.KK;
-                    // Format: KK - VName NName
-                    option.textContent = `${String(observer.KK).padStart(2, '0')} - ${observer.VName} ${observer.NName}`;
+                    option.value = obs.kk;
+                    option.textContent = `${String(obs.kk).padStart(2, '0')} - ${escapeHtml(obs.vname)} ${escapeHtml(obs.nname)}`;
                     selectValue.appendChild(option);
                 });
             } catch (error) {selectValue.innerHTML = '<option value="">Error loading observers</option>';

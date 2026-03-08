@@ -383,7 +383,7 @@
     "error_observer_update_failed": "Error updating observer",
     "error_site_add_failed": "Error adding site entry",
     "error_no_data_provided": "No data provided",
-    "error_original_seit_required": "Original site date is missing",
+    "error_original_seit_required": "Original since date is missing",
     "error_site_entry_not_found": "Site entry not found",
     "error_site_update_failed": "Error updating site entry",
     "loading_error": "Error loading observers.",

@@ -14,77 +14,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const btnApply = document.getElementById('btn-apply-filter');
     const applySpinner = document.getElementById('apply-spinner');
     
-    // Show warning modal (same style as main.js)
-    function showWarningModal(message) {
-        const modalHtml = `
-            <div class="modal fade" id="warning-modal" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">${i18nStrings.common.warning}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>${message}</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary btn-sm px-4" data-bs-dismiss="modal">${i18nStrings.common.ok}</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        const modalEl = document.getElementById('warning-modal');
-        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
-        
-        // Wait for modal to be fully shown before allowing focus
-        modalEl.addEventListener('shown.bs.modal', () => {
-            modalEl.removeAttribute('aria-hidden');
-        }, { once: true });
-        
-        modal.show();
-
-        // Decision #033: setupModalKeyboard for Enter key (OK has data-bs-dismiss)
-        const okBtn = modalEl.querySelector('.modal-footer .btn-primary');
-        setupModalKeyboard(modalEl, okBtn);
-
-        // Navigate home when modal closes
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            window.navigateInternal('/');
-        }, { once: true });
-
-        // Decision #033: setupModalCleanup for DOM cleanup
-        setupModalCleanup(modalEl);
-    }
-
     // Placeholder is already set in HTML template via Jinja2
-
-    // Check if observations are loaded (same approach as monthly_report.js)
-    async function checkDataLoaded() {
-        // Cloud Mode: Database is always available, no need to query
-        if (window.isCloudMode) return true;
-
-        try {
-            const response = await fetch('/api/observations?limit=1');
-            if (response.ok) {
-                const data = await response.json();
-                // Local Mode: Check both data.total > 0 AND data.file exists
-                const hasData = data.total > 0 && data.file;
-                if (hasData) {
-                    return true;
-                }
-            }
-        } catch (error) {
-            console.error('Error checking server data:', error);
-        }
-        
-        // No data loaded - show warning only in Local Mode
-        if (!window.isCloudMode) {
-            showWarningModal(i18nStrings.messages.no_data);
-        }
-        return false;
-    }
 
     // Validate month/year selection from dropdowns
     function validateMonthYear() {
