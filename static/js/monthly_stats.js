@@ -216,9 +216,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const months = i18nStrings.months || {};
         const monthName = months[data.mm] || months[data.mm.toString()];
         
-        // Format year
-        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
-                 `20${data.jj.toString().padStart(2, '0')}`;
+        // Format year (data.jj is 4-digit from backend)
+        const year = String(data.jj);
         
         // Set title with month and year
         const resultsTitle = document.getElementById('results-modal-title');
@@ -647,7 +646,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 
                 const data = currentStatsData;
                 const monthShort = i18nStrings.months_short[data.mm];
-                const jjPadded = String(data.jj).padStart(2, '0');
+                const yearStr = String(data.jj);
                 
                 // Check output mode
                 const modeResponse = await fetch('/api/config/outputmode');
@@ -658,17 +657,17 @@ document.addEventListener('DOMContentLoaded', async function() {
                 
                 if (outputMode === 'H') {
                     // HTML-Tabellen mode: save as CSV with table data
-                    filename = `${monthShort.toLowerCase()}19${jjPadded}.csv`;
+                    filename = `${monthShort.toLowerCase()}${yearStr}.csv`;
                     content = generateStatsCSV(data);
                     mimeType = 'text/csv;charset=utf-8';
                 } else if (outputMode === 'M') {
                     // Markdown mode: save as Markdown with pipe tables
-                    filename = `${monthShort.toLowerCase()}19${jjPadded}.md`;
-                    content = buildMarkdownMonthlyStats(data, i18nStrings.months[data.mm], parseInt(data.jj) + 1900, i18nStrings);
+                    filename = `${monthShort.toLowerCase()}${yearStr}.md`;
+                    content = buildMarkdownMonthlyStats(data, i18nStrings.months[data.mm], data.jj, i18nStrings);
                     mimeType = 'text/markdown;charset=utf-8';
                 } else {
                     // Pseudografik mode: save as TXT with formatted statistics
-                    filename = `${monthShort.toLowerCase()}19${jjPadded}.txt`;
+                    filename = `${monthShort.toLowerCase()}${yearStr}.txt`;
                     content = generateStatsText();
                     mimeType = 'text/plain;charset=utf-8';
                 }
@@ -708,8 +707,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     function showActivityChart(data) {
         const months = i18nStrings.months || {};
         const monthName = months[data.mm];
-        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
-                 `20${data.jj.toString().padStart(2, '0')}`;
+        const year = String(data.jj);
         
         // Set chart title - LINE CHART
         const chartPrintableTitle = document.getElementById('chart-printable-title-line');
@@ -834,8 +832,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     function showActivityBarChart(data) {
         const monthName = i18nStrings.months[data.mm];
-        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
-                 `20${data.jj.toString().padStart(2, '0')}`;
+        const year = String(data.jj);
         
         // Set chart title - BAR CHART
         const chartPrintableTitle = document.getElementById('chart-printable-title-bar');
@@ -991,8 +988,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 try {
                     const data = window.chartData;
                     const monthShort = i18nStrings.months_short[data.mm];
-                    const jjPadded = String(data.jj).padStart(2, '0');
-                    const filename = `Haloaktivitaet_${monthShort.toLowerCase()}${jjPadded}.png`;
+                    const filename = `Haloaktivitaet_${monthShort.toLowerCase()}${data.jj}.png`;
                     
                     const response = await fetch(`/api/monthly-stats?mm=${data.mm}&jj=${data.jj}&format=linegraph`);
                     const blob = await response.blob();
@@ -1047,8 +1043,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 try {
                     const data = window.chartData;
                     const monthShort = i18nStrings.months_short[data.mm];
-                    const jjPadded = String(data.jj).padStart(2, '0');
-                    const filename = `Haloaktivitaet_${monthShort.toLowerCase()}${jjPadded}_Balken.png`;
+                    const filename = `Haloaktivitaet_${monthShort.toLowerCase()}${data.jj}_Balken.png`;
                     
                     const response = await fetch(`/api/monthly-stats?mm=${data.mm}&jj=${data.jj}&format=bargraph`);
                     const blob = await response.blob();
@@ -1078,8 +1073,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const data = currentStatsData;
         const monthName = i18nStrings.months[data.mm];
-        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
-                 `20${data.jj.toString().padStart(2, '0')}`;
+        const year = String(data.jj);
         
         let text = '';
         
@@ -1118,8 +1112,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const data = currentStatsData;
         const monthShort = i18nStrings.months_short[data.mm];
-        const jjPadded = String(data.jj).padStart(2, '0');
-        const filename = `Haloaktivitaet_Balken_${monthShort.toLowerCase()}${jjPadded}.png`;
+        const filename = `Haloaktivitaet_Balken_${monthShort.toLowerCase()}${data.jj}.png`;
         
         // Fetch server-generated bar graph
         fetch(`/api/monthly-stats?mm=${data.mm}&jj=${data.jj}&format=bargraph`)
@@ -1147,8 +1140,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const data = currentStatsData;
         const monthShort = i18nStrings.months_short[data.mm];
-        const jjPadded = String(data.jj).padStart(2, '0');
-        const filename = `Haloaktivitaet_${monthShort.toLowerCase()}${jjPadded}.png`;
+        const filename = `Haloaktivitaet_${monthShort.toLowerCase()}${data.jj}.png`;
         
         // Fetch server-generated line graph
         fetch(`/api/monthly-stats?mm=${data.mm}&jj=${data.jj}&format=linegraph`)
@@ -1175,8 +1167,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         let csv = '';
         const months = i18nStrings.months || {};
         const monthName = months[data.mm];
-        const year = data.jj >= (YEAR_MIN-1900) ? `19${data.jj.toString().padStart(2, '0')}` : 
-                 `20${data.jj.toString().padStart(2, '0')}`;
+        const year = String(data.jj);
         
         // Table 1: Observer Overview
         if (data.observer_overview && data.observer_overview.length > 0) {

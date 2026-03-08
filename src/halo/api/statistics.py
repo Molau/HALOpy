@@ -172,13 +172,15 @@ def get_monthly_report() -> Dict[str, Any]:
         
         if mm_int < 1 or mm_int > 12:
             return jsonify({'error': 'Invalid month (1-12)'}), 400
-        if jj_int < 0 or jj_int > 99:
-            return jsonify({'error': 'Invalid year (0-99)'}), 400
+
+        # Accept both 2-digit and 4-digit years, normalize to 4-digit
+        if 0 <= jj_int <= 99:
+            jj_int = jj_to_full_year(jj_int)
+        elif jj_int < YEAR_MIN or jj_int > YEAR_MAX:
+            return jsonify({'error': f'Invalid year (0-99 or {YEAR_MIN}-{YEAR_MAX})'}), 400
+
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameters'}), 400
-    
-    # Normalize to 4-digit year (observations store 4-digit JJ internally)
-    jj_int = jj_to_full_year(jj_int)
     
     # Load observations - CLOUD MODE: Filter in SQL, LOCAL MODE: Filter in memory
     if is_cloud_mode():
@@ -733,13 +735,15 @@ def get_monthly_stats() -> Dict[str, Any]:
         
         if mm_int < 1 or mm_int > 12:
             return jsonify({'error': 'Invalid month (1-12)'}), 400
-        if jj_int < 0 or jj_int > 99:
-            return jsonify({'error': 'Invalid year (0-99)'}), 400
+
+        # Accept both 2-digit and 4-digit years, normalize to 4-digit
+        if 0 <= jj_int <= 99:
+            jj_int = jj_to_full_year(jj_int)
+        elif jj_int < YEAR_MIN or jj_int > YEAR_MAX:
+            return jsonify({'error': f'Invalid year (0-99 or {YEAR_MIN}-{YEAR_MAX})'}), 400
+
     except ValueError:
         return jsonify({'error': 'Invalid numeric parameters'}), 400
-    
-    # Normalize to 4-digit year (observations store 4-digit JJ internally)
-    jj_int = jj_to_full_year(jj_int)
     
     # Load observations - CLOUD MODE: Filter in SQL, LOCAL MODE: Filter in memory
     if is_cloud_mode():

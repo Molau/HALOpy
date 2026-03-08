@@ -336,7 +336,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const monthName = i18nStrings.months[data.mm];
         
         // Format title
-        const year = data.jj < (YEAR_MIN-1900) ? 2000 + data.jj : 1900 + data.jj;
+        const year = data.jj;
         const title = i18nStrings.monthly_report.report_title_template
             .replace('{observer}', data.observer_name)
             .replace('{month}', monthName)
@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const data = currentReportData;
         const monthName = i18nStrings.months[data.mm];
-        const year = data.jj < (YEAR_MIN-1900) ? 2000 + data.jj : 1900 + data.jj;
+        const year = data.jj;
         const title = i18nStrings.monthly_report.report_title_template
             .replace('{observer}', data.observer_name)
             .replace('{month}', monthName)
@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const data = currentReportData;
                 const monthShort = i18nStrings.months_short[data.mm];
                 const kkPadded = String(data.kk).padStart(2, '0');
-                const jjPadded = String(data.jj).padStart(2, '0');
+                const jjPadded = String(data.jj);
                 
                 if (outputMode === 'M') {
                     // Save as Markdown file (lowercase filename) - fetch from server
