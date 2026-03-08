@@ -240,11 +240,9 @@ def _obs_to_json(obs: Dict[str, str]) -> Dict[str, Any]:
     """Convert an observation dict (str values) to JSON-friendly dict.
     
     Maps empty strings to None (JSON null) for the frontend.
-    Handles the special zz field (99 → 0) and lp8 computed field.
+    Keeps zz semantics unchanged (-1/None = not observed, 99 = no precipitation).
     """
     zz_val = _json_int(obs, 'zz')
-    if zz_val == 99:
-        zz_val = 0
 
     ee = _int(obs, 'EE')
     ho = _json_int(obs, 'HO')

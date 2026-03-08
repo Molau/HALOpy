@@ -28,7 +28,7 @@ function escapeHtml(text) {
  * Call this ONCE after modal.show().
  * 
  * - Enter key triggers the confirmBtn (unless focus is in textarea/select)
- * - ESC is handled by Bootstrap natively (keyboard: true)
+ * - ESC closes the modal (unless keyboard=false)
  * - Cleanup: listener is automatically removed when modal is hidden
  * 
  * @param {HTMLElement} modalEl - The .modal element
@@ -36,7 +36,33 @@ function escapeHtml(text) {
  */
 function setupModalKeyboard(modalEl, confirmBtn) {
     function onKeydown(e) {
-        if (e.key === 'Enter' && confirmBtn) {
+        // Only react while this modal is visible
+        if (!modalEl.classList.contains('show')) {
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            // Respect modals that explicitly disable keyboard closing
+            if (modalEl.getAttribute('data-bs-keyboard') === 'false') {
+                return;
+            }
+
+            e.preventDefault();
+
+            const instance = bootstrap.Modal.getInstance(modalEl);
+            if (instance) {
+                instance.hide();
+                return;
+            }
+
+            const dismissBtn = modalEl.querySelector('[data-bs-dismiss="modal"], .btn-close');
+            if (dismissBtn) {
+                dismissBtn.click();
+            }
+            return;
+        }
+
+        if (e.key === 'Enter' && confirmBtn && modalEl.contains(document.activeElement)) {
             const tag = document.activeElement?.tagName;
             if (tag !== 'TEXTAREA' && tag !== 'SELECT') {
                 e.preventDefault();
@@ -45,11 +71,12 @@ function setupModalKeyboard(modalEl, confirmBtn) {
         }
     }
 
-    modalEl.addEventListener('keydown', onKeydown);
+    // Listen on document to be resilient when focus temporarily leaves modal
+    document.addEventListener('keydown', onKeydown, true);
 
     // Auto-cleanup when modal is hidden
     modalEl.addEventListener('hidden.bs.modal', function cleanup() {
-        modalEl.removeEventListener('keydown', onKeydown);
+        document.removeEventListener('keydown', onKeydown, true);
         modalEl.removeEventListener('hidden.bs.modal', cleanup);
     }, { once: true });
 }

@@ -69,6 +69,34 @@ select option:disabled {
     border-radius: 0.25rem;
 }
 
+/* Consistent top-menu hover/focus feedback for items with and without dropdown */
+.menu-title:hover,
+.menu-title:focus,
+.menu-title.show,
+.menu-title.hover-active {
+    color: #0d6efd !important;
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    border-radius: 0.25rem;
+}
+
+.menu-title:focus {
+    box-shadow: none;
+}
+
+/* While hovering the menu bar, suppress stale active highlight on other entries. */
+body.menu-hover-active .menu-title.active:not(.hover-active) {
+    color: var(--bs-nav-link-color) !important;
+    background-color: transparent !important;
+    font-weight: normal;
+}
+
+/* Same suppression for Bootstrap-open dropdown toggles (.show). */
+body.menu-hover-active .menu-title.show:not(.hover-active) {
+    color: var(--bs-nav-link-color) !important;
+    background-color: transparent !important;
+    font-weight: normal;
+}
+
 /* Statistics report - ensure black text */
 .statistics-report {
     color: #000000 !important;

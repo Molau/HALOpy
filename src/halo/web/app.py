@@ -290,15 +290,16 @@ def main():
     print("Press Ctrl+C to stop")
     print("=" * 60)
 
-    # Open default browser after a short delay (server needs time to start)
-    # Only on first run (debug=True spawns a reloader child process)
-    # Skip if a browser is already connected (server was already running)
-    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+    # Browser auto-open is opt-in to avoid opening a new window on every restart.
+    # Set HALOPY_OPEN_BROWSER=1 to enable auto-open.
+    auto_open_browser = os.environ.get('HALOPY_OPEN_BROWSER', '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+    if auto_open_browser and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         already_running = False
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             already_running = s.connect_ex(('127.0.0.1', 5000)) == 0
         if not already_running:
-            threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000')).start()
+            threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000', new=0, autoraise=True)).start()
 
     app.run(host='0.0.0.0', port=5000, debug=True)
 

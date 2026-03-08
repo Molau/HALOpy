@@ -205,6 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupLanguageSwitcher();
     setupMenuHandlers();
     setupHoverDropdowns();
+    setupMenuHoverHighlightBehavior();
     
     // Clear menu highlights if on main page
     if (window.location.pathname === '/') {
@@ -343,6 +344,52 @@ async function loadCurrentLanguage() {
     const data = await response.json();
         currentLanguage = data.language || 'de'; // Default to 'de' if not provided
     window.currentLanguage = currentLanguage;
+}
+
+// Ensure only one top-level menu appears highlighted while hovering.
+function setupMenuHoverHighlightBehavior() {
+    const nav = document.querySelector('.navbar-nav');
+    if (!nav) return;
+
+    const deactivateOtherMenuHighlights = (currentTitle = null) => {
+        nav.querySelectorAll('.menu-title').forEach(title => {
+            if (title !== currentTitle) {
+                title.classList.remove('active', 'hover-active', 'show');
+            }
+        });
+
+        // Ensure only the current dropdown remains open/highlighted.
+        nav.querySelectorAll('.nav-item.dropdown .dropdown-toggle').forEach(toggle => {
+            if (toggle !== currentTitle) {
+                const instance = bootstrap.Dropdown.getInstance(toggle);
+                if (instance) {
+                    instance.hide();
+                }
+            }
+        });
+    };
+
+    const clearHoverState = () => {
+        document.body.classList.remove('menu-hover-active');
+        nav.querySelectorAll('.menu-title.hover-active').forEach(title => {
+            title.classList.remove('hover-active');
+        });
+    };
+
+    nav.querySelectorAll('.nav-item').forEach(item => {
+        const title = item.querySelector('.menu-title');
+        if (!title) return;
+
+        // Attach to the full nav-item so dropdown menus keep the hovered title highlighted.
+        item.addEventListener('mouseenter', () => {
+            document.body.classList.add('menu-hover-active');
+            deactivateOtherMenuHighlights(title);
+            title.classList.add('hover-active');
+        });
+    });
+
+    nav.addEventListener('mouseleave', clearHoverState);
+    window.addEventListener('blur', clearHoverState);
 }
 
 async function loadObserverCodes() {
@@ -491,26 +538,33 @@ function handleMenuAction(action) {
             
         // Observations menu
         case 'obs-display':
+            highlightMenu('observations');
             showDisplayObservationsDialog();
             break;
         case 'obs-add':
+            highlightMenu('observations');
             showAddObservationDialog();
             break;
         case 'obs-modify':
+            highlightMenu('observations');
             showModifyObservationsDialog();
             break;
         case 'obs-delete':
+            highlightMenu('observations');
             showDeleteObservationsDialog();
             break;
             
         // Observers menu
         case 'observer-add':
+            highlightMenu('observers');
             showAddObserverDialog();
             break;
         case 'observer-modify':
+            highlightMenu('observers');
             showEditObserverDialog();
             break;
         case 'observer-delete':
+            highlightMenu('observers');
             showDeleteObserverDialog();
             break;
             
@@ -799,7 +853,8 @@ function updateDropdownItem(action, text) {
 
 // Clear all menu highlights (called when returning to main page or closing dialogs)
 function clearMenuHighlights() {
-    document.querySelectorAll('.menu-title').forEach(menu => menu.classList.remove('active'));
+    document.body.classList.remove('menu-hover-active');
+    document.querySelectorAll('.menu-title').forEach(menu => menu.classList.remove('active', 'hover-active', 'show'));
 }
 
 // Highlight a specific menu by its data-page attribute

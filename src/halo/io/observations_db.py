@@ -48,6 +48,12 @@ def _observation_to_tuple(obs: Dict[str, str]) -> Tuple:
             return int(val)
         except (ValueError, TypeError):
             return None
+
+    def to_precip_int_or_none(val):
+        # Preserve zz distinction: // means "no precipitation" (=99), not NULL.
+        if val == '//':
+            return 99
+        return to_int_or_none(val)
     
     # Format pillar field: "8HHHH" where HH=HO, HH=HU
     # Each HH can be digits (01-90) or "//" (not specified)
@@ -82,7 +88,7 @@ def _observation_to_tuple(obs: Dict[str, str]) -> Tuple:
         to_int_or_none(obs.get('F', '')),
         to_int_or_none(obs.get('V', '')),
         to_int_or_none(obs.get('f', '')),
-        to_int_or_none(obs.get('zz', '')),
+        to_precip_int_or_none(obs.get('zz', '')),
         to_int_or_none(obs.get('GG', '')),
         pillar,
         obs.get('sectors', ''),

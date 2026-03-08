@@ -149,6 +149,26 @@ class ObservationCSV:
             return ''
 
     @staticmethod
+    def _norm_zz(value: str) -> str:
+        """Normalize zz while preserving HALO semantics.
+
+        - blank/space => '' (not observed)
+        - '//' => '99' (no precipitation)
+        - digits => stripped int string
+        """
+        v = value.strip()
+        if not v:
+            return ''
+        if v == '//':
+            return '99'
+        if v == '/':
+            return ''
+        try:
+            return str(int(v))
+        except ValueError:
+            return ''
+
+    @staticmethod
     def _parse_observation_parts(parts: List[str]) -> Dict[str, str]:
         """Parse observation from CSV field parts into a Dict[str, str].
         
@@ -177,7 +197,7 @@ class ObservationCSV:
         obs['F'] = _n(parts[15])
         obs['V'] = _n(parts[16])
         obs['f'] = _n(parts[17])
-        obs['zz'] = _n(parts[18])
+        obs['zz'] = ObservationCSV._norm_zz(parts[18])
         obs['GG'] = _n(parts[19])
         
         # Parse 8HHHH field into HO and HU

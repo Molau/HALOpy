@@ -456,7 +456,7 @@ async function showGroupModifyDialogMenu(filteredObs) {
                                 <select class="form-select form-select-sm" id="group-zz">
                                     <option value="">${i18nStrings.fields.select}</option>
                                     ${Array.from({length: 99}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')} h</option>`).join('')}
-                                    <option value="99">99</option>
+                                    <option value="99">//</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -951,10 +951,6 @@ async function showObservationFormForDelete(obs, currentNum, totalNum, onYes, on
 
 // Show Display Observations dialog (filter then navigate)
 async function showDisplayObservationsDialog() {
-    // Show spinner while loading
-    const loadingMessage = i18nStrings.messages.loading_observations;
-    const spinnerInfo = showInfoModal(i18nStrings.common.loading, loadingMessage);
-    
     try {
         // Get config to check cloud mode
         const configResponse = await fetch('/api/config');
@@ -964,37 +960,31 @@ async function showDisplayObservationsDialog() {
         // In Cloud Mode, data is always in database
         if (!isCloudMode) {
             try {
-                const response = await fetch('/api/observations?limit=1');
-                if (!response.ok) {
-                    spinnerInfo.modal.hide();
+                const statusResponse = await fetch('/api/file/status');
+                if (!statusResponse.ok) {
                     await showWarningModal(i18nStrings.messages.no_data);
                     return;
                 }
-                const data = await response.json();
-                if (!data.total || data.total === 0) {
-                    spinnerInfo.modal.hide();
+
+                const status = await statusResponse.json();
+                if (!status.filename) {
+                    await showWarningModal(i18nStrings.observations.no_file_loaded);
+                    return;
+                }
+
+                if (!status.count || status.count === 0) {
                     await showWarningModal(i18nStrings.messages.no_data);
                     return;
                 }
             } catch (error) {
-                spinnerInfo.modal.hide();
                 await showWarningModal(i18nStrings.messages.no_data);
                 return;
             }
         }
-        
+
         // Initialize filter dialog (allowObserverChange: Cloud Mode users can select different observer)
         const filterDialog = new FilterDialog({ allowObserverChange: true });
         await filterDialog.initialize();
-        
-        // Hide and immediately remove spinner (don't wait for hidden.bs.modal event)
-        spinnerInfo.modal.hide();
-        // Remove immediately to prevent re-showing when other modals close
-        setTimeout(() => {
-            if (spinnerInfo.modalEl && spinnerInfo.modalEl.parentNode) {
-                spinnerInfo.modalEl.remove();
-            }
-        }, 100);
         
         // Show filter dialog with callbacks
         filterDialog.show(
@@ -1019,14 +1009,6 @@ async function showDisplayObservationsDialog() {
         },
         () => {
             // onCancel callback - user cancelled
-            // Hide spinner if still visible
-            if (spinnerInfo.modal && spinnerInfo.modalEl) {
-                spinnerInfo.modal.hide();
-                if (spinnerInfo.modalEl.parentNode) {
-                    spinnerInfo.modalEl.remove();
-                }
-            }
-            
             // Force cleanup of any remaining modal backdrops
             setTimeout(() => {
                 const backdrops = document.querySelectorAll('.modal-backdrop');
@@ -1042,9 +1024,6 @@ async function showDisplayObservationsDialog() {
         }
     );
     } catch (error) {
-        // Hide spinner on error
-        spinnerInfo.modal.hide();
-        spinnerInfo.modalEl.remove();
         showErrorDialog(i18nStrings.messages.error_loading_data);
     }
 }

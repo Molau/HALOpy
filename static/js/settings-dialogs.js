@@ -220,14 +220,21 @@ async function showFixedObserverDialog() {
         document.getElementById('btn-fixed-observer-ok').addEventListener('click', async () => {
             const select = document.getElementById('fixed-observer-select');
             const newObserver = select.value;
-            
-            modal.hide();
-            
-            await fetch('/api/config/fixed_observer', {
-                method: 'POST',
+
+            const response = await fetch('/api/config/fixed_observer', {
+                method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({observer: newObserver})
             });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                const errMsg = data.error || i18nStrings.messages.error_saving;
+                showErrorDialog(errMsg);
+                return;
+            }
+
+            modal.hide();
         });
         
         // clearMenuHighlights on close (settings menu)

@@ -640,7 +640,11 @@ def validate_observation(obs: Dict[str, str]) -> Tuple[bool, List[str]]:
     f = _int(obs, 'F', -1)
     v = _int(obs, 'V', -1)
     front = _int(obs, 'f', -1)
-    zz = _int(obs, 'zz', -1)
+    zz_raw = obs.get('zz', '')
+    if zz_raw == '//':
+        zz = 99
+    else:
+        zz = _int(obs, 'zz', -1)
     ho = _int(obs, 'HO', -1)
     hu = _int(obs, 'HU', -1)
     

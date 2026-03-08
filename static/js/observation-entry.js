@@ -1509,6 +1509,13 @@ function parseNumericObservation(s) {
         }
         return parseInt(x, 10);
     };
+
+    // zz has distinct semantics: spaces = not observed, // = no precipitation (99)
+    const toPrecipInt2 = (x) => {
+        if (x === '  ' || x === '') return -1;
+        if (x === '//') return 99;
+        return parseInt(x, 10);
+    };
     
     const obs = {
         KK: parseInt(s.slice(0,2),10),
@@ -1529,7 +1536,7 @@ function parseNumericObservation(s) {
         F: toInt(s.slice(23,24), false),    // No slash allowed
         V: toInt(s.slice(24,25), false),    // No slash allowed
         f: toInt(s.slice(25,26), false),    // No slash allowed
-        zz: toInt2(s.slice(26,28), false),  // No slash allowed
+        zz: toPrecipInt2(s.slice(26,28)),  // '//' = 99 (no precipitation), '  ' = -1
         GG: parseInt(s.slice(28,30),10),
         HO: -1,
         HU: -1,

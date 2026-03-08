@@ -223,6 +223,10 @@ class ObservationForm {
             nextBtn.style.display = '';
             nextBtn.disabled = currentNum >= totalNum;
         }
+
+        // Keep keyboard handling stable after in-place updates.
+        // Without explicit focus, some browsers can leave focus outside modal.
+        this.modalElement.focus();
     }
     
     /**
@@ -491,7 +495,7 @@ class ObservationForm {
                 <select class="form-select form-select-sm" id="form-zz">
                     <option value="-1">${i18nStrings.fields.select}</option>
                     ${Array.from({length: 99}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
-                    <option value="99">99</option>
+                    <option value="99">//</option>
                 </select>
             </div>
             <div class="col-md-3">
