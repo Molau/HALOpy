@@ -300,7 +300,7 @@ class FilterDialog {
         for (let year = YEAR_MIN; year <= YEAR_MAX; year++) {
             const option = document.createElement('option');
             const yearStr = String(year);
-            option.value = yearStr.substring(2); // 2-digit year
+            option.value = yearStr; // 4-digit year (architecture decision)
             option.textContent = yearStr; // Display full 4-digit year
             yearSelect.appendChild(option);
         }

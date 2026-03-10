@@ -14,7 +14,7 @@ Local mode (file-based operation) remains fully available and works as before. T
 Version 3.0 is a complete reprogramming of the original DOS program. We have adhered as closely as possible to the proven original program and made changes only where technically necessary (e.g., replacing DOS-dependent functions with web equivalents).
 
 - Web platform and OS independence: Web application, operation completely in the browser; no longer tied to DOS (no DOS printer or color settings).
-- Data handling: CSV only – both observation files (*.NAL) and observer file (HALO.BEO) are now in CSV format; no adapt/transfer/export of legacy HAL files in the program, no directory switching needed.
+- Data handling: CSV only – both observation files (*.HAL) and observer file (HALO.BEO) are now in CSV format; no adapt/transfer/export of legacy HAL files in the program, no directory switching needed.
 - Display/Analysis: Analysis in the browser with three text formats (HTML tables, pseudographics like DOS, Markdown), save as CSV/TXT/MD, graphics as PNG.
 - Output: Monthly report, monthly and annual statistics as browser pages, same text format as above selectable; output destination (screen/print/file) is selected in the result view, printing via browser.
 - Filter dialogs: All filter and parameter queries are bundled in one window instead of multiple sequential dialogs.

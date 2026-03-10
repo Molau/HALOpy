@@ -554,8 +554,32 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
 
         const uploadMode = document.querySelector('input[name="upload_mode"]:checked').value;
         
-        // CLOSE upload modal FIRST (setupModalCleanup handles DOM removal)
-        modal.hide();
+        // Replace mode: warn that all existing observations will be deleted
+        if (uploadMode === 'replace') {
+            modal.hide();
+            const confirmId = 'confirm-replace-' + Date.now();
+            const noId = confirmId + '-no';
+            const yesId = confirmId + '-yes';
+            const footer = createModalButton(i18nStrings.common.no, 'primary', { id: noId, dismiss: true }) +
+                           createModalButton(i18nStrings.common.yes, 'secondary', { id: yesId });
+            const { modal: confirmModal, modalEl: confirmEl } = showSimpleModal({
+                title: i18nStrings.common.warning,
+                body: `<p>${i18nStrings.upload_download.upload_replace_warning}</p>`,
+                footer
+            });
+            let confirmed = false;
+            document.getElementById(yesId).addEventListener('click', () => {
+                confirmed = true;
+                confirmModal.hide();
+            });
+            await new Promise(resolve => {
+                confirmEl.addEventListener('hidden.bs.modal', resolve, { once: true });
+            });
+            if (!confirmed) return;
+        } else {
+            // CLOSE upload modal FIRST (setupModalCleanup handles DOM removal)
+            modal.hide();
+        }
         
         // Show single spinner for entire operation (reading + uploading)
         const uploadSpinner = showInfoModal(i18nStrings.upload_download.upload_title, i18nStrings.upload_download.upload_progress);

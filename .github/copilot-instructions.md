@@ -73,6 +73,7 @@ This document provides workflow guidance for GitHub Copilot when working on HALO
 2. Reuse existing patterns — don't reinvent dialogs, validations, formatters
 3. Follow existing code style in HALOpy
 4. All user-visible text must use i18n
+5. **ALWAYS use VS Code editor tools** (`replace_string_in_file`, `create_file`, `multi_replace_string_in_file`) for file changes — never write files via Python scripts or terminal commands. The user needs to see inline diffs in the editor.
 
 ### When Making Changes
 

@@ -39,6 +39,67 @@
 // ============================================================================
 
 
+// Ask if user wants to perform another operation (modify/delete).
+// Default button is Yes (primary) since the user still needs to select the observation.
+function showAnotherOperationDialog(title, message) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const modalHtml = `
+            <div class="modal fade" id="another-operation-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header py-2">
+                            <h6 class="modal-title mb-0">${title}</h6>
+                        </div>
+                        <div class="modal-body py-3">
+                            <p class="mb-0">${message}</p>
+                        </div>
+                        <div class="modal-footer py-2">
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-another-no">${i18nStrings.common.no}</button>
+                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-another-yes">${i18nStrings.common.yes}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modalEl = document.getElementById('another-operation-modal');
+            const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+
+            let resolved = false;
+
+            const btnYes = modalEl.querySelector('#btn-another-yes');
+
+            btnYes.addEventListener('click', () => {
+                if (!resolved) {
+                    resolved = true;
+                    modal.hide();
+                    resolve(true);
+                }
+            });
+
+            modalEl.querySelector('#btn-another-no').addEventListener('click', () => {
+                if (!resolved) {
+                    resolved = true;
+                    modal.hide();
+                    resolve(false);
+                }
+            });
+
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve(false);
+                }
+                modalEl.remove();
+            });
+
+            modal.show();
+            setupModalKeyboard(modalEl, btnYes);
+        }, 300);
+    });
+}
+
 // Show Modify Observations dialog
 async function showModifyObservationsDialog() {
     // Check if data is loaded on the server
@@ -183,14 +244,20 @@ async function showModifySingleObservations(filterState) {
                 await triggerAutosave();
                 
                 const successMsg = i18nStrings.messages.observation_modified;
-                sessionStorage.setItem('pendingNotification', JSON.stringify({
-                    message: '<strong>✓</strong> ' + successMsg,
-                    type: 'success',
-                    duration: 3000
-                }));
+                showNotification('<strong>✓</strong> ' + successMsg);
                 
-                // Return to main menu
-                window.navigateInternal('/');
+                // After form closes, ask if user wants to modify another observation
+                form.modalElement.addEventListener('hidden.bs.modal', async () => {
+                    const another = await showAnotherOperationDialog(
+                        i18nStrings.observations.modify_another_title,
+                        i18nStrings.observations.modify_another_message
+                    );
+                    if (another) {
+                        showModifyObservationsDialog();
+                    } else {
+                        window.navigateInternal('/');
+                    }
+                }, { once: true });
             } catch (e) {showErrorDialog(i18nStrings.common.error + ': ' + e.message);
             }
     };
@@ -704,20 +771,24 @@ async function showDeleteSingleObservations(filterState) {
                 
                 await triggerAutosave();
 
-                // Store notification for display after navigation (toast must survive page change)
                 const msg = `${i18nStrings.common.observation} ${i18nStrings.common.deleted}`;
-                sessionStorage.setItem('pendingNotification', JSON.stringify({
-                    message: `<strong>✓</strong> ${msg}`,
-                    type: 'success',
-                    duration: 3000
-                }));
+                showNotification(`<strong>✓</strong> ${msg}`);
                 
-                // Continue to next observation (longer delay to let message show)
-                currentIndex += 1;
-                // Modal is closed by ObservationForm after Yes callback returns.
-                // Re-open fresh for the next observation.
-                isFormShown = false;
-                setTimeout(() => showNextObservation(), 2500);
+                // Prevent form's hidden handler from calling cancel
+                form.saved = true;
+                
+                // After form closes, ask if user wants to delete another observation
+                form.modalElement.addEventListener('hidden.bs.modal', async () => {
+                    const another = await showAnotherOperationDialog(
+                        i18nStrings.observations.delete_another_title,
+                        i18nStrings.observations.delete_another_message
+                    );
+                    if (another) {
+                        showDeleteObservationsDialog();
+                    } else {
+                        window.navigateInternal('/');
+                    }
+                }, { once: true });
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
                 window.navigateInternal('/');
             }
@@ -1013,6 +1084,7 @@ async function showDisplayObservationsDialog() {
         },
         () => {
             // onCancel callback - user cancelled
+            clearMenuHighlights();
             // Force cleanup of any remaining modal backdrops
             setTimeout(() => {
                 const backdrops = document.querySelectorAll('.modal-backdrop');
@@ -1040,6 +1112,7 @@ async function showDisplayCompactList(filterState) {
     
     if (filteredObs.length === 0) {
         await showWarningModal(i18nStrings.messages.no_observations);
+        clearMenuHighlights();
         return;
     }
     
@@ -1347,6 +1420,7 @@ async function showDisplaySingleObservations(filterState) {
     
     if (filteredObs.length === 0) {
         await showWarningModal(i18nStrings.messages.no_observations);
+        clearMenuHighlights();
         return;
     }
     

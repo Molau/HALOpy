@@ -7,16 +7,15 @@ Python web application for maintenance of halo observations, modernized from the
 ### Backend (Python/Flask)
 - `models/` - Data structures (Observation dataclass, constants, halo calculations)
 - `services/` - Configuration persistence (settings.py)
-- `io/` - CSV file handler (ObservationCSV class)
+- `io/` - CSV file handler and PostgreSQL database adapter
 - `resources/` - i18n JSON strings (German/English), help files, observer metadata
-- `api/` - REST API endpoints (routes.py with astronomy calculations, update.py with auto-updater)
-- `web/` - Flask application
+- `api/` - REST API endpoints (observations, statistics, auto-updater)
+- `web/` - Flask application, page routing
 
 ### Frontend (HTML/CSS/JavaScript)
-- Responsive web interface
+- Responsive web interface (Bootstrap 5)
 - Multi-language support (German/English)
 - Works on desktop, tablet, and mobile
-- Settings menu path for startup-file configuration: `Einstellungen -> feste Datei` (EN: `Settings -> Fixed File`)
 
 ### MCP Integration
 HALOpy provides **MCP-ready API endpoints** for generating statistics charts programmatically:
@@ -28,6 +27,18 @@ Returns PNG images ready for AI assistants, reporting tools, and automation. See
 ### Data
 - `data/` - Observation CSV files (.CSV format)
 - `resources/` - Observer metadata (halobeo.csv)
+
+## Operating Modes
+
+### Local Mode
+- CSV file-based storage in the `data/` folder
+- No database or cloud account needed
+- Start HALOpy and work directly
+
+### Cloud Mode
+- PostgreSQL database backend
+- Password-protected access
+- Deployed on AWS EC2 at [halopy.online](https://halopy.online)
 
 ## Data Import/Export
 
@@ -52,10 +63,11 @@ The original HALO software used compressed binary files (.HAL, .BEO). To migrate
 
 **Automated Installer** - Similar to the original HALO.EXE installer:
 
-1. Download `install.bat` and `install.ps1` from the [installer](installer/) folder
+1. Download `install.bat` and `install_de.ps1` (or `install_en.ps1`) from the [installer](installer/) folder
 2. Double-click `install.bat`
 3. Follow the prompts (installs Python, dependencies, creates start script)
-4. Double-click `halo.bat` to start HALOpy
+4. A desktop shortcut `HALOpy.lnk` is created (optional)
+5. Double-click the shortcut or `halo.bat` — this starts the server and opens the browser automatically
 
 See [installer/README.md](installer/README.md) for detailed installation instructions and troubleshooting.
 
@@ -87,43 +99,37 @@ pip3 --version
 
 Both should show Python 3.10+ and pip version.
 
-## Deployment Options
-
-### Local Development
+### Starting HALOpy
 
 **Windows (PowerShell/CMD):**
 ```powershell
 pip install -r requirements.txt
 python halo.py
-# Browser opens automatically at http://localhost:5000
+# Server starts and browser opens automatically at http://localhost:5000
 ```
 
 **Linux/macOS:**
 ```bash
 pip install -r requirements.txt
 python halo.py
-# Browser opens automatically at http://localhost:5000
+# Server starts and browser opens automatically at http://localhost:5000
 ```
-
-### Local Server
-Run on a machine in your home/lab network, accessible from other devices.
-
-### Cloud Deployment
-Deploy to:
-- Heroku
-- AWS Elastic Beanstalk
-- Google Cloud Run
-- DigitalOcean App Platform
 
 ## Requirements
 
 - Python 3.10+ (both 32-bit and 64-bit supported)
-- Flask web framework (3.0+)
-- NumPy (1.24+)
-- Matplotlib (3.7+)
 - Modern web browser
 
-**Note**: HALOpy has minimal dependencies (3 packages) for easy installation on any system.
+### Python Dependencies (installed via `pip install -r requirements.txt`)
+
+| Package | Purpose |
+|---------|---------|
+| Flask, Flask-CORS, Flask-WTF, Flask-Limiter | Web framework and middleware |
+| python-dotenv | Environment configuration |
+| matplotlib, numpy | Statistics charts and calculations |
+| psycopg2-binary | PostgreSQL database (Cloud Mode) |
+| boto3, bcrypt | AWS authentication (Cloud Mode) |
+| uwsgi | Production server (Linux only) |
 
 ## License
 

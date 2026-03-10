@@ -503,9 +503,6 @@ async function showAusgabeartDialog() {
 window.showChangePasswordDialog = async function showChangePasswordDialog() {
     try {
         const i18n = i18nStrings.settings;
-        if (!i18n) {
-            throw new Error('Missing i18nStrings.settings');
-        }
         
         // Check if user is admin
         const configResponse = await fetch('/api/config');
