@@ -134,12 +134,12 @@ class Settings:
         rows = [
             ['INPUT_MODE', app_config.get('INPUT_MODE', 'N')],
             ['OUTPUT_MODE', app_config.get('OUTPUT_MODE', 'P')],
-            ['ACTIVE_OBSERVERS_ONLY', '1' if app_config.get('ACTIVE_OBSERVERS_ONLY', False) else '0'],
+            ['ACTIVE_OBSERVERS_ONLY', '1' if app_config.get('ACTIVE_OBSERVERS_ONLY', False) not in (False, '0', 0) else '0'],
             ['DATE_DEFAULT_MODE', app_config.get('DATE_DEFAULT_MODE', 'none')],
             ['DATE_DEFAULT_MONTH', str(app_config.get('DATE_DEFAULT_MONTH', 1))],
             ['DATE_DEFAULT_YEAR', str(app_config.get('DATE_DEFAULT_YEAR', 2026))],
             ['LANGUAGE', app_config.get('LANGUAGE', 'de')],
-            ['SHOW_WARNINGS', '1' if app_config.get('SHOW_WARNINGS', True) else '0'],
+            ['SHOW_WARNINGS', '1' if app_config.get('SHOW_WARNINGS', True) not in (False, '0', 0) else '0'],
         ]
         # Local Mode only: FIXED_OBSERVER, file operations
         if not is_cloud_mode():
