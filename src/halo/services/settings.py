@@ -104,11 +104,11 @@ class Settings:
                             app_config['DATE_DEFAULT_YEAR'] = int(value)
                         except ValueError:
                             app_config['DATE_DEFAULT_YEAR'] = 2026
-                    elif key == 'UPLOAD_OBSERVER_KK':
-                        app_config['UPLOAD_OBSERVER_KK'] = value
                     elif key == 'LANGUAGE':
                         # Saved language preference (de or en)
                         app_config['LANGUAGE'] = value if value in ('de', 'en') else 'de'
+                    elif key == 'SHOW_WARNINGS':
+                        app_config['SHOW_WARNINGS'] = value not in ('0', 'false', 'False')
         except Exception:
             # On any error, keep existing defaults
             pass
@@ -139,12 +139,12 @@ class Settings:
             ['DATE_DEFAULT_MONTH', str(app_config.get('DATE_DEFAULT_MONTH', 1))],
             ['DATE_DEFAULT_YEAR', str(app_config.get('DATE_DEFAULT_YEAR', 2026))],
             ['LANGUAGE', app_config.get('LANGUAGE', 'de')],
+            ['SHOW_WARNINGS', '1' if app_config.get('SHOW_WARNINGS', True) else '0'],
         ]
-        # Local Mode only: FIXED_OBSERVER, file operations, upload settings
+        # Local Mode only: FIXED_OBSERVER, file operations
         if not is_cloud_mode():
             rows.insert(3, ['FIXED_OBSERVER', app_config.get('FIXED_OBSERVER', '')])
             rows.append(['STARTUP_FILE_PATH', app_config.get('STARTUP_FILE_PATH', '')])
-            rows.append(['UPLOAD_OBSERVER_KK', app_config.get('UPLOAD_OBSERVER_KK', '')])
         
         with open(cfg_file, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)

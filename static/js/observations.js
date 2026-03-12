@@ -530,10 +530,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function displayPage() {
         // Load displayMode from configuration (Eingabeart setting)
         try {
-            const response = await fetch('/api/config/inputmode');
+            const response = await fetch('/api/config/setting?key=INPUT_MODE');
             const config = await response.json();
 
-            displayMode = config.mode === 'M' ? 'lang' : 'kurz';
+            displayMode = config.value === 'M' ? 'lang' : 'kurz';
 
         } catch (error) {displayMode = 'kurz';  // Default to compact on error
         }

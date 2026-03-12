@@ -38,10 +38,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function loadObserverDropdown() {
         let fixedObserver = '';
         try {
-            const resp = await fetch('/api/config/fixed_observer');
+            const resp = await fetch('/api/config/setting?key=FIXED_OBSERVER');
             if (resp.ok) {
                 const cfg = await resp.json();
-                fixedObserver = cfg.observer || '';
+                fixedObserver = cfg.value || '';
             }
         } catch (e) { /* optional */ }
 
@@ -191,9 +191,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Check output mode setting
         let outputMode = 'P'; // Default: Pseudografik
         try {
-            const modeResponse = await fetch('/api/config/outputmode');
+            const modeResponse = await fetch('/api/config/setting?key=OUTPUT_MODE');
             const modeData = await modeResponse.json();
-            outputMode = modeData.mode || 'P';
+            outputMode = modeData.value || 'P';
         } catch (error) {
             console.error('Error fetching output mode:', error);
         }

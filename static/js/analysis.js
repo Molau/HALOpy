@@ -1299,9 +1299,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Check output mode setting
         let outputMode = 'H'; // Default: HTML-Tabellen (current for analysis)
         try {
-            const modeResponse = await fetch('/api/config/outputmode');
+            const modeResponse = await fetch('/api/config/setting?key=OUTPUT_MODE');
             const modeData = await modeResponse.json();
-            outputMode = modeData.mode || 'H';
+            outputMode = modeData.value || 'H';
         } catch (error) {
             console.error('Error fetching output mode:', error);
         }
@@ -2039,9 +2039,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!lastAnalysisResult || !lastAnalysisParams) return;
 
         // Check output mode
-        const modeResponse = await fetch('/api/config/outputmode');
+        const modeResponse = await fetch('/api/config/setting?key=OUTPUT_MODE');
         const modeData = await modeResponse.json();
-        const outputMode = modeData.mode || 'P';
+        const outputMode = modeData.value || 'P';
 
         // Generate filename based on parameters
         const param1 = lastAnalysisParams.param1;

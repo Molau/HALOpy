@@ -326,9 +326,9 @@ async function showGroupModifyDialogMenu(filteredObs) {
         // Load fixed observer in parallel with observers
         const [observers, configResp] = await Promise.all([
             fetchObserversDeduped(),
-            fetch('/api/config/fixed_observer').then(r => r.ok ? r.json() : {}).catch(() => ({}))
+            fetch('/api/config/setting?key=FIXED_OBSERVER').then(r => r.ok ? r.json() : {}).catch(() => ({}))
         ]);
-        fixedObserver = configResp.observer || null;
+        fixedObserver = configResp.value || null;
 
         observerOptions = observers.map(obs => {
             const kk = String(obs.kk).padStart(2, '0');
@@ -751,7 +751,50 @@ async function showDeleteSingleObservations(filterState) {
 
         if (!isFormShown) {
             form.show('delete', obs, null, null, currentIndex + 1, filteredObs.length, i18nStrings.observations.delete_question, async () => {
-            // Yes -> delete
+            // Yes -> check SHOW_WARNINGS before deleting
+            let showWarnings = true;
+            try {
+                const warnResp = await fetch('/api/config/setting?key=SHOW_WARNINGS');
+                const warnData = await warnResp.json();
+                showWarnings = warnData.value !== false;
+            } catch (e) {}
+
+            if (showWarnings) {
+                // Show confirmation dialog with "don't warn again" checkbox
+                const confirmId = 'confirm-delete-' + Date.now();
+                const noId = confirmId + '-no';
+                const yesId = confirmId + '-yes';
+                const checkId = confirmId + '-check';
+                const footer = createModalButton(i18nStrings.common.no, 'primary', { id: noId, dismiss: true }) +
+                               createModalButton(i18nStrings.common.yes, 'secondary', { id: yesId });
+                const { modal: confirmModal, modalEl: confirmEl } = showSimpleModal({
+                    title: i18nStrings.common.warning,
+                    body: `<p>${i18nStrings.observations.delete_confirm_warning}</p>
+                           <div class="form-check mt-2">
+                               <input class="form-check-input" type="checkbox" id="${checkId}">
+                               <label class="form-check-label" for="${checkId}">${i18nStrings.common.dont_warn_again}</label>
+                           </div>`,
+                    footer
+                });
+                let confirmed = false;
+                document.getElementById(yesId).addEventListener('click', async () => {
+                    confirmed = true;
+                    if (document.getElementById(checkId).checked) {
+                        await fetch('/api/config/setting', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: 'SHOW_WARNINGS', value: false })
+                        });
+                    }
+                    confirmModal.hide();
+                });
+                setupModalKeyboard(confirmEl, { defaultButtonId: noId, enterButtonId: noId });
+                await new Promise(resolve => {
+                    confirmEl.addEventListener('hidden.bs.modal', resolve, { once: true });
+                });
+                if (!confirmed) return;
+            }
+
             try {
                 // Delete on server
                 const resp = await fetch('/api/observations/delete', {
@@ -1067,10 +1110,10 @@ async function showDisplayObservationsDialog() {
             // onApply callback - filters have been applied
             // Check INPUT_MODE to decide display format
             try {
-                const response = await fetch('/api/config/inputmode');
+                const response = await fetch('/api/config/setting?key=INPUT_MODE');
                 const config = await response.json();
                 
-                if (config.mode === 'N') {
+                if (config.value === 'N') {
                     // Zahleneingaben - show compact list in modal
                     await showDisplayCompactList(filterState);
                 } else {

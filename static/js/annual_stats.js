@@ -116,9 +116,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Check output mode setting
         let outputMode = 'P'; // Default: Pseudografik
         try {
-            const modeResponse = await fetch('/api/config/outputmode');
+            const modeResponse = await fetch('/api/config/setting?key=OUTPUT_MODE');
             const modeData = await modeResponse.json();
-            outputMode = modeData.mode || 'P';
+            outputMode = modeData.value || 'P';
         } catch (error) {
             console.error('Error fetching output mode:', error);
         }
@@ -948,9 +948,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const year = String(currentStatsData.jj);
         
         // Check output mode
-        const modeResponse = await fetch('/api/config/outputmode');
+        const modeResponse = await fetch('/api/config/setting?key=OUTPUT_MODE');
         const modeData = await modeResponse.json();
-        const outputMode = modeData.mode || 'P';
+        const outputMode = modeData.value || 'P';
         
         let content, mimeType, filename;
         

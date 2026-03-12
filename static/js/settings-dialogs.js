@@ -27,9 +27,9 @@
 // Show Active Observers setting dialog (Ja/Nein)
 async function showActiveObserversDialog() {
     try {
-        const response = await fetch('/api/config/active_observers');
+        const response = await fetch('/api/config/setting?key=ACTIVE_OBSERVERS_ONLY');
         const config = await response.json();
-        const enabled = !!config.enabled;
+        const enabled = !!config.value;
 
         const modalHtml = `
             <div class="modal fade" id="active-observers-modal" tabindex="-1">
@@ -75,10 +75,10 @@ async function showActiveObserversDialog() {
             const newEnabled = selected ? selected.value === '1' : enabled;
             modal.hide();
 
-            await fetch('/api/config/active_observers', {
-                method: 'POST',
+            await fetch('/api/config/setting', {
+                method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({enabled: newEnabled})
+                body: JSON.stringify({key: 'ACTIVE_OBSERVERS_ONLY', value: newEnabled})
             });
         });
 
@@ -95,9 +95,9 @@ async function showStartupFileDialog() {
         const files = fileListResult.files || [];
         
         // Load current startup file configuration
-        const response = await fetch('/api/config/startup_file');
+        const response = await fetch('/api/config/setting?key=STARTUP_FILE_PATH');
         const config = await response.json();
-        const currentFile = config.file_path || '';
+        const currentFile = config.value || '';
 
         // Build file dropdown options with "Keine Datei laden" as first option
         const fileOptions = [
@@ -142,10 +142,10 @@ async function showStartupFileDialog() {
             modal.hide();
 
             // Save selection (empty string = no file)
-            await fetch('/api/config/startup_file', {
+            await fetch('/api/config/setting', {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({file_path: selectedFile})
+                body: JSON.stringify({key: 'STARTUP_FILE_PATH', value: selectedFile})
             });
             
             // Show success message
@@ -168,9 +168,9 @@ async function showStartupFileDialog() {
 async function showFixedObserverDialog() {
     try {
         // Get current fixed observer setting
-        const configResponse = await fetch('/api/config/fixed_observer');
+        const configResponse = await fetch('/api/config/setting?key=FIXED_OBSERVER');
         const config = await configResponse.json();
-        const currentObserver = config.observer || '';
+        const currentObserver = config.value || '';
         
         // Get list of observers
         const obsResponse = await fetch('/api/observers/list');
@@ -221,10 +221,10 @@ async function showFixedObserverDialog() {
             const select = document.getElementById('fixed-observer-select');
             const newObserver = select.value;
 
-            const response = await fetch('/api/config/fixed_observer', {
+            const response = await fetch('/api/config/setting', {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({observer: newObserver})
+                body: JSON.stringify({key: 'FIXED_OBSERVER', value: newObserver})
             });
 
             if (!response.ok) {
@@ -246,11 +246,14 @@ async function showFixedObserverDialog() {
 // Show Datum (Date Default) dialog
 async function showDatumDialog() {
     try {
-        const response = await fetch('/api/config/datedefault');
-        const config = await response.json();
-        const currentSetting = config.mode || 'none';
-        const currentMonth = config.month || 1;
-        const currentYear = config.year || new Date().getFullYear();
+        const [modeResp, monthResp, yearResp] = await Promise.all([
+            fetch('/api/config/setting?key=DATE_DEFAULT_MODE'),
+            fetch('/api/config/setting?key=DATE_DEFAULT_MONTH'),
+            fetch('/api/config/setting?key=DATE_DEFAULT_YEAR')
+        ]);
+        const currentSetting = (await modeResp.json()).value || 'none';
+        const currentMonth = (await monthResp.json()).value || 1;
+        const currentYear = (await yearResp.json()).value || new Date().getFullYear();
         
         // Generate month options
         const monthOptions = [];
@@ -353,11 +356,23 @@ async function showDatumDialog() {
             
             modal.hide();
             
-            await fetch('/api/config/datedefault', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({mode: newMode, month: month, year: year})
-            });
+            await Promise.all([
+                fetch('/api/config/setting', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({key: 'DATE_DEFAULT_MODE', value: newMode})
+                }),
+                fetch('/api/config/setting', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({key: 'DATE_DEFAULT_MONTH', value: month})
+                }),
+                fetch('/api/config/setting', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({key: 'DATE_DEFAULT_YEAR', value: year})
+                })
+            ]);
         });
         
         modalEl.addEventListener('hidden.bs.modal', () => clearMenuHighlights(), { once: true });
@@ -369,9 +384,9 @@ async function showDatumDialog() {
 // Show Eingabeart dialog
 async function showEingabeartDialog() {
     try {
-        const response = await fetch('/api/config/inputmode');
+        const response = await fetch('/api/config/setting?key=INPUT_MODE');
         const config = await response.json();
-        const currentMode = config.mode;
+        const currentMode = config.value;
         
         // Create Bootstrap modal
         const modalHtml = `
@@ -416,10 +431,10 @@ async function showEingabeartDialog() {
             modal.hide();
             
             if (newMode !== currentMode) {
-                await fetch('/api/config/inputmode', {
+                await fetch('/api/config/setting', {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({mode: newMode})
+                    body: JSON.stringify({key: 'INPUT_MODE', value: newMode})
                 });
                 // Silent success: no confirmation dialogs
             }
@@ -433,9 +448,9 @@ async function showEingabeartDialog() {
 // Show Ausgabeart (output format) dialog - NEW FEATURE
 async function showAusgabeartDialog() {
     try {
-        const response = await fetch('/api/config/outputmode');
+        const response = await fetch('/api/config/setting?key=OUTPUT_MODE');
         const config = await response.json();
-        const currentMode = config.mode;
+        const currentMode = config.value;
         
         // Create Bootstrap modal
         const modalHtml = `
@@ -484,10 +499,10 @@ async function showAusgabeartDialog() {
             modal.hide();
             
             if (newMode !== currentMode) {
-                await fetch('/api/config/outputmode', {
+                await fetch('/api/config/setting', {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({mode: newMode})
+                    body: JSON.stringify({key: 'OUTPUT_MODE', value: newMode})
                 });
                 // Silent success: no confirmation dialogs
             }

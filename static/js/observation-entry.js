@@ -98,9 +98,9 @@ function showAddAnotherObservationDialog() {
 // Add Observation dialog entry point
 async function showAddObservationDialog() {
     try {
-        const modeResp = await fetch('/api/config/inputmode');
+        const modeResp = await fetch('/api/config/setting?key=INPUT_MODE');
         const modeData = await modeResp.json();
-        const mode = modeData.mode;
+        const mode = modeData.value;
         if (mode === 'N') {
             return await showAddObservationDialogNumeric();
         } else {
@@ -135,9 +135,9 @@ async function showAddObservationDialogNumeric() {
     // Get fixed observer setting
     let fixedObserver = '';
     try {
-        const configResponse = await fetch('/api/config/fixed_observer');
+        const configResponse = await fetch('/api/config/setting?key=FIXED_OBSERVER');
         const config = await configResponse.json();
-        fixedObserver = config.observer || '';
+        fixedObserver = config.value || '';
     } catch (e) {}
 
     // Get date default setting

@@ -44,9 +44,9 @@ async function showAddObserverDialog(formData = null) {
     // Check for fixed observer
     let fixedObserver = '';
     try {
-        const response = await fetch('/api/config/fixed_observer');
+        const response = await fetch('/api/config/setting?key=FIXED_OBSERVER');
         const config = await response.json();
-        fixedObserver = config.observer || '';
+        fixedObserver = config.value || '';
     } catch (error) {}
     
     // Build month options with names
@@ -431,9 +431,9 @@ async function showDeleteObserverDialog() {
     // Check for fixed observer
     let fixedObserver = '';
     try {
-        const response = await fetch('/api/config/fixed_observer');
+        const response = await fetch('/api/config/setting?key=FIXED_OBSERVER');
         const config = await response.json();
-        fixedObserver = config.observer || '';
+        fixedObserver = config.value || '';
     } catch (error) {}
     
     // Load observers first
@@ -651,9 +651,9 @@ async function showEditObserverDialog() {
     // Check for fixed observer
     let fixedObserver = '';
     try {
-        const response = await fetch('/api/config/fixed_observer');
+        const response = await fetch('/api/config/setting?key=FIXED_OBSERVER');
         const config = await response.json();
-        fixedObserver = config.observer || '';
+        fixedObserver = config.value || '';
     } catch (error) {}
     
     // Load observers first

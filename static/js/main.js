@@ -462,23 +462,27 @@ async function loadObserverCodes() {
 // Helper function to get default month and year based on date default setting
 async function getDateDefault() {
     try {
-        const response = await fetch('/api/config/datedefault');
-        if (!response.ok) {
+        const [modeResp, monthResp, yearResp] = await Promise.all([
+            fetch('/api/config/setting?key=DATE_DEFAULT_MODE'),
+            fetch('/api/config/setting?key=DATE_DEFAULT_MONTH'),
+            fetch('/api/config/setting?key=DATE_DEFAULT_YEAR')
+        ]);
+        if (!modeResp.ok) {
             return null;
         }
-        const config = await response.json();
+        const mode = (await modeResp.json()).value;
         
-        if (!config.mode || config.mode === 'none') {
+        if (!mode || mode === 'none') {
             return null;
         }
         
         const now = new Date();
         let month, year;
         
-        if (config.mode === 'current') {
+        if (mode === 'current') {
             month = now.getMonth() + 1; // JavaScript months are 0-indexed
             year = now.getFullYear();
-        } else if (config.mode === 'previous') {
+        } else if (mode === 'previous') {
             month = now.getMonth(); // 0 = Dec of previous year, 1-11 = Jan-Nov of current year
             if (month === 0) {
                 month = 12;
@@ -486,9 +490,9 @@ async function getDateDefault() {
             } else {
                 year = now.getFullYear();
             }
-        } else if (config.mode === 'constant') {
-            month = config.month || 1;
-            year = config.year || now.getFullYear();
+        } else if (mode === 'constant') {
+            month = (await monthResp.json()).value || 1;
+            year = (await yearResp.json()).value || now.getFullYear();
         }
         
         // Use 4-digit year for consistency with internal format

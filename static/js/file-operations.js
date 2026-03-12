@@ -165,16 +165,14 @@ async function saveFile() {
 
 // Authentication modal for HALO server login
 async function showAuthenticationModal(onSuccess, cloudServerUrl) {
-    // Load observers, fixed observer, and saved observer_kk
+    // Load observers and fixed observer
     let observers = [];
     let fixedObserver = '';
-    let savedObserverKK = '';
     
     try {
-        const [obsResponse, configResponse, kkResponse] = await Promise.all([
+        const [obsResponse, configResponse] = await Promise.all([
             fetch('/api/observers'),
-            fetch('/api/config/fixed_observer'),
-            fetch('/api/config/upload_observer_kk')
+            fetch('/api/config/setting?key=FIXED_OBSERVER')
         ]);
         
         if (obsResponse.ok) {
@@ -184,12 +182,7 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         
         if (configResponse.ok) {
             const config = await configResponse.json();
-            fixedObserver = config.observer || '';
-        }
-        
-        if (kkResponse.ok) {
-            const kkData = await kkResponse.json();
-            savedObserverKK = kkData.observer_kk || '';
+            fixedObserver = config.value || '';
         }
     } catch (error) {}
     
@@ -245,17 +238,10 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
     observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
         const option = document.createElement('option');
         option.value = obs.KK;
-        // Preselect: savedObserverKK > fixedObserver > none
-        const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
-        option.selected = selected === 'selected';
+        option.selected = obs.KK === fixedObserver;
         option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
         observerSelect.appendChild(option);
     });
-    
-    // Preselect admin if that was saved
-    if (savedObserverKK === 'admin') {
-        adminOption.selected = true;
-    }
     
     // Toggle password visibility
     togglePasswordBtn.addEventListener('click', () => {
@@ -291,15 +277,6 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
 
         // Local Mode: No separate login call - credentials will be sent with upload/download request
         // Just collect credentials and pass to callback
-        
-        // Save observer_kk to halo.cfg for convenience
-        try {
-            await fetch('/api/config/upload_observer_kk', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ observer_kk: observerKK })
-            });
-        } catch (error) {}
         
         modal.hide();
         setTimeout(() => {
@@ -363,16 +340,14 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
     // Load data for Local Mode auth fields
     let observers = [];
     let fixedObserver = '';
-    let savedObserverKK = '';
     let startupFilePath = '';
     
     if (!isCloudMode) {
         try {
-            const [obsResponse, configResponse, kkResponse, startupResponse] = await Promise.all([
+            const [obsResponse, configResponse, startupResponse] = await Promise.all([
                 fetch('/api/observers'),
-                fetch('/api/config/fixed_observer'),
-                fetch('/api/config/upload_observer_kk'),
-                fetch('/api/config/startup_file')
+                fetch('/api/config/setting?key=FIXED_OBSERVER'),
+                fetch('/api/config/setting?key=STARTUP_FILE_PATH')
             ]);
             
             if (obsResponse.ok) {
@@ -382,18 +357,13 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
             
             if (configResponse.ok) {
                 const config = await configResponse.json();
-                fixedObserver = config.observer || '';
-            }
-            
-            if (kkResponse.ok) {
-                const kkData = await kkResponse.json();
-                savedObserverKK = kkData.observer_kk || '';
+                fixedObserver = config.value || '';
             }
             
             if (startupResponse.ok) {
                 const startupConfig = await startupResponse.json();
-                if (startupConfig.enabled && startupConfig.file_path) {
-                    startupFilePath = startupConfig.file_path;
+                if (startupConfig.value) {
+                    startupFilePath = startupConfig.value;
                 }
             }
         } catch (error) {}
@@ -480,17 +450,10 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
         observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
             const option = document.createElement('option');
             option.value = obs.KK;
-            // Preselect: savedObserverKK > fixedObserver > none
-            const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
-            option.selected = selected === 'selected';
+            option.selected = obs.KK === fixedObserver;
             option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName} ${obs.NName}`.trim();
             observerSelect.appendChild(option);
         });
-        
-        // Preselect admin if that was saved
-        if (savedObserverKK === 'admin') {
-            adminOption.selected = true;
-        }
         
         // Toggle password visibility
         togglePasswordBtn.addEventListener('click', () => {
@@ -526,15 +489,6 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
                 showErrorDialog(i18nStrings.observers.error_missing_required);
                 return;
             }
-            
-            // Save observer_kk to config for convenience
-            try {
-                await fetch('/api/config/upload_observer_kk', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ observer_kk: observerKK })
-                });
-            } catch (error) {}
         }
         
         // Get the file (either from input or startup file)
@@ -556,26 +510,51 @@ async function showUploadFileDialog(isCloudMode, cloudServerUrl) {
         
         // Replace mode: warn that all existing observations will be deleted
         if (uploadMode === 'replace') {
-            modal.hide();
-            const confirmId = 'confirm-replace-' + Date.now();
-            const noId = confirmId + '-no';
-            const yesId = confirmId + '-yes';
-            const footer = createModalButton(i18nStrings.common.no, 'primary', { id: noId, dismiss: true }) +
-                           createModalButton(i18nStrings.common.yes, 'secondary', { id: yesId });
-            const { modal: confirmModal, modalEl: confirmEl } = showSimpleModal({
-                title: i18nStrings.common.warning,
-                body: `<p>${i18nStrings.upload_download.upload_replace_warning}</p>`,
-                footer
-            });
-            let confirmed = false;
-            document.getElementById(yesId).addEventListener('click', () => {
-                confirmed = true;
-                confirmModal.hide();
-            });
-            await new Promise(resolve => {
-                confirmEl.addEventListener('hidden.bs.modal', resolve, { once: true });
-            });
-            if (!confirmed) return;
+            // Check if warning is enabled in config
+            let showWarnings = true;
+            try {
+                const warnResp = await fetch('/api/config/setting?key=SHOW_WARNINGS');
+                const warnData = await warnResp.json();
+                showWarnings = warnData.value !== false;
+            } catch (e) {}
+
+            if (showWarnings) {
+                modal.hide();
+                const confirmId = 'confirm-replace-' + Date.now();
+                const noId = confirmId + '-no';
+                const yesId = confirmId + '-yes';
+                const checkId = confirmId + '-check';
+                const footer = createModalButton(i18nStrings.common.no, 'primary', { id: noId, dismiss: true }) +
+                               createModalButton(i18nStrings.common.yes, 'secondary', { id: yesId });
+                const { modal: confirmModal, modalEl: confirmEl } = showSimpleModal({
+                    title: i18nStrings.common.warning,
+                    body: `<p>${i18nStrings.upload_download.upload_replace_warning}</p>
+                           <div class="form-check mt-2">
+                               <input class="form-check-input" type="checkbox" id="${checkId}">
+                               <label class="form-check-label" for="${checkId}">${i18nStrings.common.dont_warn_again}</label>
+                           </div>`,
+                    footer
+                });
+                let confirmed = false;
+                document.getElementById(yesId).addEventListener('click', async () => {
+                    confirmed = true;
+                    // Save "don't warn again" preference if checked
+                    if (document.getElementById(checkId).checked) {
+                        await fetch('/api/config/setting', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: 'SHOW_WARNINGS', value: false })
+                        });
+                    }
+                    confirmModal.hide();
+                });
+                await new Promise(resolve => {
+                    confirmEl.addEventListener('hidden.bs.modal', resolve, { once: true });
+                });
+                if (!confirmed) return;
+            } else {
+                modal.hide();
+            }
         } else {
             // CLOSE upload modal FIRST (setupModalCleanup handles DOM removal)
             modal.hide();
@@ -690,14 +669,12 @@ async function showDownloadDialog() {
     // Load data for Local Mode auth fields
     let observers = [];
     let fixedObserver = '';
-    let savedObserverKK = '';
     
     if (!isCloudMode) {
         try {
-            const [obsResponse, configResp, kkResp] = await Promise.all([
+            const [obsResponse, configResp] = await Promise.all([
                 fetch('/api/observers'),
-                fetch('/api/config/fixed_observer'),
-                fetch('/api/config/upload_observer_kk')
+                fetch('/api/config/setting?key=FIXED_OBSERVER')
             ]);
             
             if (obsResponse.ok) {
@@ -707,12 +684,7 @@ async function showDownloadDialog() {
             
             if (configResp.ok) {
                 const configData = await configResp.json();
-                fixedObserver = configData.observer || '';
-            }
-            
-            if (kkResp.ok) {
-                const kkData = await kkResp.json();
-                savedObserverKK = kkData.observer_kk || '';
+                fixedObserver = configData.value || '';
             }
         } catch (error) {}
     }
@@ -801,17 +773,10 @@ async function showDownloadDialog() {
         observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
             const option = document.createElement('option');
             option.value = obs.KK;
-            // Preselect: savedObserverKK > fixedObserver > none
-            const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
-            option.selected = selected === 'selected';
+            option.selected = obs.KK === fixedObserver;
             option.textContent = `${String(obs.KK).padStart(2, '0')} - ${obs.VName || ''} ${obs.NName || ''}`.trim();
             observerSelect.appendChild(option);
         });
-        
-        // Preselect admin if that was saved
-        if (savedObserverKK === 'admin') {
-            adminOption.selected = true;
-        }
         
         // Store values when changed
         observerSelect.addEventListener('change', () => {
@@ -887,19 +852,6 @@ async function showDownloadDialog() {
             const result = await response.json();
             
             if (response.ok && result.success) {
-                // Save observer_kk for convenience (Local Mode only)
-                if (!isCloudMode) {
-                    try {
-                        await fetch('/api/config/upload_observer_kk', {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ observer_kk: observerKK })
-                        });
-                    } catch (error) {
-                        // Silent fail - not critical if settings save fails
-                    }
-                }
-                
                 // Hide spinner before file picker
                 spinner.modal.hide();
                 setTimeout(() => spinner.modalEl.remove(), 300);
@@ -1324,14 +1276,12 @@ async function showObserverDownloadDialog() {
     // Load data for Local Mode auth fields
     let observers = [];
     let fixedObserver = '';
-    let savedObserverKK = '';
     
     if (!isCloudMode) {
         try {
-            const [obsResponse, configResp, kkResp] = await Promise.all([
+            const [obsResponse, configResp] = await Promise.all([
                 fetch('/api/observers'),
-                fetch('/api/config/fixed_observer'),
-                fetch('/api/config/upload_observer_kk')
+                fetch('/api/config/setting?key=FIXED_OBSERVER')
             ]);
             
             if (obsResponse.ok) {
@@ -1341,12 +1291,7 @@ async function showObserverDownloadDialog() {
             
             if (configResp.ok) {
                 const configData = await configResp.json();
-                fixedObserver = configData.observer || '';
-            }
-            
-            if (kkResp.ok) {
-                const kkData = await kkResp.json();
-                savedObserverKK = kkData.observer_kk || '';
+                fixedObserver = configData.value || '';
             }
         } catch (error) {}
     }
@@ -1434,9 +1379,8 @@ async function showObserverDownloadDialog() {
         observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {
             const option = document.createElement('option');
             option.value = obs.KK;
-            const selected = obs.KK === (savedObserverKK || fixedObserver) ? 'selected' : '';
+            option.selected = obs.KK === fixedObserver;
             option.textContent = `${obs.KK} - ${obs.VName} ${obs.NName}`;
-            if (selected) option.selected = true;
             observerSelect.appendChild(option);
         });
         
@@ -1461,16 +1405,6 @@ async function showObserverDownloadDialog() {
             if (!observerKK || !password) {
                 showErrorDialog(i18nStrings.upload_download.upload_auth_missing);
                 return;
-            }
-            
-            // Save observer_kk to halo.cfg for convenience
-            try {
-                await fetch('/api/config/upload_observer_kk', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ observer_kk: observerKK })
-                });
-            } catch (error) {
             }
         }
         

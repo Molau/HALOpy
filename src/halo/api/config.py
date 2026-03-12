@@ -1,8 +1,6 @@
 """Configuration and constants API endpoints.
 
-Routes: /constants, /config, /config/inputmode, /config/outputmode,
-        /config/datedefault, /config/fixed_observer, /config/upload_observer_kk,
-        /config/active_observers, /config/startup_file
+Routes: /constants, /config, /config/setting
 
 Copyright (c) 1992-2026 Sirko Molau
 Licensed under MIT License - see LICENSE file for details.
@@ -69,230 +67,64 @@ def get_config() -> Dict[str, Any]:
     })
 
 
-@api_blueprint.route('/config/inputmode', methods=['GET', 'PUT'])
-def inputmode() -> Dict[str, Any]:
-    """Get or set Eingabeart (input mode) - implements 'Einstellungen -> Eingabeart' from H_BEOBNG.PAS"""
+@api_blueprint.route('/config/setting', methods=['GET', 'PUT'])
+def generic_setting() -> Dict[str, Any]:
+    """Generic GET/PUT for all config keys stored in halo.cfg.
+
+    GET  /api/config/setting?key=INPUT_MODE   -> {"key": "INPUT_MODE", "value": "N"}
+    PUT  /api/config/setting  {"key": "INPUT_MODE", "value": "M"}
+
+    Allowed keys and their types are defined in ALLOWED_SETTINGS.
+    FIXED_OBSERVER in cloud mode reads from session (set on login).
+    """
+    ALLOWED_SETTINGS: Dict[str, dict] = {
+        'INPUT_MODE':           {'type': 'str',  'default': 'N'},
+        'OUTPUT_MODE':          {'type': 'str',  'default': 'P'},
+        'DATE_DEFAULT_MODE':    {'type': 'str',  'default': 'none'},
+        'DATE_DEFAULT_MONTH':   {'type': 'int',  'default': 1},
+        'DATE_DEFAULT_YEAR':    {'type': 'int',  'default': 2026},
+        'FIXED_OBSERVER':       {'type': 'str',  'default': ''},
+        'ACTIVE_OBSERVERS_ONLY': {'type': 'bool', 'default': False},
+        'STARTUP_FILE_PATH':    {'type': 'str',  'default': ''},
+        'SHOW_WARNINGS':        {'type': 'bool', 'default': True},
+    }
+
     if request.method == 'PUT':
-        data = request.get_json()
-        mode = data.get('mode', 'N')
-        
-        if mode not in ['M', 'N']:
-            return jsonify({'error': 'Invalid mode. Must be M or N'}), 400
-        
-        current_app.config['INPUT_MODE'] = mode
-        # Persist setting
-        root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'INPUT_MODE', mode)
-        
-        return jsonify({
-            'success': True,
-            'mode': mode,
-            'display': 'lang' if mode == 'M' else 'kurz'
-        })
-    else:
-        mode = current_app.config.get('INPUT_MODE', 'N')
-        return jsonify({
-            'mode': mode,
-            'display': 'lang' if mode == 'M' else 'kurz'
-        })
+        data = request.get_json() or {}
+        key = data.get('key', '')
+        if key not in ALLOWED_SETTINGS:
+            return jsonify({'error': f'Unknown setting: {key}'}), 400
 
-
-@api_blueprint.route('/config/outputmode', methods=['GET', 'PUT'])
-def outputmode() -> Dict[str, Any]:
-    """Get or set Ausgabeart (output format) - NEW FEATURE not in original software"""
-    if request.method == 'PUT':
-        data = request.get_json()
-        mode = data.get('mode', 'P')
-        
-        if mode not in ['H', 'P', 'M']:
-            return jsonify({'error': 'Invalid mode. Must be H, P, or M'}), 400
-        
-        current_app.config['OUTPUT_MODE'] = mode
-        # Persist setting
-        root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'OUTPUT_MODE', mode)
-        
-        display_map = {
-            'H': 'HTML-Tabellen',
-            'P': 'Pseudografik',
-            'M': 'Markdown'
-        }
-        
-        return jsonify({
-            'success': True,
-            'mode': mode,
-            'display': display_map.get(mode, 'Pseudografik')
-        })
-    else:
-        mode = current_app.config.get('OUTPUT_MODE', 'P')
-        display_map = {
-            'H': 'HTML-Tabellen',
-            'P': 'Pseudografik',
-            'M': 'Markdown'
-        }
-        return jsonify({
-            'mode': mode,
-            'display': display_map.get(mode, 'Pseudografik')
-        })
-
-
-@api_blueprint.route('/config/datedefault', methods=['GET', 'PUT'])
-def datedefault() -> Dict[str, Any]:
-    """Get or set date default (Datumsvoreinstellung) - NEW FEATURE"""
-    
-    if request.method == 'PUT':
-        data = request.get_json()
-        mode = data.get('mode', 'none')
-        month = data.get('month', 1)
-        year = data.get('year', 2026)
-        
-        if mode not in ['none', 'current', 'previous', 'constant']:
-            return jsonify({'error': 'Invalid mode. Must be none, current, previous, or constant'}), 400
-        
-        current_app.config['DATE_DEFAULT_MODE'] = mode
-        current_app.config['DATE_DEFAULT_MONTH'] = month
-        current_app.config['DATE_DEFAULT_YEAR'] = year
-        
-        # Persist settings
-        root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_from(current_app.config, root_path)
-        
-        return jsonify({
-            'success': True,
-            'mode': mode,
-            'month': month,
-            'year': year
-        })
-    else:
-        mode = current_app.config.get('DATE_DEFAULT_MODE', 'none')
-        month = current_app.config.get('DATE_DEFAULT_MONTH', 1)
-        year = current_app.config.get('DATE_DEFAULT_YEAR', 2026)
-        return jsonify({
-            'mode': mode,
-            'month': month,
-            'year': year
-        })
-
-
-@api_blueprint.route('/config/fixed_observer', methods=['GET', 'PUT'])
-def fixed_observer() -> Dict[str, Any]:
-    """Get or set fixed observer (fester Beobachter)"""
-    if request.method == 'PUT':
-        # In cloud mode, fixed observer cannot be changed via API
-        if is_cloud_mode():
-            return jsonify({
-                'success': False,
-                'error': 'fixed_observer_cloud_mode_locked'
-            }), 403
-        
-        data = request.get_json()
-        observer = data.get('observer', '')
-        
-        current_app.config['FIXED_OBSERVER'] = observer
-        # Persist setting
-        root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'FIXED_OBSERVER', observer)
-        
-        return jsonify({
-            'success': True,
-            'observer': observer
-        })
-    else:
-        # Cloud Mode: Read from session (set on login)
-        # Local Mode: Read from app.config (optional UI setting)
-        if is_cloud_mode():
-            observer = session.get('observer_kk', '')
+        spec = ALLOWED_SETTINGS[key]
+        raw = data.get('value', spec['default'])
+        if spec['type'] == 'bool':
+            value = bool(raw)
+        elif spec['type'] == 'int':
+            try:
+                value = int(raw)
+            except (ValueError, TypeError):
+                value = spec['default']
         else:
-            observer = current_app.config.get('FIXED_OBSERVER', '')
-        
-        return jsonify({
-            'observer': observer,
-            'cloud_mode': is_cloud_mode(),
-            'editable': not is_cloud_mode()
-        })
+            value = str(raw)
 
-
-@api_blueprint.route('/config/upload_observer_kk', methods=['GET', 'PUT'])
-def upload_observer_kk() -> Dict[str, Any]:
-    """Get or set the saved observer_kk for upload/download convenience."""
-    
-    if request.method == 'PUT':
-        data = request.get_json()
-        observer_kk = data.get('observer_kk', '')
-        
-        current_app.config['UPLOAD_OBSERVER_KK'] = str(observer_kk)
-        
-        # Persist setting
+        current_app.config[key] = value
         root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'UPLOAD_OBSERVER_KK', str(observer_kk))
-        
-        return jsonify({
-            'success': True
-        })
+        if spec['type'] == 'bool':
+            Settings.save_key(current_app.config, root_path, key, '1' if value else '0')
+        else:
+            Settings.save_key(current_app.config, root_path, key, str(value))
+
+        return jsonify({'success': True, 'key': key, 'value': value})
     else:
-        observer_kk = current_app.config.get('UPLOAD_OBSERVER_KK', '')
-        
-        return jsonify({
-            'observer_kk': observer_kk
-        })
+        key = request.args.get('key', '')
+        if key not in ALLOWED_SETTINGS:
+            return jsonify({'error': f'Unknown setting: {key}'}), 400
 
+        # FIXED_OBSERVER in cloud mode: read from session (set on login)
+        if key == 'FIXED_OBSERVER' and is_cloud_mode():
+            value = session.get('observer_kk', '')
+        else:
+            spec = ALLOWED_SETTINGS[key]
+            value = current_app.config.get(key, spec['default'])
 
-@api_blueprint.route('/config/active_observers', methods=['GET', 'PUT'])
-def active_observers_setting() -> Dict[str, Any]:
-    """Get or set the 'aktive Beobachter' setting.
-
-    This setting controls whether only active observers should be considered.
-    As requested, this setting does not change current observers or observations menus behavior.
-    """
-
-    if request.method == 'PUT':
-        data = request.get_json() or {}
-        enabled = bool(data.get('enabled', False))
-        current_app.config['ACTIVE_OBSERVERS_ONLY'] = enabled
-        # Persist setting
-        root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'ACTIVE_OBSERVERS_ONLY', '1' if enabled else '0')
-        return jsonify({
-            'success': True,
-            'enabled': enabled
-        })
-    else:
-        enabled = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
-        return jsonify({'enabled': enabled})
-
-
-@api_blueprint.route('/config/startup_file', methods=['GET', 'PUT'])
-def startup_file_setting() -> Dict[str, Any]:
-    """Get or set the startup file setting.
-    
-    This setting controls whether a file should be automatically loaded on program start.
-    """
-    
-    # Cloud Mode: Startup file not supported (no file operations)
-    if is_cloud_mode():
-        return jsonify({
-            'success': False,
-            'error': 'startup_file_cloud_mode_not_supported'
-        }), 403
-    
-    if request.method == 'PUT':
-        data = request.get_json() or {}
-        file_path = data.get('file_path', '')
-        
-        current_app.config['STARTUP_FILE_PATH'] = file_path
-        
-        # Persist settings
-        root_path = Path(__file__).parent.parent.parent.parent
-        Settings.save_key(current_app.config, root_path, 'STARTUP_FILE_PATH', file_path)
-        
-        return jsonify({
-            'success': True,
-            'enabled': bool(file_path),
-            'file_path': file_path
-        })
-    else:
-        file_path = current_app.config.get('STARTUP_FILE_PATH', '')
-        return jsonify({
-            'enabled': bool(file_path),
-            'file_path': file_path
-        })
+        return jsonify({'key': key, 'value': value})

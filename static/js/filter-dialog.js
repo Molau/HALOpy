@@ -49,9 +49,9 @@ class FilterDialog {
         // Load fixed observer setting
         let fixedObserver = '';
         try {
-            const configResponse = await fetch('/api/config/fixed_observer');
+            const configResponse = await fetch('/api/config/setting?key=FIXED_OBSERVER');
             const config = await configResponse.json();
-            fixedObserver = config.observer || '';
+            fixedObserver = config.value || '';
         } catch (e) {
             console.error('Error loading fixed observer:', e);
         }
