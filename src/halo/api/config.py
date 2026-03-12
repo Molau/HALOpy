@@ -125,6 +125,16 @@ def generic_setting() -> Dict[str, Any]:
             value = session.get('observer_kk', '')
         else:
             spec = ALLOWED_SETTINGS[key]
-            value = current_app.config.get(key, spec['default'])
+            raw = current_app.config.get(key, spec['default'])
+            # Coerce to proper type (app_config may hold strings after save_key)
+            if spec['type'] == 'bool':
+                value = raw not in (False, '0', 0)
+            elif spec['type'] == 'int':
+                try:
+                    value = int(raw)
+                except (ValueError, TypeError):
+                    value = spec['default']
+            else:
+                value = str(raw) if raw is not None else spec['default']
 
         return jsonify({'key': key, 'value': value})
