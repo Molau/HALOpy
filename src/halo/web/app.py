@@ -13,7 +13,7 @@ import webbrowser
 from pathlib import Path
 
 # Third-party imports
-from flask import Flask, render_template, session, request, g, redirect, url_for
+from flask import Flask, render_template, session, request, g, redirect, url_for, jsonify
 from flask_cors import CORS
 
 # Project imports
@@ -180,7 +180,9 @@ def create_app(config=None):
         # In cloud mode, require authentication
         if is_cloud_mode():
             if not session.get('authenticated', False):
-                # Redirect to login page
+                # API endpoints get 401 JSON; web pages get redirect to login
+                if request.path.startswith('/api/'):
+                    return jsonify({'success': False, 'error': 'not_authenticated'}), 401
                 return redirect(url_for('login'))
             
             # Load user-specific settings after authentication
