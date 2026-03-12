@@ -284,7 +284,7 @@
     "add_another_message": "Möchten Sie eine weitere Beobachtung erfassen?",
     "modify_another_title": "Weitere Beobachtung ändern?",
     "modify_another_message": "Möchten Sie eine weitere Beobachtung ändern?",
-    "delete_confirm_warning": "Soll diese Beobachtung wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.",
+    "delete_confirm_warning": "Soll diese Beobachtung wirklich gelöscht werden?",
     "delete_another_title": "Weitere Beobachtung löschen?",
     "delete_another_message": "Möchten Sie eine weitere Beobachtung löschen?",
     "attributes_label": "Besondere Attribute",

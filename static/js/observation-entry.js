@@ -1030,8 +1030,9 @@ async function showAddObservationDialogNumeric() {
                 if (addAnother) {
                     // User clicked Yes - show the add dialog again
                     await showAddObservationDialogNumeric();
+                } else {
+                    clearMenuHighlights();
                 }
-                // If user clicked No, do nothing (stay on current page)
             }, { once: true });
         } catch (e) {
             errEl.textContent = e.message;
@@ -1045,6 +1046,7 @@ async function showAddObservationDialogNumeric() {
     modalEl.addEventListener('hidden.bs.modal', () => {
         if (!saveHandled) {
             modalEl.remove();
+            clearMenuHighlights();
         }
     });
 }
@@ -1106,14 +1108,16 @@ async function showAddObservationDialogMenu() {
                 if (addAnother) {
                     // User clicked Yes - show the add dialog again
                     await showAddObservationDialogMenu();
+                } else {
+                    clearMenuHighlights();
                 }
-                // If user clicked No, do nothing (modal already closed, stay on current page)
             }, { once: true });
         } catch (e) {
             showErrorDialog(e.message);
         }
     }, () => {
-        // Cancel callback - nothing to do
+        // Cancel callback
+        clearMenuHighlights();
     });
 }
 
