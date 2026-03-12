@@ -141,7 +141,8 @@ async function saveFile() {
                 // Clean up autosave file
                 await fetch('/api/file/cleanup_autosave', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
                 });
                 
                 showNotification(`<strong>✓</strong> ${escapeHtml(i18nStrings.messages.file_saved.replace('{filename}', newFilename))}`, 'success');
