@@ -777,23 +777,24 @@ async function showDeleteSingleObservations(filterState) {
                     footer
                 });
                 let confirmed = false;
+                const dontWarnCheckbox = document.getElementById(checkId);
                 document.getElementById(yesId).addEventListener('click', () => {
                     confirmed = true;
                     confirmModal.hide();
                 });
                 setupModalKeyboard(confirmEl, { defaultButtonId: noId, enterButtonId: noId });
                 await new Promise(resolve => {
-                    confirmEl.addEventListener('hidden.bs.modal', async () => {
+                    confirmEl.addEventListener('hide.bs.modal', () => {
                         // Save "don't warn again" preference if checked (regardless of Yes/No)
-                        if (document.getElementById(checkId)?.checked) {
-                            await fetch('/api/config/setting', {
+                        if (dontWarnCheckbox?.checked) {
+                            fetch('/api/config/setting', {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ key: 'SHOW_WARNINGS', value: false })
                             });
                         }
-                        resolve();
                     }, { once: true });
+                    confirmEl.addEventListener('hidden.bs.modal', () => resolve(), { once: true });
                 });
                 if (!confirmed) return;
             }
