@@ -236,7 +236,7 @@
       "download_scope_own_observer": "Nur eigene Beobachtereinträge",
       "download_scope_all_observer": "Alle Beobachtereinträge",
       "legacy_format_converted_title": "Dateiformat konvertiert",
-      "legacy_format_converted_message": "Die Datei wurde aus dem alten HALO-Format in das aktuelle CSV-Format konvertiert und gespeichert.",
+      "legacy_format_converted_message": "Die Datei wurde aus dem alten HALO-Format in das aktuelle CSV-Format konvertiert.",
       "server_unreachable": "HALO Online-Service ist nicht erreichbar",
       "server_unreachable_details": "Der HALO Online-Service ({0}) kann aktuell nicht erreicht werden. Bitte überprüfen Sie Ihre Internetverbindung oder versuchen Sie es später erneut.",
       "upload_success_observer": "Beobachterdaten erfolgreich hochgeladen",

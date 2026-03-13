@@ -236,7 +236,7 @@
       "download_scope_own_observer": "Only own observer records",
       "download_scope_all_observer": "All observer records",
       "legacy_format_converted_title": "File format converted",
-      "legacy_format_converted_message": "The file has been converted from the old HALO format to the current CSV format and saved.",
+      "legacy_format_converted_message": "The file has been converted from the old HALO format to the current CSV format.",
       "server_unreachable": "HALO Online Service is unreachable",
       "server_unreachable_details": "The HALO Online Service ({0}) cannot be reached at this time. Please check your internet connection or try again later.",
       "upload_success_observer": "Observer data successfully uploaded",
