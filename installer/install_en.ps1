@@ -324,11 +324,18 @@ Write-Header "Step 3: Installing Python Dependencies"
 
 Set-Location $INSTALL_DIR
 
-$pythonCommand = "py -3"
+$pythonCommand = "python"
 try {
-    & $pythonCommand --version 2>&1 | Out-Null
+    $testVersion = & python --version 2>&1
+    if ($testVersion -notmatch "Python 3") { throw "not Python 3" }
 } catch {
-    $pythonCommand = "python"
+    $pythonCommand = "py"
+    try {
+        & py -3 --version 2>&1 | Out-Null
+        $pythonCommand = "py"
+    } catch {
+        $pythonCommand = "python"
+    }
 }
 
 if (Test-Path "requirements.txt") {
@@ -366,16 +373,37 @@ REM Created by install.ps1
 
 cd /d "%~dp0"
 
-REM Use py launcher (more reliable on Windows 10/11)
-py -3 halo.py
+REM Detect Python command (python, py -3, python3)
+where python >nul 2>&1 && (
+    python --version 2>&1 | findstr /R "Python 3" >nul 2>&1 && (
+        python halo.py
+        goto :done
+    )
+)
+where py >nul 2>&1 && (
+    py -3 halo.py
+    goto :done
+)
+where python3 >nul 2>&1 && (
+    python3 halo.py
+    goto :done
+)
 
+echo.
+echo Error: Could not start HALOpy
+echo Make sure Python 3 is installed and available in PATH
+echo.
+pause
+goto :eof
+
+:done
 if errorlevel 1 (
     echo.
-    echo Error: Could not start HALOpy
-    echo Make sure Python 3 is installed
+    echo Error: HALOpy exited with an error
     echo.
     pause
 )
+:eof
 '@
 
 $batPath = Join-Path $INSTALL_DIR "halo.bat"
