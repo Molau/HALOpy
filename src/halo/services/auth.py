@@ -173,21 +173,21 @@ class AuthService:
         try:
             ssm = boto3.client('ssm', region_name='eu-central-1')
             
-            response = ssm.get_parameters_by_path(
-                Path='/halopy/passwords/',
-                Recursive=False,
-                MaxResults=100
-            )
-            
             usernames = set()
-            for param in response.get('Parameters', []):
-                # Extract username from parameter name like /halopy/passwords/kk44 or /halopy/passwords/admin
-                name = param['Name'].rsplit('/', 1)[-1]
-                if name == 'admin':
-                    usernames.add('admin')
-                elif name.startswith('kk'):
-                    # Convert kk04 -> '4', kk44 -> '44'
-                    usernames.add(str(int(name[2:])))
+            params = {'Path': '/halopy/passwords/', 'Recursive': False}
+            while True:
+                response = ssm.get_parameters_by_path(**params)
+                for param in response.get('Parameters', []):
+                    name = param['Name'].rsplit('/', 1)[-1]
+                    if name == 'admin':
+                        usernames.add('admin')
+                    elif name.startswith('kk'):
+                        # Convert kk04 -> '4', kk44 -> '44'
+                        usernames.add(str(int(name[2:])))
+                token = response.get('NextToken')
+                if not token:
+                    break
+                params['NextToken'] = token
             
             return usernames
             
