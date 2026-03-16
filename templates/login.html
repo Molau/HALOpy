@@ -200,20 +200,22 @@
             'server_unreachable': '{{ g.i18n.get("login.error_server_unreachable") }}'
         };
         
-        // Load observers and populate dropdown
+        // Load observers and populate dropdown (only those with AWS passwords)
         async function loadObservers() {
             try {
-                const response = await fetch('/api/observers/list');
+                const response = await fetch('/api/observers/list?registered_only=true');
                 if (response.ok) {
                     const data = await response.json();
                     const observers = data.observers || [];
                     const usernameSelect = document.getElementById('username');
                     
-                    // Add admin option first
-                    const adminOption = document.createElement('option');
-                    adminOption.value = 'admin';
-                    adminOption.textContent = 'Admin';
-                    usernameSelect.appendChild(adminOption);
+                    // Add admin option first (only if admin has a password)
+                    if (data.has_admin !== false) {
+                        const adminOption = document.createElement('option');
+                        adminOption.value = 'admin';
+                        adminOption.textContent = 'Admin';
+                        usernameSelect.appendChild(adminOption);
+                    }
                     
                     // Add observer options (sorted by KK)
                     observers.sort((a, b) => parseInt(a.KK) - parseInt(b.KK)).forEach(obs => {

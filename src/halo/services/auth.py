@@ -8,7 +8,9 @@ Passwords are stored as bcrypt hashes in AWS SSM Parameter Store.
 import re
 
 import bcrypt
+import boto3
 from typing import Optional, Tuple
+
 from halo.config import is_cloud_mode
 from halo.models.constants import PASSWORD_MIN_LENGTH, PASSWORD_REQUIRE_CATEGORIES
 
@@ -96,8 +98,6 @@ class AuthService:
             Bcrypt hash string or None if not found
         """
         try:
-            import boto3
-            
             # Create SSM client
             ssm = boto3.client('ssm', region_name='eu-central-1')  # Frankfurt region
             
@@ -161,6 +161,41 @@ class AuthService:
         return hashed.decode('utf-8')
     
     @staticmethod
+    def get_registered_usernames() -> set:
+        """Get set of usernames that have passwords in AWS Parameter Store.
+        
+        Returns:
+            Set of username strings (KK numbers and/or 'admin')
+        """
+        if not is_cloud_mode():
+            return set()
+        
+        try:
+            ssm = boto3.client('ssm', region_name='eu-central-1')
+            
+            response = ssm.get_parameters_by_path(
+                Path='/halopy/passwords/',
+                Recursive=False,
+                MaxResults=100
+            )
+            
+            usernames = set()
+            for param in response.get('Parameters', []):
+                # Extract username from parameter name like /halopy/passwords/kk44 or /halopy/passwords/admin
+                name = param['Name'].rsplit('/', 1)[-1]
+                if name == 'admin':
+                    usernames.add('admin')
+                elif name.startswith('kk'):
+                    # Convert kk04 -> '4', kk44 -> '44'
+                    usernames.add(str(int(name[2:])))
+            
+            return usernames
+            
+        except Exception as e:
+            print(f"Error listing AWS SSM parameters: {e}")
+            return set()
+    
+    @staticmethod
     def change_password(username: str, current_password: str, new_password: str, admin_bypass: bool = False) -> Tuple[bool, Optional[str]]:
         """
         Change user password in AWS Parameter Store.
@@ -189,8 +224,6 @@ class AuthService:
             return False, error
         
         try:
-            import boto3
-            
             # Create new hash
             new_hash = AuthService.hash_password(new_password)
             

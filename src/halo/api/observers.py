@@ -461,6 +461,12 @@ def get_observers_list() -> Dict[str, Any]:
     This endpoint does NOT require authentication - it's used by login, upload, and download dialogs.
     """
     
+    # Check if only registered users (with AWS passwords) should be returned
+    registered_only = request.args.get('registered_only', '').lower() == 'true'
+    registered_usernames = None
+    if registered_only and is_cloud_mode():
+        registered_usernames = AuthService.get_registered_usernames()
+    
     # Get observers based on deployment mode
     if is_cloud_mode():
         # Cloud Mode: Direct database access WITHOUT session filtering
@@ -484,6 +490,11 @@ def get_observers_list() -> Dict[str, Any]:
                 # Convert to standardized format (rows are tuples: (KK, VName, NName, seit))
                 observers = []
                 for obs in db_observers:
+                    # If registered_only, skip observers without AWS password
+                    if registered_usernames is not None:
+                        kk_str = str(obs[0])
+                        if kk_str not in registered_usernames:
+                            continue
                     observers.append({
                         'KK': obs[0],
                         'VName': obs[1] or '',
@@ -521,7 +532,12 @@ def get_observers_list() -> Dict[str, Any]:
     # Sort by KK (handle both int and string types)
     observers.sort(key=lambda x: int(x['KK']) if isinstance(x['KK'], str) and x['KK'].isdigit() else (x['KK'] if isinstance(x['KK'], int) else 0))
     
-    return jsonify({'observers': observers})
+    result = {'observers': observers}
+    # Include admin flag when filtering for registered users
+    if registered_usernames is not None:
+        result['has_admin'] = 'admin' in registered_usernames
+    
+    return jsonify(result)
 
 
 @api_blueprint.route('/observers/regions', methods=['GET'])
