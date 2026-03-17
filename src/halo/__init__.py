@@ -3,6 +3,6 @@ HALO - Atmospheric Halo Observation Software
 Python translation of the original Borland Pascal software
 """
 
-__version__ = "3.2.1"
+__version__ = "3.2.2"
 __version_date__ = "2026-03-17"
 __author__ = "Original: 1992, Python Translation: 2025"

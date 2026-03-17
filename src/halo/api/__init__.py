@@ -6,7 +6,9 @@ api_blueprint = Blueprint('api', __name__, url_prefix='/api')
 
 # Import route modules to register their routes on the blueprint.
 # These imports MUST come after api_blueprint is created.
-from . import auth  # noqa: E402, F401
+from halo.config import is_cloud_mode
+if is_cloud_mode():
+    from . import auth  # noqa: E402, F401
 from . import general  # noqa: E402, F401
 from . import observations  # noqa: E402, F401
 from . import files  # noqa: E402, F401

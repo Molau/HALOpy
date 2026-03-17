@@ -7,8 +7,6 @@ Passwords are stored as bcrypt hashes in AWS SSM Parameter Store.
 
 import re
 
-import bcrypt
-import boto3
 from typing import Optional, Tuple
 
 from halo.config import is_cloud_mode
@@ -99,6 +97,7 @@ class AuthService:
         """
         try:
             # Create SSM client
+            import boto3
             ssm = boto3.client('ssm', region_name='eu-central-1')  # Frankfurt region
             
             # Construct parameter name
@@ -136,6 +135,7 @@ class AuthService:
             True if password matches hash
         """
         try:
+            import bcrypt
             return bcrypt.checkpw(
                 password.encode('utf-8'),
                 hash_string.encode('utf-8')
@@ -156,6 +156,7 @@ class AuthService:
         Returns:
             Bcrypt hash string
         """
+        import bcrypt
         salt = bcrypt.gensalt()
         hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
         return hashed.decode('utf-8')
@@ -171,8 +172,9 @@ class AuthService:
             return set()
         
         try:
+            import boto3
             ssm = boto3.client('ssm', region_name='eu-central-1')
-            
+
             usernames = set()
             params = {'Path': '/halopy/passwords/', 'Recursive': False}
             while True:
@@ -228,6 +230,7 @@ class AuthService:
             new_hash = AuthService.hash_password(new_password)
             
             # Update in AWS Parameter Store
+            import boto3
             ssm = boto3.client('ssm', region_name='eu-central-1')
             if username == AuthService.ADMIN_USERNAME:
                 param_name = f'/halopy/passwords/admin'
