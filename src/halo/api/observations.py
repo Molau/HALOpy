@@ -114,6 +114,12 @@ def search_observations() -> Dict[str, Any]:
         elif criterion1 == 'region' and value1 is not None:
             filters['gg'] = int(value1)
         
+        # Non-admin users: always filter by session observer unless they
+        # explicitly chose a different observer above
+        fixed_observer = session.get('observer_kk')
+        if fixed_observer and 'kk' not in filters:
+            filters['kk'] = int(fixed_observer)
+        
         # Second criterion
         if criterion2 == 'date' and value2:
             if value2.get('t') is not None:

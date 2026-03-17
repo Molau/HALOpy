@@ -1154,18 +1154,46 @@ async function showDisplayObservationsDialog() {
 
 // Show compact list of observations in modal (Kurzausgabe - number format)
 async function showDisplayCompactList(filterState) {
-    // Apply filters to get filtered observations
-    const filteredObs = await applyFilterToObservations(filterState);
-    
-    if (filteredObs.length === 0) {
+    const pageSize = 50;
+    let currentPage = 1;
+    let totalCount = 0;
+    let maxPage = 1;
+
+    // Build search params from filterState
+    function buildSearchParams(page) {
+        return {
+            criterion1: filterState.criterion1 || null,
+            value1: filterState.value1 !== undefined ? filterState.value1 : null,
+            criterion2: filterState.criterion2 || null,
+            value2: filterState.value2 !== undefined ? filterState.value2 : null,
+            limit: pageSize,
+            offset: (page - 1) * pageSize
+        };
+    }
+
+    // Fetch a single page from the server
+    async function fetchPage(page) {
+        const response = await fetch('/api/observations/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(buildSearchParams(page))
+        });
+        if (!response.ok) return { observations: [], total: 0 };
+        return await response.json();
+    }
+
+    // First page fetch to get total count
+    const firstResult = await fetchPage(1);
+    totalCount = firstResult.total || 0;
+
+    if (totalCount === 0) {
         await showWarningModal(i18nStrings.messages.no_observations);
         clearMenuHighlights();
         return;
     }
-    
-    const pageSize = 50;
-    let currentPage = 1;
-    const maxPage = Math.ceil(filteredObs.length / pageSize);
+
+    maxPage = Math.ceil(totalCount / pageSize);
+    let currentPageData = firstResult.observations || [];
     
     // Create modal
     const modalHtml = `
@@ -1218,21 +1246,20 @@ async function showDisplayCompactList(filterState) {
     const modalEl = document.getElementById('compact-list-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
-    // Display function
+    // Display function (uses already-fetched currentPageData)
     const displayPage = () => {
         const startIndex = (currentPage - 1) * pageSize;
-        const endIndex = Math.min(startIndex + pageSize, filteredObs.length);
-        const pageData = filteredObs.slice(startIndex, endIndex);
+        const endIndex = Math.min(startIndex + currentPageData.length, totalCount);
         
         // Generate compact lines using kurzausgabe
-        const lines = pageData.map(obs => kurzausgabe(obs));
+        const lines = currentPageData.map(obs => kurzausgabe(obs));
         document.getElementById('compact-list-content').textContent = lines.join('\n');
         
         // Update page info
         document.getElementById('page-info').textContent = `${i18nStrings.common.page} ${currentPage} ${i18nStrings.common.of} ${maxPage}`;
         
         // Update record info
-        document.getElementById('record-info').textContent = `${i18nStrings.common.row} ${startIndex + 1}-${endIndex} ${i18nStrings.common.of} ${filteredObs.length}`;
+        document.getElementById('record-info').textContent = `${i18nStrings.common.row} ${startIndex + 1}-${endIndex} ${i18nStrings.common.of} ${totalCount}`;
         
         // Update button states
         document.getElementById('btn-first').disabled = currentPage === 1;
@@ -1244,11 +1271,20 @@ async function showDisplayCompactList(filterState) {
     // Close button (OK)
     const btnClose = modalEl.querySelector('.modal-footer [data-bs-dismiss="modal"]');
 
-    // Navigation handlers - refocus OK button after page change so ESC keeps working
-    document.getElementById('btn-first').onclick = () => { currentPage = 1; displayPage(); btnClose.focus(); };
-    document.getElementById('btn-prev').onclick = () => { if (currentPage > 1) { currentPage--; displayPage(); btnClose.focus(); } };
-    document.getElementById('btn-next').onclick = () => { if (currentPage < maxPage) { currentPage++; displayPage(); btnClose.focus(); } };
-    document.getElementById('btn-last').onclick = () => { currentPage = maxPage; displayPage(); btnClose.focus(); };
+    // Navigation handlers - fetch page from server, then display
+    const goToPage = async (page) => {
+        if (page < 1 || page > maxPage || page === currentPage) return;
+        currentPage = page;
+        const result = await fetchPage(page);
+        currentPageData = result.observations || [];
+        displayPage();
+        btnClose.focus();
+    };
+
+    document.getElementById('btn-first').onclick = () => goToPage(1);
+    document.getElementById('btn-prev').onclick = () => goToPage(currentPage - 1);
+    document.getElementById('btn-next').onclick = () => goToPage(currentPage + 1);
+    document.getElementById('btn-last').onclick = () => goToPage(maxPage);
     
     // Decision #033: Use setupModalKeyboard for Enter key ? OK button (closes modal)
     setupModalKeyboard(modalEl, btnClose);
@@ -1462,10 +1498,50 @@ function kurzausgabe(obs) {
 
 // Show single observations for display (one by one with navigation)
 async function showDisplaySingleObservations(filterState) {
-    // Apply filters to get filtered observations
-    const filteredObs = await applyFilterToObservations(filterState);
-    
-    if (filteredObs.length === 0) {
+    const bufferSize = 50;
+    let buffer = [];        // current page of observations
+    let bufferOffset = 0;   // global offset of first element in buffer
+    let totalCount = 0;
+    let currentIndex = 0;   // global index of current observation
+
+    // Fetch a chunk of observations from the server
+    async function fetchChunk(offset) {
+        const response = await fetch('/api/observations/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                criterion1: filterState.criterion1 || null,
+                value1: filterState.value1 !== undefined ? filterState.value1 : null,
+                criterion2: filterState.criterion2 || null,
+                value2: filterState.value2 !== undefined ? filterState.value2 : null,
+                limit: bufferSize,
+                offset: offset
+            })
+        });
+        if (!response.ok) return { observations: [], total: 0 };
+        return await response.json();
+    }
+
+    // Get observation at global index, fetching new chunk if needed
+    async function getObservation(index) {
+        if (index < bufferOffset || index >= bufferOffset + buffer.length) {
+            // Need to fetch a new chunk containing this index
+            const newOffset = Math.floor(index / bufferSize) * bufferSize;
+            const result = await fetchChunk(newOffset);
+            buffer = result.observations || [];
+            bufferOffset = newOffset;
+            totalCount = result.total || totalCount;
+        }
+        return buffer[index - bufferOffset];
+    }
+
+    // Initial fetch
+    const firstResult = await fetchChunk(0);
+    totalCount = firstResult.total || 0;
+    buffer = firstResult.observations || [];
+    bufferOffset = 0;
+
+    if (totalCount === 0) {
         await showWarningModal(i18nStrings.messages.no_observations);
         clearMenuHighlights();
         return;
@@ -1475,21 +1551,20 @@ async function showDisplaySingleObservations(filterState) {
     const form = new ObservationForm();
     await form.initialize('view');
     
-    let currentIndex = 0;
     let isFormShown = false;
 
-    const showNext = () => {
-        if (currentIndex >= filteredObs.length) {
+    const showNext = async () => {
+        if (currentIndex >= totalCount) {
             form.navigating = true;
             form.hideModal();
             window.navigateInternal('/');
             return;
         }
         
-        const obs = filteredObs[currentIndex];
+        const obs = await getObservation(currentIndex);
 
         if (!isFormShown) {
-            form.show('view', obs, null, null, currentIndex + 1, filteredObs.length, null, () => {
+            form.show('view', obs, null, null, currentIndex + 1, totalCount, null, () => {
                 // Next button
                 currentIndex++;
                 showNext();
@@ -1505,11 +1580,11 @@ async function showDisplaySingleObservations(filterState) {
             });
             isFormShown = true;
         } else {
-            form.navigateTo(obs, currentIndex + 1, filteredObs.length);
+            form.navigateTo(obs, currentIndex + 1, totalCount);
         }
     };
     
-    showNext();
+    await showNext();
 }
 
 // Show observation form for viewing (read-only display with navigation)
