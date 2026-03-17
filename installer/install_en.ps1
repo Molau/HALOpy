@@ -372,7 +372,6 @@ REM HALOpy Launcher
 REM Created by install.ps1
 
 cd /d "%~dp0"
-set HALOPY_OPEN_BROWSER=1
 
 REM Detect Python command (python, py -3, python3)
 where python >nul 2>&1 && (

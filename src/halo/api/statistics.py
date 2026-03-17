@@ -740,7 +740,7 @@ def get_monthly_stats() -> Dict[str, Any]:
         # Layer 3b: Direct database query with SQL filtering
         filtered_obs = obs_db.load_filtered(mm=mm_int, jj=jj_int)
         observers = observer_db.load_all()
-        active_observers_only = False  # In Cloud Mode, admin can see all
+        active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
     else:
         # Local Mode: Load from memory cache, filter in Python
         observations = current_app.config.get('OBSERVATIONS', [])

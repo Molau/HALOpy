@@ -372,7 +372,6 @@ REM HALOpy Launcher (Deutsch)
 REM Erstellt durch install_de.ps1
 
 cd /d "%~dp0"
-set HALOPY_OPEN_BROWSER=1
 
 REM Python-Befehl ermitteln (python, py -3, python3)
 where python >nul 2>&1 && (

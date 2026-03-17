@@ -22,8 +22,9 @@ let ALL_PILLAR_HEIGHT_VALUES = []; // All height values including 0
 let VALID_HALO_TYPES = []; // Valid halo type numbers (1-77, 99)
 let COMBINED_HALO_TYPES = new Set(); // Combined halo types from backend
 
-// Global cloud mode flag - loaded once at startup
-let isCloudMode = false;
+// Global cloud mode flag - set server-side in base.html <script> tag,
+// available immediately (no async wait needed).
+let isCloudMode = !!window.isCloudMode;
 
 // Password policy configuration (defaults, overridden by /api/constants at startup)
 let PASSWORD_POLICY = {
@@ -107,7 +108,7 @@ window.refreshFileStatus = refreshFileStatus;
 
 // Global config (loaded once at startup)
 window.haloConfig = {
-    cloud_mode: false
+    cloud_mode: !!window.isCloudMode
 };
 
 // Helper function to save haloData metadata to sessionStorage
@@ -159,18 +160,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadCurrentLanguage();
     await loadI18n(currentLanguage);
 
-    // Load config (cloud mode flag)
-    try {
-        const configResponse = await fetch('/api/config');
-        if (configResponse.ok) {
-            const config = await configResponse.json();
-            isCloudMode = config.cloud_mode; // Initialize global variable
-            window.isCloudMode = config.cloud_mode; // Make available to other scripts
-            window.haloConfig.cloud_mode = config.cloud_mode;
-        }
-    } catch (e) {
-        console.error('Failed to load config:', e);
-    }
+    // Cloud mode flag is already set server-side in base.html <script>
+    // No API call needed — window.isCloudMode is available immediately.
 
     // Check if i18n loaded successfully - fail fast if not
     if (!i18nStrings) {
