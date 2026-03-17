@@ -3,8 +3,8 @@
 ## 1. Über das Programm selbst
 
 HALOpy ist eine Web‑Anwendung zur Eingabe, Anzeige und Auswertung von Halobeobachtungen im standardisierten HALO‑Schlüsselformat. Die Bedienung erfolgt komfortabel im Browser, die bewährten Funktionen des Originalprogramms unter DOS bleiben erhalten. Beobachtungen können erfasst, gespeichert und als Monatsmeldungen sowie in vielfältigen statistischen Auswertungen dargestellt werden. Darüber hinaus lassen sich mit geladenen Daten komplette Monats‑ und Jahresstatistiken sowie Untersuchungen über größere Datenmengen erstellen.
-Durch seine unterschiedliche Konfigurierbarkeit läßt sich das Programm problemlos an die speziellen Erfordernisse des jeweiligen Nutzers anpassen und ist auch als zentrales Erfassungsprogramm in der Meldestellegut geeignet. Es hält sich streng an die seit Januar 1978 in der Sektion Halobeobachtung verwendeten Verschlüsselungsvorschrift in der jeweils aktuellen Form.
-Das Programm 'Halo' ist Public-Domain-Software, daß regelmäßig aktualisiert und verbessert wird. Es darf frei kopiert werden und ist vom Autor jederzeit kostenlos erhältlich. Die unter 6. genannten Copyrights sind zu beachten.
+Durch seine unterschiedliche Konfigurierbarkeit lässt sich das Programm problemlos an die speziellen Erfordernisse des jeweiligen Nutzers anpassen und ist auch als zentrales Erfassungsprogramm in der Meldestelle gut geeignet. Es hält sich streng an die seit Januar 1978 in der Sektion Halobeobachtung verwendeten Verschlüsselungsvorschrift in der jeweils aktuellen Form.
+Das Programm HALOpy ist Open-Source-Software, die regelmäßig aktualisiert und verbessert wird. Der Quellcode ist auf GitHub frei verfügbar und kann von dort jederzeit kostenlos heruntergeladen werden. Die unter 6. genannten Copyrights sind zu beachten.
 An dieser Stelle sei denjenigen gedankt, die sich den Haloschlüssel sehr zeitig ausdachten und somit die Voraussetzungen für die digitale Erfassung und die damit möglichen Auswertungen schufen.
 
 Ab Version 3.1 unterstützt HALOpy zwei Betriebsmodi:
@@ -98,7 +98,7 @@ Legacy .HAL-Dateien müssen in der DOS-Originalversion nach CSV exportiert werde
 
 Ein Verzeichniswechsel entfällt im Browser; die Dateiauswahl erfolgt über den Dateidialog des Betriebssystems.
 
-**Cloud-Modus:** Das Menü 'Datei' entfällt im Cloud-Modus vollständig. Die Datenhaltung erfolgt über die Datenbank; Laden, Speichern und Dateiverwaltung sind nicht erforderlich. Der Schreibzugriff ist auf die eigenen Beobachtungen und Beobachter des angemeldeten Benutzers beschränkt. Administratoren haben Zugriff auf alle Daten.
+**Cloud-Modus:** Im Cloud-Modus entfallen die dateibezogenen Funktionen (Neue Datei, Laden, Selektieren, Verbinden, Speichern, Speichern unter), da die Datenhaltung vollständig über die Datenbank erfolgt. Upload und Download stehen weiterhin zur Verfügung (siehe unten). 
 
 **Beide Modi:** Folgende Funktionen stehen in beiden Betriebsmodi zur Verfügung:
 
@@ -109,7 +109,7 @@ Ein Verzeichniswechsel entfällt im Browser; die Dateiauswahl erfolgt über den 
 
 Dieses Menü bündelt Anzeige, Eingabe, Änderung und Löschung von Beobachtungen aus der geladenen Datei.
 
-  * 'Anzeigen': Zeigt Beobachtungen gefiltert nach Kriterien (z.B. Jahr/Monat/Tag, Uhrzeit, Beobachter, Region, ...). Ausgabe erfolgt im Browser; wenn keine Treffer vorhanden sind, erscheint eine Warnung.
+  * 'Anzeigen': Zeigt Beobachtungen gefiltert nach Kriterien (z.B. Jahr/Monat/Tag, Uhrzeit, Beobachter, Region, Haloart). Ausgabe erfolgt im Browser; wenn keine Treffer vorhanden sind, erscheint eine Warnung.
   * 'Hinzufügen': Öffnet die Eingabemaske nach HALO-Schlüssel. Eingaben werden sofort gegen die Validierungsregeln geprüft; unzulässige Kombinationen werden abgelehnt. Fest eingestellte Werte (z.B. fester Beobachter/Datum) werden übernommen, Pflichtfelder sind markiert.
   * 'Verändern': Sucht Beobachtungen nach Kriterien und erlaubt die Änderung einzelner Felder. Änderungen werden unmittelbar validiert; nach Speicherung bleibt die Sortierung erhalten.
   * 'Löschen': Sucht Beobachtungen nach Kriterien und entfernt ausgewählte Einträge aus der geladenen Datei.

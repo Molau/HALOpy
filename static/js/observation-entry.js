@@ -632,9 +632,10 @@ async function showAddObservationDialogNumeric() {
                             errEl.textContent = res.msg;
                             errEl.style.display = 'block';
                             renderNumericGuide(eing);
-                        } else {
-                            errEl.textContent = res.msg;
-                            errEl.style.display = 'block';
+                        } else if (res.backtrack) {
+                            eing = candidate.slice(0, -res.backtrack);
+                            input.value = eing;
+                            renderNumericGuide(eing);
                         }
                         ev.preventDefault();
                         return;
@@ -960,7 +961,8 @@ async function showAddObservationDialogNumeric() {
                 renderNumericGuide(eing);
             } else if (res.backtrack) {
                 // Remove specified number of characters when 2-digit field validation fails
-                eing = eing.slice(0, -res.backtrack);
+                // Use candidate (which includes the rejected char) as base, not eing
+                eing = candidate.slice(0, -res.backtrack);
                 input.value = eing;
                 renderNumericGuide(eing);
             }
@@ -1375,11 +1377,17 @@ function validateNumericProgress(s, observerCodes) {
     if (len === 25) return { ok: ['1','2','/'].includes(s[24]) };
     // 26 f (weather front, digit or space)
     if (len === 26) return { ok: digit.test(s[25]) || s[25] === ' ' };
-    // 27-28 zz (two digits) or '//' or '  '
+    // 27-28 zz (two digits 00-36) or '//' or '  '
     if (len === 27) return { ok: digit.test(s[26]) || s[26] === '/' || s[26] === ' ' };
     if (len === 28) {
         const zz = s.slice(26,28);
-        return { ok: zz === '//' || zz === '  ' || /^\d{2}$/.test(zz) };
+        if (zz === '//' || zz === '  ') return { ok: true };
+        if (/^\d{2}$/.test(zz)) {
+            const zzVal = parseInt(zz, 10);
+            if (zzVal > 36) return { ok: false, backtrack: 2 };
+            return { ok: true };
+        }
+        return { ok: false, backtrack: 2 };
     }
     // 29-30 G (01-39, excluding 12-15 and 18)
     if (len === 29) return { ok: digit.test(s[28]) };

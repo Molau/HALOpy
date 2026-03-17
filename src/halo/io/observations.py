@@ -681,8 +681,8 @@ def validate_observation(obs: Dict[str, str]) -> Tuple[bool, List[str]]:
     if front != -1 and (front < 0 or front > 8):
         errors.append(f"Invalid f: {front} (must be 0-8)")
     
-    if zz != -1 and (zz < 0 or zz > 99):
-        errors.append(f"Invalid zz: {zz} (must be 0-99)")
+    if zz != -1 and zz != 99 and (zz < 0 or zz > 36):
+        errors.append(f"Invalid zz: {zz} (must be 0-36 or 99)")
     
     if ho != -1 and ho != 0 and (ho < 1 or ho > 90):
         errors.append(f"Invalid HO: {ho} (must be 0 or 1-90)")

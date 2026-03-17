@@ -6,7 +6,7 @@ HALOpy is a web application for recording, displaying, and analyzing halo observ
 
 Due to its various configuration options, the program can easily be adapted to the specific requirements of the individual user and is also suitable as a central recording program for reporting stations. It strictly adheres to the encryption specifications used in the Halo Observation Section since January 1978 in their current form.
 
-The program HALOpy is public domain software that is regularly updated and improved. It may be freely copied and is available to you at no cost from the author at any time. The copyrights mentioned under section 6 must be observed.
+The program HALOpy is open-source software that is regularly updated and improved. The source code is freely available on GitHub and can be downloaded at any time at no cost. The copyrights mentioned under section 6 must be observed.
 
 At this point, we thank those who developed the halo key and thus created the prerequisites for digital recording and the analyses that are now possible.
 
@@ -101,7 +101,7 @@ Legacy .HAL files must be exported to CSV in the original DOS version; then they
 
 Directory switching is not needed in the browser; file selection is done via the operating system's file dialog.
 
-**Cloud Mode:** The 'File' menu is not available in cloud mode. Data management is handled through the database; loading, saving, and file management are not required. Write access is limited to the logged-in user's own observations and observers. Administrators have access to all data.
+**Cloud Mode:** In cloud mode, the file-related functions (New File, Open, Select, Concatenate, Save, Save As) are not available, as data management is handled entirely through the database. Upload and Download remain available (see below). 
 
 **Both Modes:** The following functions are available in both operating modes:
 
@@ -112,7 +112,7 @@ Directory switching is not needed in the browser; file selection is done via the
 
 This menu bundles the display, entry, modification, and deletion of observations from the loaded file.
 
-  * 'Display': Shows observations filtered by criteria (e.g., year/month/day, time, observer, region, ...). Output occurs in the browser; if no matches are found, a warning appears.
+  * 'Display': Shows observations filtered by criteria (e.g., year/month/day, time, observer, region, halo type). Output occurs in the browser; if no matches are found, a warning appears.
   * 'Add': Opens the input mask according to the HALO key. Entries are immediately checked against the validation rules; invalid combinations are rejected. Fixed values (e.g., fixed observer/date) are adopted, required fields are marked.
   * 'Change': Searches for observations according to criteria and allows modification of individual fields. Changes are validated immediately; sorting is retained after saving.
   * 'Delete': Searches for observations according to criteria and removes selected entries from the loaded file.
@@ -165,9 +165,9 @@ Text output formats: HTML table (web layout), pseudographics (DOS layout), or Ma
 
 This menu provides the current settings. All changes are saved immediately and take effect in the browser (no printer or color options needed anymore).
 
-  * 'Fixed Observer': Default observer setting for input and output masks (e.g., monthly report).
+  * 'Fixed Observer' (local mode only): Default observer setting for input and output masks (e.g., monthly report).
   * 'Active Observers': Lists and analyses optionally limited to active observers or showing all.
-  * 'Fixed File': Optionally load a specific CSV file automatically at program startup.
+  * 'Fixed File' (local mode only): Optionally load a specific CSV file automatically at program startup.
   * 'Date': Choose default for date prompts: none, current month, previous month, or constant month (with month/year selection).
   * 'Input Mode': Preset menu entries (guided forms) or numeric entries (key line) for observation dialogs.
   * 'Output Mode': Choose text format for monthly report/statistics, annual statistics, and analysis: HTML tables, pseudographics, or Markdown (CSV/TXT/MD accordingly).

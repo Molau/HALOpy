@@ -108,11 +108,6 @@ def search_observations() -> Dict[str, Any]:
         # Cloud Mode: Build SQL filters for load_filtered()
         filters = {}
         
-        # Fixed observer filter (per-user session)
-        fixed_observer = session.get('observer_kk')
-        if fixed_observer:
-            filters['kk'] = int(fixed_observer)
-        
         # First criterion
         if criterion1 == 'observer' and value1 is not None:
             filters['kk'] = int(value1)

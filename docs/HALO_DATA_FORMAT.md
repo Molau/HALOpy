@@ -403,7 +403,7 @@ Complete mapping:
 - **Pascal Variable**: `zz` (ShortInt)
 - **Position**: Characters 27-28
 - **Type**: Integer (2 digits)
-- **Range**: 00-98, 99, or blank
+- **Range**: 00-36, 99, or blank
 - **Values**:
   - 00-98: Hours after observation until precipitation
   - 99: No precipitation occurred [encoded as `//`]

@@ -204,7 +204,7 @@ def _format_lp8(e: int, ho: int | None, hu: int | None) -> str:
         s += '//' if hu_unknown else f"{hu:02d}"
         return s
     else:
-        return '/////'
+        return '8////'
 
 
 def _int(obs: Dict[str, str], key: str, default: int = 0) -> int:
@@ -434,7 +434,7 @@ def _kurzausgabe(obs) -> str:
         hu_str = fmt2_ho_hu(HU)
         erg += '8' + ho_str + hu_str
     else:
-        erg += '/////'
+        erg += '8////'
     
     # Add sectors and remarks - total line must be exactly 69 chars + sectors + remarks
     erg += ' '

@@ -494,8 +494,8 @@ class ObservationForm {
                 <label class="form-label">zz - ${i18nStrings.fields.precipitation}</label>
                 <select class="form-select form-select-sm" id="form-zz">
                     <option value="-1">${i18nStrings.fields.select}</option>
-                    ${Array.from({length: 99}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
                     <option value="99">//</option>
+                    ${Array.from({length: 37}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
                 </select>
             </div>
             <div class="col-md-3">

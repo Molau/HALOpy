@@ -1137,7 +1137,7 @@ window.getParameterRange = function(paramCode, observers) {
         case 'zz':
             const zzTimes = [];
             const hourText = i18nStrings.observations.detail_labels.hours.trim();
-            for (let i = 0; i <= 99; i++) {
+            for (let i = 0; i <= 36; i++) {
                 zzTimes.push({ value: i, display: `${i} ${hourText}` });
             }
             return zzTimes;

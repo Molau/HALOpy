@@ -108,7 +108,8 @@ class Settings:
                         # Saved language preference (de or en)
                         app_config['LANGUAGE'] = value if value in ('de', 'en') else 'de'
                     elif key == 'SHOW_WARNINGS':
-                        app_config['SHOW_WARNINGS'] = value not in ('0', 'false', 'False')
+                        # Intentionally ignored on load: warnings reset to True each session
+                        pass
         except Exception:
             # On any error, keep existing defaults
             pass

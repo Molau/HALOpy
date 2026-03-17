@@ -181,9 +181,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             keyboard: false
         });
         resultsModal.show();
+
+        // Navigate to main when modal is closed (OK button or X button)
+        const resultsModalEl = document.getElementById('results-modal');
+        resultsModalEl.addEventListener('hidden.bs.modal', () => {
+            window.navigateInternal('/');
+        }, { once: true });
         
         // Decision #033: setupModalKeyboard for Enter key → OK button
-        const resultsModalEl = document.getElementById('results-modal');
         const statsOkBtn = document.getElementById('btn-stats-ok');
         setupModalKeyboard(resultsModalEl, statsOkBtn);
         
@@ -527,13 +532,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Setup action buttons
     function setupActionButtons() {
-        // OK button - close and return to main
+        // OK button - close modal (hidden.bs.modal handler navigates to main)
         const btnOk = document.getElementById('btn-stats-ok');
         if (btnOk) {
             btnOk.onclick = () => {
                 const resultsModal = bootstrap.Modal.getInstance(document.getElementById('results-modal'));
                 resultsModal.hide();
-                window.navigateInternal('/');
             };
             
             // Focus OK button
