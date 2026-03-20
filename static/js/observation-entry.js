@@ -185,7 +185,7 @@ async function showAddObservationDialogNumeric() {
 
     const input = document.getElementById('obs-code-input');
     const errEl = document.getElementById('obs-code-error');
-    let eing = fixedObserver;  // Pre-fill with fixed observer KK
+    let eing = fixedObserver ? String(fixedObserver).padStart(2, '0') : '';  // Pre-fill with fixed observer KK
     
     // If date default is available, append MM and JJ after KK and O (positions 2-3)
     if (dateDefault && eing.length >= 4) {
