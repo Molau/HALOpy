@@ -13,7 +13,7 @@ from flask import jsonify, request, session
 from halo.api import api_blueprint
 from halo.config import is_cloud_mode
 from halo.services.auth import AuthService
-from halo.web.extensions import limiter
+from halo.web.extensions import csrf, limiter
 
 
 # ============================================================================
@@ -21,6 +21,7 @@ from halo.web.extensions import limiter
 # ============================================================================
 
 @api_blueprint.route('/login', methods=['POST'])
+@csrf.exempt
 @limiter.limit('10/minute')
 def login() -> Dict[str, Any]:
     """
