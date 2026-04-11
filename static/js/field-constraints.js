@@ -76,8 +76,8 @@ function calculateFieldConstraints(fieldKey, context) {
                 // d=4-6 (thick cirrus/non-cirrus): N must be -1
                 return ['-1'];
             } else if (d === 7) {
-                // d=7 (virga): N must be -1
-                return ['-1'];
+                // d=7 (virga): N can be -1 or 1..9 (same as cirrus)
+                return ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
             } else if (d === -2) {
                 // d=-2 (observed but not present, '/'): N must be -1
                 return ['-1'];
@@ -92,11 +92,6 @@ function calculateFieldConstraints(fieldKey, context) {
             const n = norm(context.n);
             const d = norm(context.d);
             
-            // Special case: d=7 (virga) forces C=-1
-            if (d === 7) {
-                return ['-1'];
-            }
-            
             if (n === 0) {
                 // N=0 (clear sky): C must be 0
                 return ['0'];
@@ -107,8 +102,8 @@ function calculateFieldConstraints(fieldKey, context) {
                 // N=9 (overcast): C=-1..7
                 return ['-1', '0', '1', '2', '3', '4', '5', '6', '7'];
             } else {
-                // N=-1 (not observed): C=-1
-                return ['-1'];
+                // N=-1 (not observed): no restriction on C
+                return ['-1', '0', '1', '2', '3', '4', '5', '6', '7'];
             }
         }
         
@@ -132,8 +127,8 @@ function calculateFieldConstraints(fieldKey, context) {
                 // N=9 (overcast): c=-1 or 1..9 (not 0)
                 return ['-1', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
             } else {
-                // N=-1 (not observed): c=-1
-                return ['-1'];
+                // N=-1 (not observed): no restriction on c
+                return ['-1', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
             }
         }
         

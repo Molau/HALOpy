@@ -165,9 +165,9 @@ Textausgabeformate: HTML-Tabelle (Web-Layout), Pseudografik (DOS-Layout) oder Ma
 
 Dieses Menü stellt die aktuellen Voreinstellungen bereit. Alle Änderungen werden direkt gespeichert und wirken sofort im Browser (keine Drucker- oder Farboptionen mehr nötig).
 
-  * 'fester Beobachter': Voreinstellung des Beobachters für Eingabe- und Ausgabemasken (z.B. Monatsmeldung).
+  * 'fester Beobachter' (nur lokaler Modus): Voreinstellung des Beobachters für Eingabe- und Ausgabemasken (z.B. Monatsmeldung).
   * 'aktive Beobachter': Listen und Auswertungen wahlweise auf aktive Beobachter beschränken oder alle anzeigen.
-  * 'feste Datei': Optional eine bestimmte CSV-Datei beim Programmstart automatisch laden.
+  * 'feste Datei' (nur lokaler Modus): Optional eine bestimmte CSV-Datei beim Programmstart automatisch laden.
   * 'Datum': Voreinstellung für Datumsprompts wählen: keine, aktueller Monat, Vormonat oder konstanter Monat (mit Monat/Jahr-Auswahl).
   * 'Eingabeart': Menüeingaben (geführte Formulare) oder Zahleneingaben (Schlüsselzeile) für Beobachtungsdialoge voreinstellen.
   * 'Ausgabeart': Textformat für Monatsmeldung/‑statistik/Jahresstatistik und Analyse wählen: HTML-Tabellen, Pseudografik oder Markdown (entsprechend werden CSV/TXT/MD erzeugt).

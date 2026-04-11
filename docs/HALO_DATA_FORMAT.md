@@ -571,15 +571,11 @@ Dependencies are also applied when setting initial values for new observations.
   - N = -1 (not set)
 
 - **d = 7** (virga - fallstreifen):
-  - N = -1 (not set)
-  - C = -1 (not set)
+  - N = -1, 1-9 (not 0 - some cloud cover required)
+  - C = -1, 0-7 (all options)
   - c = -1, 1-9 (not 0 - fallstreifen enforce low cloud cover)
 
 #### 3. N (Cloud Cover) → C, c
-
-- **N = -1** (not observed):
-  - C = -1 (not set)
-  - c = -1 (not set)
 
 - **N = 0** (clear sky):
   - C = 0 (no cirrus)
