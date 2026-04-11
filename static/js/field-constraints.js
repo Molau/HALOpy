@@ -92,6 +92,11 @@ function calculateFieldConstraints(fieldKey, context) {
             const n = norm(context.n);
             const d = norm(context.d);
             
+            // d=4-6 (non-cirrus): C must be -1
+            if (d >= 4 && d <= 6) {
+                return ['-1'];
+            }
+            
             if (n === 0) {
                 // N=0 (clear sky): C must be 0
                 return ['0'];
@@ -111,6 +116,11 @@ function calculateFieldConstraints(fieldKey, context) {
         case 'c': {
             const n = norm(context.n);
             const d = norm(context.d);
+            
+            // d=4-6 (non-cirrus): c must be -1
+            if (d >= 4 && d <= 6) {
+                return ['-1'];
+            }
             
             // Special case: d=7 (virga) allows c=-1,1..9 (not 0)
             if (d === 7) {

@@ -178,11 +178,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.haloData.fileName = metadata.fileName;
             window.haloData.isLoaded = metadata.isLoaded;
             window.haloData.count = metadata.count || 0;
-            
-            // Verify with server and get current count + dirty state
-            if (metadata.isLoaded && metadata.fileName) {
-                await refreshFileStatus();
-            }
+            // Don't call refreshFileStatus() here — checkAndDisplayFileInfo() runs later
+            // and handles auto_loaded notification. An early call would consume the flag.
         } catch (e) {
             sessionStorage.removeItem('haloData');
         }
@@ -1131,6 +1128,7 @@ window.getParameterRange = function(paramCode, observers) {
             for (let i = 0; i <= 36; i++) {
                 zzTimes.push({ value: i, display: `${i} ${hourText}` });
             }
+            zzTimes.push({ value: 99, display: `// - ${i18nStrings.observations.detail_labels.no_precipitation.trim()}` });
             return zzTimes;
 
         case 'HO_HU':

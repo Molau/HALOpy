@@ -244,6 +244,11 @@ def calculate_halo_activity(observations, observers, mm, jj, active_observers_on
         # Check if observer exists in observer data
         kk = str(obs_KK).zfill(2)
         
+        # If active_observers_only, skip observations from excluded observers
+        # Matches Pascal: (aktbeob<>'J') OR Beo^[elem.K].aktiv
+        if active_observers_only and kk not in observers:
+            continue
+        
         # Track active observers for this month
         active_observers.add(kk)
         

@@ -100,29 +100,29 @@ def get_annual_stats() -> Dict[str, Any]:
     
     # Get unique active observers up to this year
     active_observers = {}
+    # Step 1: Find latest record per KK regardless of aktiv status
     for obs_record in observers:
         kk = obs_record.get('KK', '')
         seit_str = obs_record.get('seit', '')
-        aktiv_str = obs_record.get('aktiv', '')
         
         # Parse seit from "MM/JJ" to integer MMJJ
         seit = _parse_seit(seit_str) if seit_str else 0
         
-        # Parse aktiv to integer
-        try:
-            aktiv = int(aktiv_str) if aktiv_str else 0
-        except (ValueError, TypeError):
-            aktiv = 0
-        
-        # Observer is active if:
-        # 1. They started before or during this year (seit <= month_year_value)
-        # 2. If active_observers_only is True, they must be marked as active (aktiv == 1)
+        # Only consider records that started before or during this year
         if seit <= month_year_value:
-            if not active_observers_only or aktiv == 1:
-                # Keep the most recent record for each KK
-                kk_seit_str = active_observers.get(kk, {}).get('seit', '') if kk in active_observers else None
-                if kk not in active_observers or seit > _parse_seit(kk_seit_str if kk_seit_str else ''):
-                    active_observers[kk] = obs_record
+            # Keep the most recent record for each KK
+            kk_seit_str = active_observers.get(kk, {}).get('seit', '') if kk in active_observers else None
+            if kk not in active_observers or seit > _parse_seit(kk_seit_str if kk_seit_str else ''):
+                active_observers[kk] = obs_record
+    
+    # Step 2: If active_observers_only, exclude observers whose latest record has aktiv != 1
+    # Matches Pascal: Beo^[K].aktiv is checked on the single (latest) record per observer slot
+    if active_observers_only:
+        active_observers = {kk: rec for kk, rec in active_observers.items()
+                           if rec.get('aktiv') in (1, '1')}
+        # Pascal: (aktbeob<>'J') OR Beo^[elem.K].aktiv — skip ALL observations from inactive observers
+        active_kk_set = {int(kk) for kk in active_observers}
+        filtered_obs = [obs for obs in filtered_obs if _int(obs, 'KK') in active_kk_set]
     
     # Calculate statistics per month using deduplication algorithm
     # Prevents double counting: each observer (KK) can only count each halo type (EE) once per day

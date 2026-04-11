@@ -285,10 +285,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // Special handling for zz (time till precipitation) - display as hours
+        // Valid values: 0-36 and 99 (no precipitation)
         if (paramCode === 'zz') {
             const hoursVal = parseInt(rawValue);
-            if (isNaN(hoursVal)) {
+            if (isNaN(hoursVal) || (hoursVal > 36 && hoursVal !== 99)) {
                 return null;
+            }
+            if (hoursVal === 99) {
+                return `// - ${i18nStrings.observations.detail_labels.no_precipitation.trim()}`;
             }
             const hourText = i18nStrings.observations.detail_labels.hours.trim();
             return `${hoursVal} ${hourText}`;
@@ -2130,6 +2134,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             lines.push([param1Name, `${i18nStrings.analysis_results.count} (Σ=${result.total} ${i18nStrings.analysis_results.observations})`].map(escapeCsv).join(','));
             for (const item of result.data) {
                 const displayKey = formatParamValue(params.param1, item.key);
+                if (displayKey === null) continue;
                 const percentage = result.total > 0 ? ((item.count / result.total) * 100).toFixed(1) : '0.0';
                 lines.push([displayKey, `${item.count} (${percentage}%)`].map(escapeCsv).join(','));
             }
@@ -2158,9 +2163,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
             });
 
+            // Filter out invalid param values
+            const validColumns = columns.filter(col => formatParamValue(params.param2, col) !== null);
+
             // Header row
             const header = [param1Name, `${param2Name} Σ (Σ=${result.total})`];
-            columns.forEach(col => {
+            validColumns.forEach(col => {
                 const colTotal = columnTotals[col];
                 const colPercentage = result.total > 0 ? ((colTotal / result.total) * 100).toFixed(1) : '0.0';
                 const colLabel = formatParamValue(params.param2, col);
@@ -2184,9 +2192,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
                 const rowPercentage = result.total > 0 ? ((rowTotal / result.total) * 100).toFixed(1) : '0.0';
                 const rowLabel = formatParamValue(params.param1, param1Val);
+                if (rowLabel === null) return;
 
                 const row = [rowLabel, `Σ=${rowTotal} (Σ=${rowPercentage}%)`];
-                columns.forEach(col => {
+                validColumns.forEach(col => {
                     const val = rowData[col] !== undefined ? rowData[col] : 0;
                     row.push(val);
                 });
@@ -2195,7 +2204,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             // Totals row
             const totalsRow = [i18nStrings.analysis_results.total, `Σ=${result.total} (Σ=100%)`];
-            columns.forEach(col => {
+            validColumns.forEach(col => {
                 const colTotal = columnTotals[col];
                 const colPercentage = result.total > 0 ? ((colTotal / result.total) * 100).toFixed(1) : '0.0';
                 totalsRow.push(`${colTotal} (${colPercentage}%)`);
@@ -2244,6 +2253,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             lines.push('| --- | --- |');
             for (const item of result.data) {
                 const displayKey = formatParamValue(params.param1, item.key);
+                if (displayKey === null) continue;
                 const percentage = result.total > 0 ? ((item.count / result.total) * 100).toFixed(1) : '0.0';
                 lines.push(`| **${escapeCell(displayKey)}** | ${item.count} (${percentage}%) |`);
             }
@@ -2303,17 +2313,21 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
             });
 
+            // Filter out invalid param values
+            const validColumns = columns.filter(col => formatParamValue(params.param2, col) !== null);
+            const validParam1Values = param1Values_pre.filter(v => formatParamValue(params.param1, v) !== null);
+
             // Header row: param names with overall total in brackets
             const firstHeader = `**${escapeCell(param1Name)} \\ ${escapeCell(param2Name)}** (Σ=${result.total})`;
             let headerLine = `| ${firstHeader} |`;
-            columns.forEach(col => {
+            validColumns.forEach(col => {
                 const colTotal = columnTotals[col];
                 let colPercentageStr;
                 if (params.percentage_mode === 'param2') {
                     colPercentageStr = 'Σ=100.0%';
                 } else if (params.percentage_mode === 'param1') {
                     let sum = 0, cnt = 0;
-                    param1Values_pre.forEach(r => {
+                    validParam1Values.forEach(r => {
                         if (mdCells[r][col].count > 0) { sum += mdCells[r][col].pRow; cnt++; }
                     });
                     colPercentageStr = cnt > 0 ? 'Ø=' + (sum / cnt).toFixed(1) + '%' : 'Ø=0.0%';
@@ -2327,11 +2341,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             // Separator row (one for param1, one for each param2 column)
             let sepLine = '| --- |';
-            columns.forEach(() => { sepLine += ' --- |'; });
+            validColumns.forEach(() => { sepLine += ' --- |'; });
             lines.push(sepLine);
 
             // Build rows: merge label and row total into first cell
-            param1Values_pre.forEach(param1Val => {
+            validParam1Values.forEach(param1Val => {
                 const rowData = data[param1Val];
                 const rowTotal = mdRowTotals[param1Val];
                 let rowPercentageStr;
@@ -2339,7 +2353,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     rowPercentageStr = 'Σ=100.0%';
                 } else if (params.percentage_mode === 'param2') {
                     let sum = 0, cnt = 0;
-                    columns.forEach(c => {
+                    validColumns.forEach(c => {
                         if (mdCells[param1Val][c].count > 0) { sum += mdCells[param1Val][c].pCol; cnt++; }
                     });
                     rowPercentageStr = cnt > 0 ? 'Ø=' + (sum / cnt).toFixed(1) + '%' : 'Ø=0.0%';
@@ -2350,7 +2364,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 // First cell contains label and row total
                 let rowLine = `| **${escapeCell(rowLabel)}** Σ=${rowTotal} (${rowPercentageStr}) |`;
-                columns.forEach(col => {
+                validColumns.forEach(col => {
                     const count = rowData[col] !== undefined ? rowData[col] : 0;
                     let pct = 0.0;
                     if (params.percentage_mode === 'param1') {
@@ -2368,7 +2382,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             // Totals row: merge label and total into first cell
             let totalsLine = `| **${escapeCell(i18nStrings.analysis_results.total)}** Σ=${result.total} (Σ=100.0%) |`;
-            columns.forEach(col => {
+            validColumns.forEach(col => {
                 const colTotal = columnTotals[col];
                 let colTotalPctStr;
                 if (params.percentage_mode === 'param2') {
@@ -2404,6 +2418,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             const key = item.key;
             const count = item.count;
             const displayKey = formatParamValue(paramCode, key);
+            
+            // Skip invalid/non-existent values (formatParamValue returns null)
+            if (displayKey === null) {
+                continue;
+            }
+            
             const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
             html += `
                 <tr>
@@ -2481,7 +2501,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         `;
         
         // Add column headers with totals
-        columns.forEach(col => {
+        const validColumns = columns.filter(col => formatParamValue(param2Code, col) !== null);
+        validColumns.forEach(col => {
             const colTotal = columnTotals[col];
             let colPercentage;
             if (percentageMode === 'param2') {
@@ -2513,6 +2534,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         `;
         
         param1Values.forEach(param1Val => {
+            const rowLabel = formatParamValue(param1Code, param1Val);
+            
+            // Skip invalid/non-existent values
+            if (rowLabel === null) {
+                return;
+            }
+            
             const rowTotal = rowTotals[param1Val];
             let rowPercentage;
             if (percentageMode === 'param1') {
@@ -2533,7 +2561,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // Global mode: show actual percentage
                 rowPercentage = total > 0 ? (rowTotal / total * 100).toFixed(1) + '%' : '0.0%';
             }
-            const rowLabel = formatParamValue(param1Code, param1Val);
             
             html += `
                 <tr>
@@ -2541,7 +2568,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             `;
             
             // Add data cells with percentages
-            columns.forEach(col => {
+            validColumns.forEach(col => {
                 const cell = cells[param1Val][col];
                 const percentage = (percentageMode === 'param1')
                     ? cell.pRow.toFixed(1)
@@ -2742,8 +2769,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         let totalCountWidthFirst = 0; // width for Σ count in first column
         let totalPercWidthFirst = 0; // width for percentage in first column
         
+        // Filter out invalid param values
+        const validParam1Values = param1Values.filter(v => formatParamValue(param1Code, v) !== null);
+        const validColumns2 = columns.filter(col => formatParamValue(param2Code, col) !== null);
+        
         // Check row labels width + totals
-        param1Values.forEach(param1Val => {
+        validParam1Values.forEach(param1Val => {
             const rowLabel = formatParamValue(param1Code, param1Val);
             labelWidth = Math.max(labelWidth, rowLabel.length);
 
@@ -2783,7 +2814,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const obsAbbr = i18nStrings.analysis_results.observation_abbr;
         const alignNumericParam1 = param1Code === 'DD' || param1Code === 'zz';
         
-        columns.forEach(col => {
+        validColumns2.forEach(col => {
             const colLabel = formatParamValue(param2Code, col);
             const colTotal = columnTotals[col];
             const colPercentage = total > 0 ? ((colTotal / total) * 100).toFixed(1) : '0.0';
@@ -2796,7 +2827,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Determine fixed subfield widths per column (count and percentage) using precomputed cells
             let countWidth = 0;
             let percWidth = 0;
-            param1Values.forEach(param1Val => {
+            validParam1Values.forEach(param1Val => {
                 const cell = cells[param1Val][col];
                 const pctVal = (percentageMode === 'param1') ? cell.pRow : (percentageMode === 'param2') ? cell.pCol : cell.pGlobal;
                 const percStr = pctVal.toFixed(1) + '%';
@@ -2816,7 +2847,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Calculate fixed center padding per column using coreLen
         const centerPaddings = [];
-        columns.forEach((col, idx) => {
+        validColumns2.forEach((col, idx) => {
             const coreLen = countColWidths[idx] + 1 + obsAbbr.length + 3 + percColWidths[idx];
             const centerPad = Math.floor((cellWidths[idx] - coreLen) / 2);
             centerPaddings.push(Math.max(0, centerPad));
@@ -2841,7 +2872,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += '║' + headerCombined;
         
         // Parameter 2 columns (centered column headers)
-        columns.forEach((col, idx) => {
+        validColumns2.forEach((col, idx) => {
             const colLabel = formatParamValue(param2Code, col);
             const leftPad = Math.max(0, Math.floor((cellWidths[idx] - colLabel.length) / 2));
             const rightPad = Math.max(0, cellWidths[idx] - leftPad - colLabel.length);
@@ -2855,7 +2886,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += '║' + headerSpace;
         
         // Column headers with totals and percentages (centered)
-        columns.forEach((col, idx) => {
+        validColumns2.forEach((col, idx) => {
             const colTotal = columnTotals[col];
             let colPercentageStr;
             if (percentageMode === 'param2') {
@@ -2865,7 +2896,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // Zeilensumme mode: column header shows average of percentages in this column
                 let sum = 0;
                 let count = 0;
-                param1Values.forEach(r => {
+                validParam1Values.forEach(r => {
                     if (cells[r][col].count > 0) {
                         sum += cells[r][col].pRow;
                         count++;
@@ -2890,7 +2921,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         html += '╣\n';
         
         // Data rows
-        param1Values.forEach((param1Val, rowIndex) => {
+        validParam1Values.forEach((param1Val, rowIndex) => {
             // Use precomputed row total
             const rowTotal = rowTotals[param1Val];
             let rowPercentageStr;
@@ -2901,7 +2932,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // Spaltensumme mode: row header shows average of percentages in this row
                 let sum = 0;
                 let count = 0;
-                columns.forEach(c => {
+                validColumns2.forEach(c => {
                     if (cells[param1Val][c].count > 0) {
                         sum += cells[param1Val][c].pCol;
                         count++;
@@ -2926,7 +2957,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += '║' + combinedCell;
             
             // Data cells
-            columns.forEach((col, idx) => {
+            validColumns2.forEach((col, idx) => {
                 const cellMetrics = cells[param1Val][col];
                 const pctVal = (percentageMode === 'param1') ? cellMetrics.pRow : (percentageMode === 'param2') ? cellMetrics.pCol : cellMetrics.pGlobal;
                 // Build aligned inner content: right-align count and percentage per column widths

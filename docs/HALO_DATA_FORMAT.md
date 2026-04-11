@@ -562,13 +562,15 @@ Dependencies are also applied when setting initial values for new observations.
 - **d = -1** (not observed):
   - N = -1 (not set)
 
-- **d = 0-2** (thin cirrus):
+- **d = 0-2** (cirrus):
   - N = -1, 1-9 (not 0 - some cloud cover required)
   - C = -1, 1-7 (not 0 - cirrus present)
   - c = -1, 0-9 (all low cloud options)
 
-- **d = 4-6** (thick cirrus or non-cirrus):
+- **d = 4-6** (non-cirrus):
   - N = -1 (not set)
+  - C = -1 (not set)
+  - c = -1 (not set)
 
 - **d = 7** (virga - fallstreifen):
   - N = -1, 1-9 (not 0 - some cloud cover required)

@@ -123,7 +123,7 @@ def create_app(config=None):
         
         if startup_file:
             try:
-                observations, filepath = obs_file.open_file(startup_file)
+                observations, filepath, _ = obs_file.open_file(startup_file)
                 app.config['OBSERVATIONS'] = observations
                 app.config['LOADED_FILE'] = filepath.name
                 app.config['DIRTY'] = False

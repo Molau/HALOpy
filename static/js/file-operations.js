@@ -2021,7 +2021,8 @@ async function checkAndDisplayFileInfo() {
             // No data loaded
             clearFileInfoDisplay();
         }
-    } catch (error) {clearFileInfoDisplay();
+    } catch (error) {
+        clearFileInfoDisplay();
     }
 }
 
