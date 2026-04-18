@@ -38,7 +38,7 @@ from halo.api.statistics import (
 import halo.io.observations_db as obs_db
 import halo.io.observers_db as observer_db
 from ._helpers import (
-    _int, _parse_seit, calculate_solar_altitude,
+    _int, _is_photographic_observation, _parse_seit, calculate_solar_altitude,
     dispatch_format_response, get_observer_coordinates, get_days_in_month,
 )
 
@@ -89,6 +89,9 @@ def get_annual_stats() -> Dict[str, Any]:
         observers = current_app.config.get('OBSERVERS', [])
         active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
     
+    # Exclude photographic observations from annual statistics.
+    filtered_obs = [obs for obs in filtered_obs if not _is_photographic_observation(obs)]
+
     # Get all active observers up to end of year
     # Use December of the year as reference (month 12)
     # Convert 4-digit year to seit-compatible format for comparison
@@ -449,7 +452,10 @@ def analyze_observations() -> Dict[str, Any]:
     
     try:
         # Get request parameters
-        params = request.get_json()
+        params = request.get_json() or {}
+
+        # Exclude photographic observations (# marker in remarks) from analysis by default.
+        params['exclude_photographic'] = True
         
         # Cloud Mode: Use database analysis functions (SQL-based)
         # Local Mode: Use Python filtering on loaded observations
@@ -477,7 +483,7 @@ def analyze_observations() -> Dict[str, Any]:
                     observations = obs_db.load_all()
                 
                 # Apply filters and grouping in Python (same as Local Mode)
-                filtered_obs = observations
+                filtered_obs = [obs for obs in observations if not _is_photographic_observation(obs)]
                 
                 # Apply filter1 if specified
                 if params.get('filter1'):
@@ -574,7 +580,7 @@ def analyze_observations() -> Dict[str, Any]:
                 })
             
             # Apply filters first
-            filtered_obs = observations
+            filtered_obs = [obs for obs in observations if not _is_photographic_observation(obs)]
             
             # Apply filter1 if specified
             if params.get('filter1'):

@@ -1293,6 +1293,33 @@ document.addEventListener('DOMContentLoaded', async function() {
     let lastAnalysisResult = null;
     let lastAnalysisParams = null;
 
+    // Determine if analysis returned no matching observations.
+    // Covers both truly empty payloads and range-filled zero rows.
+    function isAnalysisResultEmpty(result, params) {
+        if (!result) return true;
+
+        if (typeof result.total === 'number') {
+            return result.total <= 0;
+        }
+
+        if (!params?.param2) {
+            if (!Array.isArray(result.data) || result.data.length === 0) return true;
+            return result.data.every(item => Number(item?.count || 0) === 0);
+        }
+
+        if (!result.data || typeof result.data !== 'object') return true;
+
+        let total = 0;
+        Object.values(result.data).forEach(row => {
+            if (!row || typeof row !== 'object') return;
+            Object.values(row).forEach(value => {
+                total += Number(value || 0);
+            });
+        });
+
+        return total <= 0;
+    }
+
     // Display analysis result as table
     async function displayAnalysisResult(result, params) {
         if (!result.success) {
@@ -1308,6 +1335,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             outputMode = modeData.value || 'H';
         } catch (error) {
             console.error('Error fetching output mode:', error);
+        }
+
+        // Do not render empty tables/charts when nothing matched.
+        if (isAnalysisResultEmpty(result, params)) {
+            showWarningAndGoHome(i18nStrings.messages.no_observations);
+            return;
         }
         
         // Store result for later use (print/save)

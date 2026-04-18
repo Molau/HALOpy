@@ -24,7 +24,7 @@ from halo.models.constants import YEAR_MIN, YEAR_MAX, jj_to_full_year, resolve_h
 from halo.resources.i18n import get_i18n
 import halo.io.observations_db as obs_db
 import halo.io.observers_db as observer_db
-from ._helpers import _int, _obs_to_json, _kurzausgabe, _parse_seit, dispatch_format_response, get_days_in_month
+from ._helpers import _int, _is_photographic_observation, _obs_to_json, _kurzausgabe, _parse_seit, dispatch_format_response, get_days_in_month
 
 
 def _format_monthly_report_text(data: Dict[str, Any], i18n) -> str:
@@ -752,6 +752,9 @@ def get_monthly_stats() -> Dict[str, Any]:
         observers = current_app.config.get('OBSERVERS', [])
         active_observers_only = bool(current_app.config.get('ACTIVE_OBSERVERS_ONLY', False))
     
+    # Exclude photographic observations from monthly statistics.
+    filtered_obs = [obs for obs in filtered_obs if not _is_photographic_observation(obs)]
+
     # Get all active observers at the end of this month/year (SEIT <= MMJJ)
     # Build SEIT value for comparison using same formula as _parse_seit: mm + 13 * jj
     # Handle century boundary: years 00-79 are 2000-2079, must add 100 (same as _parse_seit)

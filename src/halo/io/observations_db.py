@@ -847,6 +847,12 @@ def build_analysis_sql(params: dict) -> Tuple[str, List]:
     # Only add param2 range if param2 is specified
     if params.get('param2'):
         add_param_range('param2')
+
+    # Exclude photographic observations marked with '#' in remarks.
+    # Enabled by default for analysis calls.
+    if params.get('exclude_photographic', True):
+        conditions.append('(remarks IS NULL OR remarks NOT LIKE %s)')
+        sql_params.append('%#%')
     
     # Join all conditions with AND
     where_clause = " AND ".join(conditions) if conditions else "1=1"

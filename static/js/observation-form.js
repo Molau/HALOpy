@@ -539,6 +539,10 @@ class ObservationForm {
                             <label class="form-check-label" for="form-attr-star">${i18nStrings.observations.attribute_star}</label>
                         </div>
                         <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="form-attr-photo">
+                            <label class="form-check-label" for="form-attr-photo">${i18nStrings.observations.attribute_photo}</label>
+                        </div>
+                        <div class="form-check form-check-inline">
                             <input class="form-check-input" type="checkbox" id="form-attr-ka">
                             <label class="form-check-label" for="form-attr-ka">${i18nStrings.observations.attribute_ka}</label>
                         </div>
@@ -1205,6 +1209,7 @@ class ObservationForm {
             remarks: document.getElementById('form-remarks'),
             // Attribute checkboxes
             attrStar: document.getElementById('form-attr-star'),
+            attrPhoto: document.getElementById('form-attr-photo'),
             attrKA: document.getElementById('form-attr-ka'),
             attrKE: document.getElementById('form-attr-ke'),
             attrUB: document.getElementById('form-attr-ub'),
@@ -1712,6 +1717,9 @@ class ObservationForm {
         if (this.fields.attrStar && this.fields.attrStar.checked) {
             attributes.push('*');
         }
+        if (this.fields.attrPhoto && this.fields.attrPhoto.checked) {
+            attributes.push('#');
+        }
         if (this.fields.attrKA && this.fields.attrKA.checked) {
             attributes.push('kA');
         }
@@ -1749,6 +1757,7 @@ class ObservationForm {
         
         // Reset all checkboxes first
         this.fields.attrStar.checked = false;
+        this.fields.attrPhoto.checked = false;
         this.fields.attrKA.checked = false;
         this.fields.attrKE.checked = false;
         this.fields.attrUB.checked = false;
@@ -1760,6 +1769,9 @@ class ObservationForm {
         // Check for each attribute with word boundaries (case-insensitive)
         if (remarks.includes('*')) {
             this.fields.attrStar.checked = true;
+        }
+        if (remarks.includes('#')) {
+            this.fields.attrPhoto.checked = true;
         }
         if (new RegExp(boundaryPattern.replace('{attr}', 'ka'), 'i').test(remarks)) {
             this.fields.attrKA.checked = true;
@@ -1779,6 +1791,7 @@ class ObservationForm {
         
         // Remove attribute patterns (case-insensitive, with word boundaries)
         cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])\\*([\\s,;]|$)', 'gi'), '$1$2');
+        cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])#([\\s,;]|$)', 'gi'), '$1$2');
         cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])ka([\\s,;]|$)', 'gi'), '$1$2');
         cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])ke([\\s,;]|$)', 'gi'), '$1$2');
         cleanedRemarks = cleanedRemarks.replace(new RegExp('(^|[\\s,;])ub([\\s,;]|$)', 'gi'), '$1$2');

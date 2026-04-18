@@ -289,6 +289,7 @@
     "delete_another_message": "Would you like to delete another observation?",
     "attributes_label": "Special Attributes",
     "attribute_star": "* (part of halo phenomenon)",
+    "attribute_photo": "# (photographic observation)",
     "attribute_ka": "kA (no beginning)",
     "attribute_ke": "kE (no end)",
     "attribute_ub": "UB (observation interrupted)",

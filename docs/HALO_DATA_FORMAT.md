@@ -521,6 +521,26 @@ Complete mapping:
   - Can contain any text
   - Used for additional observation details
 
+### 22a. Sondermarker in Bemerkungen (Programmkonvention)
+The following markers are entered in the **Bemerkungen** field and interpreted by HALOpy as observation attributes:
+
+- `*` = Teil eines Halophänomens (part of a halo phenomenon)
+- `#` = fotografische Beobachtung (photographic observation)
+- `kA` = kein Anfang (no start time)
+- `kE` = kein Ende (no end time)
+- `UB` = Unterbrechung der Beobachtung (observation interrupted)
+- `UH` = Unterbrechung des Halos (halo interrupted)
+
+Implementation notes for HALOpy:
+- Markers are stored in the remarks text (semicolon/space separated).
+- `#`-marked observations are **excluded** from:
+  - freie Auswertung (`/api/analysis`)
+  - Monatsstatistik (`/api/monthly-stats`)
+  - Jahresstatistik (`/api/annual-stats`)
+- `#`-marked observations are still included in:
+  - Monatsmeldung (`/api/monthly-report`)
+  - Beobachtungsverwaltung (Anzeigen, Hinzufügen, Verändern, Löschen)
+
 ---
 
 ## Field Dependencies Summary

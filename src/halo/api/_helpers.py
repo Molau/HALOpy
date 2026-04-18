@@ -236,6 +236,16 @@ def _json_int(obs: Dict[str, str], key: str) -> int:
         return None
 
 
+def _is_photographic_observation(obs: Dict[str, str]) -> bool:
+    """Return True if an observation is marked as photographic in remarks.
+
+    Photographic observations are tagged with '#' in remarks and are
+    excluded from analysis, monthly statistics, and annual statistics.
+    """
+    remarks = (obs.get('remarks', '') or '').strip()
+    return '#' in remarks
+
+
 def _obs_to_json(obs: Dict[str, str]) -> Dict[str, Any]:
     """Convert an observation dict (str values) to JSON-friendly dict.
     
