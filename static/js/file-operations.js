@@ -1063,7 +1063,15 @@ async function showObserverUploadDialog() {
                     const error = await response.json();
                     // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
                     const errorKey = error.error || 'unknown_error';
-                    const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                    const baseMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                    const details = [];
+                    if (error.details) {
+                        details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details));
+                    }
+                    if (error.debug && error.debug.traceback) {
+                        details.push(error.debug.traceback);
+                    }
+                    const errorMsg = details.length > 0 ? `${baseMsg}\n\n${details.join('\n')}` : baseMsg;
                     showErrorDialog(errorMsg);
                 }
             } catch (error) {
@@ -1156,13 +1164,29 @@ async function showObserverUploadDialog() {
                     setTimeout(() => {
                         // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
                         const errorKey = error.error || 'unknown_error';
-                        const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                        const baseMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                        const details = [];
+                        if (error.details) {
+                            details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details));
+                        }
+                        if (error.debug && error.debug.traceback) {
+                            details.push(error.debug.traceback);
+                        }
+                        const errorMsg = details.length > 0 ? `${baseMsg}\n\n${details.join('\n')}` : baseMsg;
                         showErrorDialog(errorMsg);
                     }, 300);
                 } else {
                     // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
                     const errorKey = error.error || 'unknown_error';
-                    const errorMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                    const baseMsg = i18nStrings.messages[errorKey] || i18nStrings.messages.unknown_error;
+                    const details = [];
+                    if (error.details) {
+                        details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details));
+                    }
+                    if (error.debug && error.debug.traceback) {
+                        details.push(error.debug.traceback);
+                    }
+                    const errorMsg = details.length > 0 ? `${baseMsg}\n\n${details.join('\n')}` : baseMsg;
                     showErrorDialog(errorMsg);
                 }
             }

@@ -148,9 +148,27 @@ def upload_observers() -> Dict[str, Any]:
             for kk in uploaded_kks:
                 existing_records = observer_db.load_filtered(kk=kk)
                 for i, record in enumerate(existing_records):
-                    # Database returns dicts with column names as keys
-                    record_kk = record['kk'] if isinstance(record, dict) else record[0]
-                    record_since = record['since'] if isinstance(record, dict) else record[2]
+                    # Database dict keys can be mixed-case depending on query/result mapping.
+                    # Accept canonical keys (KK, seit) and legacy fallbacks (kk, since).
+                    record_kk = (
+                        record.get('KK')
+                        if isinstance(record, dict)
+                        else record[0]
+                    )
+                    if isinstance(record, dict) and record_kk is None:
+                        record_kk = record.get('kk')
+
+                    record_since = (
+                        record.get('seit')
+                        if isinstance(record, dict)
+                        else record[2]
+                    )
+                    if isinstance(record, dict) and record_since is None:
+                        record_since = record.get('since')
+
+                    if record_kk is None or record_since is None:
+                        continue
+
                     # Delete by kk and since (unique key)
                     observer_db.delete_one(int(record_kk), record_since)
         except Exception as e:
@@ -158,7 +176,11 @@ def upload_observers() -> Dict[str, Any]:
             traceback.print_exc()
             raise
         
-        # Add new observer records to database
+        # Add new observer records to database.
+        # Robustness: skip malformed rows instead of aborting the whole upload with 500.
+        saved_count = 0
+        skipped_count = 0
+        row_errors = []
         for i, obs_record in enumerate(observers):
             try:
                 # Convert array to dict if needed (database expects dict format)
@@ -166,24 +188,61 @@ def upload_observers() -> Dict[str, Any]:
                     observer_dict = _observer_row_to_dict(obs_record)
                 else:
                     observer_dict = obs_record
-                
-                observer_db.save_one(observer_dict)
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                raise
+
+                if observer_db.save_one(observer_dict):
+                    saved_count += 1
+            except Exception as row_error:
+                skipped_count += 1
+                if len(row_errors) < 10:
+                    row_errors.append({
+                        'row_index': i,
+                        'kk': str(obs_record[0]).strip() if isinstance(obs_record, list) and obs_record else str(obs_record.get('KK', '')).strip() if isinstance(obs_record, dict) else '',
+                        'error': str(row_error)
+                    })
+                continue
+
+        if saved_count == 0:
+            return jsonify({'error': 'no_observer_data_to_upload'}), 400
+
+        if skipped_count > 0:
+            current_app.logger.warning(
+                'upload_observers: skipped malformed rows',
+                extra={
+                    'skipped_count': skipped_count,
+                    'row_errors': row_errors,
+                    'requested_count': len(observers)
+                }
+            )
         
         # Get total count from database for response
         total_count = observer_db.count()
         
         return jsonify({
             'success': True,
-            'count': len(observers),
+            'count': saved_count,
+            'skipped': skipped_count,
+            'row_errors': row_errors,
             'total_count': total_count
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception(
+            'upload_observers failed',
+            extra={
+                'use_session': use_session,
+                'is_admin': bool(session.get('is_admin', False)),
+                'authenticated': bool(session.get('authenticated', False)),
+                'observer_kk': observer_kk,
+                'records_received': len(observers) if isinstance(observers, list) else 0
+            }
+        )
+        return jsonify({
+            'error': 'upload_failed',
+            'details': str(e),
+            'debug': {
+                'traceback': traceback.format_exc()
+            }
+        }), 500
 
 
 @api_blueprint.route('/observers/download', methods=['POST'])
