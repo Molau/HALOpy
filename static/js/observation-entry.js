@@ -34,10 +34,13 @@
 //   'yes'           - add another observation (empty form)
 //   'like_previous' - add another, pre-filling fields from last observation
 //   'no'            - don't add another
-function showAddAnotherObservationDialog() {
+function showAddAnotherObservationDialog(includeLikePrevious = false) {
     return new Promise((resolve) => {
         // Add delay before creating modal to allow previous modal's backdrop to disappear
         setTimeout(() => {
+            const likePreviousButtonHtml = includeLikePrevious
+                ? `<button type="button" class="btn btn-primary btn-sm px-3" id="btn-like-previous">${i18nStrings.observations.add_another_like_previous}</button>`
+                : '';
             const modalHtml = `
             <div class="modal fade" id="add-another-modal" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered">
@@ -51,7 +54,7 @@ function showAddAnotherObservationDialog() {
                         <div class="modal-footer py-2">
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-no">${i18nStrings.common.no}</button>
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-yes">${i18nStrings.common.yes}</button>
-                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-like-previous">${i18nStrings.observations.add_another_like_previous}</button>
+                            ${likePreviousButtonHtml}
                         </div>
                     </div>
                 </div>
@@ -64,15 +67,16 @@ function showAddAnotherObservationDialog() {
         let resolved = false;
 
         const btnLikePrevious = modalEl.querySelector('#btn-like-previous');
-        
-        // "Like previous" button (default) - add another with pre-filled fields
-        btnLikePrevious.addEventListener('click', () => {
-            if (!resolved) {
-                resolved = true;
-                modal.hide();
-                resolve('like_previous');
-            }
-        });
+        if (btnLikePrevious) {
+            // "Like previous" button (default) - add another with pre-filled fields
+            btnLikePrevious.addEventListener('click', () => {
+                if (!resolved) {
+                    resolved = true;
+                    modal.hide();
+                    resolve('like_previous');
+                }
+            });
+        }
 
         // Yes button - add another (empty)
         modalEl.querySelector('#btn-yes').addEventListener('click', () => {
@@ -103,7 +107,7 @@ function showAddAnotherObservationDialog() {
         });
         
         modal.show();
-        setupModalKeyboard(modalEl, btnLikePrevious);
+        setupModalKeyboard(modalEl, btnLikePrevious || modalEl.querySelector('#btn-yes'));
         }, 300); // 300ms delay to let previous modal backdrop fully disappear
     });
 }
@@ -1041,10 +1045,9 @@ async function showAddObservationDialogNumeric() {
                 modalEl.remove();
                 
                 // Ask if user wants to add another observation
-                const addAnother = await showAddAnotherObservationDialog();
-                if (addAnother === 'yes' || addAnother === 'like_previous') {
-                    // User clicked Yes or "Like previous" - show the add dialog again
-                    // (Numeric mode does not support pre-filling from previous observation)
+                const addAnother = await showAddAnotherObservationDialog(false);
+                if (addAnother === 'yes') {
+                    // User clicked Yes - show the add dialog again
                     await showAddObservationDialogNumeric();
                 } else {
                     clearMenuHighlights();
@@ -1123,7 +1126,7 @@ async function showAddObservationDialogMenu(prefillData = null) {
             // Wait for modal to close, then ask if user wants to add another
             form.modalElement.addEventListener('hidden.bs.modal', async () => {
                 // Ask if user wants to add another observation
-                const addAnother = await showAddAnotherObservationDialog();
+                const addAnother = await showAddAnotherObservationDialog(true);
                 if (addAnother === 'yes') {
                     // User clicked Yes - show the add dialog again (empty)
                     await showAddObservationDialogMenu(null);

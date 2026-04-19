@@ -409,6 +409,7 @@ async function showAddObserverDialog(formData = null) {
             
             // Show success message
             showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_added}`);
+            clearMenuHighlights();
             
         } catch (e) {
             const formData = observerData;
@@ -896,6 +897,7 @@ function showEditBaseDataDialog(observer) {
             
             // Show success message
             showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_updated}`);
+            clearMenuHighlights();
             
             // Reload the page if we're on the observers page
             setTimeout(() => {
@@ -1227,6 +1229,7 @@ async function showAddSiteDialog(observer) {
             
             // Show success message
             showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_added}`);
+            clearMenuHighlights();
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -1415,6 +1418,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
             
             // Show success message
             showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_updated}`);
+            clearMenuHighlights();
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
@@ -1531,6 +1535,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
             
             // Show success message
             showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_site_deleted}`);
+            clearMenuHighlights();
             
             setTimeout(() => {
                 if (window.location.pathname === '/observers') {
