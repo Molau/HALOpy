@@ -1026,6 +1026,15 @@ async function showObserverUploadDialog() {
                     fields.push(current.trim());
                     
                     return fields;
+                }).filter(fields => {
+                    if (!Array.isArray(fields) || fields.length < 21) {
+                        return false;
+                    }
+                    const kk = String(fields[0] || '').trim().replace(/^\uFEFF/, '');
+                    if (!kk || kk.toUpperCase() === 'KK') {
+                        return false;
+                    }
+                    return /^\d+$/.test(kk);
                 });
                 
                 if (observers.length === 0) {

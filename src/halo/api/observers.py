@@ -51,6 +51,35 @@ def upload_observers() -> Dict[str, Any]:
     # Validate parameters
     if not observers:
         return jsonify({'error': 'no_observer_data_to_upload'}), 400
+
+    # Normalize and pre-validate uploaded records.
+    # Accept list rows or dict rows, strip UTF-8 BOM in KK, and ignore header/malformed rows.
+    normalized_observers = []
+    for obs_record in observers:
+        if isinstance(obs_record, list):
+            if len(obs_record) < 21:
+                continue
+            rec_kk = str(obs_record[0]).strip().lstrip('\ufeff')
+            if not rec_kk or rec_kk.upper() == 'KK':
+                continue
+            if not rec_kk.isdigit():
+                continue
+            normalized_row = list(obs_record)
+            normalized_row[0] = rec_kk
+            normalized_observers.append(normalized_row)
+        elif isinstance(obs_record, dict):
+            rec_kk = str(obs_record.get('KK', '')).strip().lstrip('\ufeff')
+            if not rec_kk or rec_kk.upper() == 'KK':
+                continue
+            if not rec_kk.isdigit():
+                continue
+            normalized_record = dict(obs_record)
+            normalized_record['KK'] = rec_kk
+            normalized_observers.append(normalized_record)
+
+    observers = normalized_observers
+    if not observers:
+        return jsonify({'error': 'no_observer_data_to_upload'}), 400
     
     # Authentication (both Cloud Mode with session and Local Mode with password)
     try:
@@ -112,7 +141,7 @@ def upload_observers() -> Dict[str, Any]:
             # obs_record is a raw list from frontend JSON upload
             rec_kk = obs_record[0] if isinstance(obs_record, list) else obs_record.get('KK', '')
             if rec_kk:
-                uploaded_kks.add(int(rec_kk))
+                uploaded_kks.add(int(str(rec_kk).strip().lstrip('\ufeff')))
         
         # Delete existing records for uploaded KKs
         try:
