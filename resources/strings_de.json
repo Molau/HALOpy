@@ -282,6 +282,7 @@
     "select_no_filter": "Bitte wählen Sie ein Filterkriterium!",
     "add_another_title": "Weitere Beobachtung erfassen?",
     "add_another_message": "Möchten Sie eine weitere Beobachtung erfassen?",
+    "add_another_like_previous": "Wie vorheriges Halo",
     "modify_another_title": "Weitere Beobachtung ändern?",
     "modify_another_message": "Möchten Sie eine weitere Beobachtung ändern?",
     "delete_confirm_warning": "Soll diese Beobachtung wirklich gelöscht werden?",

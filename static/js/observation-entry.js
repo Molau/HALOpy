@@ -30,7 +30,10 @@
 
 
 // Show dialog asking if user wants to add another observation
-// Returns: Promise<boolean> - true if user wants to add another, false otherwise
+// Returns: Promise<'yes'|'like_previous'|'no'>
+//   'yes'           - add another observation (empty form)
+//   'like_previous' - add another, pre-filling fields from last observation
+//   'no'            - don't add another
 function showAddAnotherObservationDialog() {
     return new Promise((resolve) => {
         // Add delay before creating modal to allow previous modal's backdrop to disappear
@@ -47,7 +50,8 @@ function showAddAnotherObservationDialog() {
                         </div>
                         <div class="modal-footer py-2">
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-no">${i18nStrings.common.no}</button>
-                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-yes">${i18nStrings.common.yes}</button>
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-yes">${i18nStrings.common.yes}</button>
+                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-like-previous">${i18nStrings.observations.add_another_like_previous}</button>
                         </div>
                     </div>
                 </div>
@@ -58,15 +62,24 @@ function showAddAnotherObservationDialog() {
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
         
         let resolved = false;
+
+        const btnLikePrevious = modalEl.querySelector('#btn-like-previous');
         
-        const btnYes = modalEl.querySelector('#btn-yes');
-        
-        // Yes button - add another
-        btnYes.addEventListener('click', () => {
+        // "Like previous" button (default) - add another with pre-filled fields
+        btnLikePrevious.addEventListener('click', () => {
             if (!resolved) {
                 resolved = true;
                 modal.hide();
-                resolve(true);
+                resolve('like_previous');
+            }
+        });
+
+        // Yes button - add another (empty)
+        modalEl.querySelector('#btn-yes').addEventListener('click', () => {
+            if (!resolved) {
+                resolved = true;
+                modal.hide();
+                resolve('yes');
             }
         });
         
@@ -75,7 +88,7 @@ function showAddAnotherObservationDialog() {
             if (!resolved) {
                 resolved = true;
                 modal.hide();
-                resolve(false);
+                resolve('no');
             }
         });
         
@@ -84,13 +97,13 @@ function showAddAnotherObservationDialog() {
             if (!resolved) {
                 // ESC or backdrop click - treat as No
                 resolved = true;
-                resolve(false);
+                resolve('no');
             }
             modalEl.remove();
         });
         
         modal.show();
-        setupModalKeyboard(modalEl, btnYes);
+        setupModalKeyboard(modalEl, btnLikePrevious);
         }, 300); // 300ms delay to let previous modal backdrop fully disappear
     });
 }
@@ -1029,8 +1042,9 @@ async function showAddObservationDialogNumeric() {
                 
                 // Ask if user wants to add another observation
                 const addAnother = await showAddAnotherObservationDialog();
-                if (addAnother) {
-                    // User clicked Yes - show the add dialog again
+                if (addAnother === 'yes' || addAnother === 'like_previous') {
+                    // User clicked Yes or "Like previous" - show the add dialog again
+                    // (Numeric mode does not support pre-filling from previous observation)
                     await showAddObservationDialogNumeric();
                 } else {
                     clearMenuHighlights();
@@ -1054,7 +1068,7 @@ async function showAddObservationDialogNumeric() {
 }
 
 // Menu-based entry (Langeingabe) dialog
-async function showAddObservationDialogMenu() {
+async function showAddObservationDialogMenu(prefillData = null) {
     // Get config to check cloud mode
     const configResponse = await fetch('/api/config');
     const config = await configResponse.json();
@@ -1068,6 +1082,9 @@ async function showAddObservationDialogMenu() {
     // Use the ObservationForm class for consistency
     const form = new ObservationForm();
     await form.initialize('add');
+    if (prefillData) {
+        form.prefillObservation = prefillData;
+    }
     
     form.show('add', null, async (newObs) => {
         // Observation saved callback
@@ -1107,9 +1124,12 @@ async function showAddObservationDialogMenu() {
             form.modalElement.addEventListener('hidden.bs.modal', async () => {
                 // Ask if user wants to add another observation
                 const addAnother = await showAddAnotherObservationDialog();
-                if (addAnother) {
-                    // User clicked Yes - show the add dialog again
-                    await showAddObservationDialogMenu();
+                if (addAnother === 'yes') {
+                    // User clicked Yes - show the add dialog again (empty)
+                    await showAddObservationDialogMenu(null);
+                } else if (addAnother === 'like_previous') {
+                    // User clicked "Wie vorheriges Halo" - show the add dialog with pre-filled fields
+                    await showAddObservationDialogMenu(newObs);
                 } else {
                     clearMenuHighlights();
                 }

@@ -17,6 +17,7 @@ class ObservationForm {
         this.saved = false;
         this.skipped = false;
         this.destroyed = false; // Track if form has been destroyed
+        this.prefillObservation = null; // Optional: pre-fill fields from a previous observation (add mode)
         // Field constraints: Store current valid value ranges for dependent fields
         this.fieldConstraints = {
             d: [],      // Valid values for cirrus density
@@ -132,6 +133,37 @@ class ObservationForm {
                 // Pre-fill fixed observer if set
                 if (this.fixedObserver && this.fields.kk) {
                     this.fields.kk.value = this.fixedObserver;
+                }
+
+                // Pre-fill specific fields from a previous observation (Convenience: "Wie vorheriges Halo")
+                if (this.prefillObservation) {
+                    const p = this.prefillObservation;
+                    const setIfPresent = (field, val, emptyVal = '') => {
+                        if (field && val !== undefined && val !== null) {
+                            field.value = val;
+                        } else if (field && emptyVal !== '') {
+                            field.value = emptyVal;
+                        }
+                    };
+                    // KK: only override if no fixed observer is forcing the value
+                    if (!this.fixedObserver && p.KK !== undefined && p.KK !== null && p.KK !== '') {
+                        this.fields.kk.value = String(p.KK).padStart(2, '0');
+                    }
+                    setIfPresent(this.fields.o, p.O !== undefined ? p.O : null);
+                    setIfPresent(this.fields.jj, p.JJ !== undefined ? parseInt(p.JJ) : null);
+                    setIfPresent(this.fields.mm, p.MM !== undefined ? parseInt(p.MM) : null);
+                    setIfPresent(this.fields.tt, p.TT !== undefined ? p.TT : null);
+                    setIfPresent(this.fields.g, (p.g !== undefined && p.g !== null) ? p.g : null);
+                    setIfPresent(this.fields.zs, p.ZS !== undefined && p.ZS !== -1 && p.ZS !== null ? p.ZS : null);
+                    setIfPresent(this.fields.zm, p.ZM !== undefined && p.ZM !== -1 && p.ZM !== null ? p.ZM : null);
+                    setIfPresent(this.fields.d, p.d !== undefined && p.d !== null ? p.d : null, '-1');
+                    setIfPresent(this.fields.dd, p.DD !== undefined && p.DD !== null ? p.DD : null, '-1');
+                    setIfPresent(this.fields.n, p.N !== undefined && p.N !== null ? p.N : null, '-1');
+                    setIfPresent(this.fields.C, p.C !== undefined && p.C !== null ? p.C : null, '-1');
+                    setIfPresent(this.fields.c, p.c !== undefined && p.c !== null ? p.c : null, '-1');
+                    setIfPresent(this.fields.f, p.f !== undefined && p.f !== null ? p.f : null, '-1');
+                    setIfPresent(this.fields.zz, p.zz !== undefined && p.zz !== null ? p.zz : null, '-1');
+                    setIfPresent(this.fields.gg, (p.GG !== undefined && p.GG !== null) ? p.GG : null);
                 }
                 
                 // Apply initial dependencies for pre-filled values
@@ -542,6 +574,8 @@ class ObservationForm {
                             <input class="form-check-input" type="checkbox" id="form-attr-photo">
                             <label class="form-check-label" for="form-attr-photo">${i18nStrings.observations.attribute_photo}</label>
                         </div>
+                    </div>
+                    <div class="col-12">
                         <div class="form-check form-check-inline">
                             <input class="form-check-input" type="checkbox" id="form-attr-ka">
                             <label class="form-check-label" for="form-attr-ka">${i18nStrings.observations.attribute_ka}</label>
