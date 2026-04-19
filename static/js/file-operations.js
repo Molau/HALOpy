@@ -824,12 +824,10 @@ async function showDownloadDialog() {
             }
         }
         
-        // Close dialog
-        modal.hide();
-        clearMenuHighlights();
-        
-        // Show spinner
+        // Show spinner first, then close dialog for a seamless backdrop transition.
         const spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        await waitForModalToClose(modal, modalEl);
+        clearMenuHighlights();
         
         try {
             // Download first, show file picker only on success
@@ -856,25 +854,22 @@ async function showDownloadDialog() {
             const result = await response.json();
             
             if (response.ok && result.success) {
-                // Hide spinner before file picker
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-                
                 // Handle file saving - show file picker only after successful download
                 const csvContent = result.csv_content;
                 const defaultFilename = result.is_admin && downloadAll
                     ? 'halobeo.csv'
                     : 'observations.csv';
                 
-                triggerFileSaveDialog(csvContent, defaultFilename);
+                const saved = await triggerFileSaveDialog(csvContent, defaultFilename, spinner);
                 
-                // Success notification
-                const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
-                showNotification(successMessage, 'success');
+                if (saved) {
+                    // Success notification
+                    const successMessage = i18nStrings.upload_download.download_success.replace('{0}', result.count);
+                    showNotification(successMessage, 'success');
+                }
             } else {
                 // Hide spinner on error
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
+                await waitForModalToClose(spinner.modal, spinner.modalEl);
                 
                 // Dynamic key lookup with i18n fallback
                 const errorKey = result.error || 'unknown_error';
@@ -883,8 +878,7 @@ async function showDownloadDialog() {
             }
         } catch (error) {
             // Hide spinner
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
+            await waitForModalToClose(spinner.modal, spinner.modalEl);
             
             // Check if it's a network error (server unreachable)
             if (error.message.includes('fetch') || error.name === 'TypeError') {
@@ -909,48 +903,143 @@ async function showDownloadDialog() {
     setupModalCleanup(modalEl);
 }
 
-function triggerFileSaveDialog(csvContent, defaultFilename, spinner = null) {
+async function waitForModalToClose(modalInstance, modalEl) {
+    if (!modalInstance || !modalEl) {
+        return;
+    }
+
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const blurIfFocusedInside = () => {
+        if (document.activeElement && modalEl.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    };
+
+    if (modalEl.classList.contains('show')) {
+        await new Promise(resolve => {
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                setTimeout(resolve, 250);
+            }, { once: true });
+            blurIfFocusedInside();
+            modalInstance.hide();
+        });
+        return;
+    }
+
+    // Bootstrap ignores hide() while the show transition is still in progress.
+    // In this case, wait briefly for shown.bs.modal and then close cleanly.
+    const wasShown = await new Promise(resolve => {
+        let settled = false;
+
+        modalEl.addEventListener('shown.bs.modal', () => {
+            settled = true;
+            resolve(true);
+        }, { once: true });
+
+        setTimeout(() => {
+            if (!settled) {
+                resolve(false);
+            }
+        }, 350);
+    });
+
+    if (wasShown && modalEl.classList.contains('show')) {
+        await new Promise(resolve => {
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                setTimeout(resolve, 250);
+            }, { once: true });
+            blurIfFocusedInside();
+            modalInstance.hide();
+        });
+        return;
+    }
+
+    await wait(250);
+}
+
+async function triggerFileSaveDialog(csvContent, defaultFilename, spinner = null) {
     // Create a Blob from CSV content
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     
     // Function to hide spinner after file operation
-    const hideSpinnerAfterSave = () => {
+    const hideSpinnerAfterSave = async () => {
         if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
+            await waitForModalToClose(spinner.modal, spinner.modalEl);
         }
     };
     
     // Try to use the modern File System Access API if available
     if ('showSaveFilePicker' in window) {
-        window.showSaveFilePicker({
-            suggestedName: defaultFilename,
-            types: [{
-                description: 'CSV files',
-                accept: {'text/csv': ['.csv']},
-            }],
-        }).then(fileHandle => {
-            return fileHandle.createWritable();
-        }).then(writable => {
-            writable.write(blob);
-            return writable.close();
-        }).then(() => {
-            hideSpinnerAfterSave();
-        }).catch(err => {
+        try {
+            const fileHandle = await window.showSaveFilePicker({
+                suggestedName: defaultFilename,
+                types: [{
+                    description: 'CSV files',
+                    accept: {'text/csv': ['.csv']},
+                }],
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            await hideSpinnerAfterSave();
+            return true;
+        } catch (err) {
+            await hideSpinnerAfterSave();
             if (err.name === 'AbortError') {
-                // User cancelled - just hide spinner
-                hideSpinnerAfterSave();
+                return false;
             } else {
                 // API not supported or other error - fallback to download
                 fallbackDownload(blob, defaultFilename);
-                hideSpinnerAfterSave();
+                await waitForWindowFocusReturn();
+                return true;
             }
-        });
+        }
     } else {
         fallbackDownload(blob, defaultFilename);
-        // Hide spinner immediately for fallback method since there's no user interaction
-        hideSpinnerAfterSave();
+        await waitForWindowFocusReturn();
+        await hideSpinnerAfterSave();
+        return true;
     }
+}
+
+async function waitForWindowFocusReturn(timeoutMs = 8000) {
+    // Browser-managed save dialogs (fallback download) block the page without
+    // exposing a completion hook. Wait until focus/visibility returns so
+    // success toasts are visible after the dialog closes.
+    await new Promise(resolve => {
+        let settled = false;
+
+        const cleanup = () => {
+            window.removeEventListener('focus', onFocus, true);
+            document.removeEventListener('visibilitychange', onVisibility, true);
+        };
+
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve();
+        };
+
+        const onFocus = () => finish();
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                finish();
+            }
+        };
+
+        window.addEventListener('focus', onFocus, true);
+        document.addEventListener('visibilitychange', onVisibility, true);
+
+        setTimeout(finish, timeoutMs);
+
+        // If no dialog stole focus, return almost immediately.
+        setTimeout(() => {
+            if (document.hasFocus()) {
+                finish();
+            }
+        }, 80);
+    });
 }
 
 function fallbackDownload(blob, filename) {
@@ -1445,15 +1534,15 @@ async function showObserverDownloadDialog() {
             }
         }
         
-        // Close dialog
-        modal.hide();
-        setTimeout(() => modalEl.remove(), 300);
+        // Show spinner first, then close dialog for a seamless backdrop transition.
+        const spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        await waitForModalToClose(modal, modalEl);
         
         // Trigger download
         if (isCloudMode) {
-            await downloadObserversCloudMode(cloudServerUrl, downloadAll);
+            await downloadObserversCloudMode(cloudServerUrl, downloadAll, spinner);
         } else {
-            await downloadObserversLocalMode(cloudServerUrl, observerKK, password, downloadAll);
+            await downloadObserversLocalMode(cloudServerUrl, observerKK, password, downloadAll, spinner);
         }
     });
     
@@ -1461,11 +1550,13 @@ async function showObserverDownloadDialog() {
     modal.show();
 }
 
-async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
+async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false, spinner = null) {
     const downloadUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/observers/download`;
-    let spinner = null;
+    let spinnerLocal = spinner;
     try {
-        spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        if (!spinnerLocal) {
+            spinnerLocal = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        }
         
         // Download from server with session authentication
         const response = await fetch(downloadUrl, {
@@ -1483,15 +1574,14 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
             // Trigger file save dialog - pass spinner so it can close it after save/cancel
             const csvContent = result.csv_content;
             const defaultFilename = 'halobeo.csv';
-            triggerFileSaveDialog(csvContent, defaultFilename, spinner);
+            const saved = await triggerFileSaveDialog(csvContent, defaultFilename, spinnerLocal);
             
-            // Note: Success notification shown immediately, but spinner stays until file dialog closes
+            if (saved) {
+                showNotification(i18nStrings.upload_download.download_success_observer, 'success');
+            }
         } else {
             // Close spinner on error
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
-            }
+            await waitForModalToClose(spinnerLocal.modal, spinnerLocal.modalEl);
             
             // Show specific error message from server
             const errorKey = result.error || 'unknown_error';
@@ -1499,10 +1589,7 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
             showErrorDialog(errorMessage);
         }
     } catch (error) {
-        if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
-        }
+        await waitForModalToClose(spinnerLocal?.modal, spinnerLocal?.modalEl);
         showErrorDialog(
             i18nStrings.upload_download.server_unreachable_details.replace('{0}', downloadUrl),
             () => { window.navigateInternal('/'); }
@@ -1510,11 +1597,13 @@ async function downloadObserversCloudMode(cloudServerUrl, downloadAll = false) {
     }
 }
 
-async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, downloadAll = false) {
+async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, downloadAll = false, spinner = null) {
     const downloadUrl = `${cloudServerUrl.replace(/\/$/, '')}/api/observers/download`;
-    let spinner = null;
+    let spinnerLocal = spinner;
     try {
-        spinner = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        if (!spinnerLocal) {
+            spinnerLocal = showInfoModal(i18nStrings.upload_download.download_title, i18nStrings.upload_download.download_progress);
+        }
         
         // Download from cloud server with password authentication
         const response = await fetch(downloadUrl, {
@@ -1546,9 +1635,9 @@ async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, 
             const saveResult = await saveResponse.json();
             
             // Close spinner
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
+            if (spinnerLocal) {
+                spinnerLocal.modal.hide();
+                setTimeout(() => spinnerLocal.modalEl.remove(), 300);
             }
             
             if (saveResponse.ok && saveResult.success) {
@@ -1568,9 +1657,9 @@ async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, 
             }
         } else {
             // Close spinner on error
-            if (spinner) {
-                spinner.modal.hide();
-                setTimeout(() => spinner.modalEl.remove(), 300);
+            if (spinnerLocal) {
+                spinnerLocal.modal.hide();
+                setTimeout(() => spinnerLocal.modalEl.remove(), 300);
             }
             
             // Dynamic key lookup with i18n fallback key – not a hardcoded text fallback
@@ -1579,9 +1668,9 @@ async function downloadObserversLocalMode(cloudServerUrl, observerKK, password, 
             showErrorDialog(errorMessage);
         }
     } catch (error) {
-        if (spinner) {
-            spinner.modal.hide();
-            setTimeout(() => spinner.modalEl.remove(), 300);
+        if (spinnerLocal) {
+            spinnerLocal.modal.hide();
+            setTimeout(() => spinnerLocal.modalEl.remove(), 300);
         }
         console.error('Observer download error:', error);
         showErrorDialog(

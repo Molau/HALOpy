@@ -1,4 +1,5 @@
 /datatest/
+/data/
 
 # Python
 __pycache__/
@@ -69,3 +70,4 @@ temp/
 
 # User-specific config (contains passwords)
 resources/[Hh][Aa][Ll][Oo].[Cc][Ff][Gg]
+resources/halobeo.csv
