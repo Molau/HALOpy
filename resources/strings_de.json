@@ -215,6 +215,7 @@
     "download": "Download"
   },
   "upload_download": {
+      "upload_auth_title": "Anmeldung",
       "upload_auth_message": "Bitte geben Sie Ihre Zugangsdaten ein.",
       "upload_auth_username": "Benutzername:",
       "upload_auth_password": "Passwort:",

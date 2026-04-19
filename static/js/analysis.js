@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await window.waitForI18n();
 
     let observers = [];
+    let filterApplied = false; // Flag to distinguish Apply from Cancel/X/ESC
 
     // Timezone array from H_TYPES.PAS - timezone offsets by region (1-38)
     const Zeitzone = [
@@ -1256,7 +1257,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Log configuration
 
         
-        // Close the parameter dialog
+        // Close the parameter dialog (flag prevents hidden handler from navigating home)
+        filterApplied = true;
         const modalInstance = bootstrap.Modal.getInstance(paramDialog);
         if (modalInstance) {
             modalInstance.hide();
@@ -1286,7 +1288,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     btnCancelParam.addEventListener('click', () => {
-        window.navigateInternal('/');
+        const m = bootstrap.Modal.getInstance(paramDialog);
+        if (m) m.hide();
     });
 
     // Store last analysis result globally for print/save functionality
@@ -3018,14 +3021,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         return { html: html, width: tableWidth };
     }
 
-    // ESC key support - close current dialog and return to main
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            window.navigateInternal('/');
-        }
-    });
-
     // Initialize
     await loadObservers();
     populateParameterSelects();
@@ -3040,4 +3035,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Decision #033: setupModalKeyboard for Enter key → OK button
     setupModalKeyboard(paramDialog, btnApplyParam);
+
+    // Navigate home when param dialog is dismissed (X, Cancel, ESC)
+    // but not when filter was applied successfully
+    paramDialog.addEventListener('hidden.bs.modal', () => {
+        if (!filterApplied) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
 });

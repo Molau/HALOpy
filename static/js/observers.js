@@ -7,6 +7,7 @@ let filteredObservers = [];
 let observersList = [];
 let regionsList = [];
 let currentPage = 1;
+let filterApplied = false; // Flag to distinguish Apply from Cancel/X/ESC
 const pageSize = 50;  // Show 50 observers per page
 
 // Show filter dialog on page load
@@ -21,7 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('filter-type').addEventListener('change', handleFilterTypeChange);
     document.getElementById('apply-filter').addEventListener('click', applyFilter);
     document.getElementById('cancel-filter').addEventListener('click', () => {
-        window.navigateInternal('/');
+        const m = bootstrap.Modal.getInstance(document.getElementById('filter-dialog'));
+        if (m) m.hide();
     });
     
     // Decision #034: Filter value change listeners for OK button state
@@ -124,6 +126,15 @@ async function showFilterDialog() {
     
     // Decision #033: Keyboard handling + cleanup
     setupModalKeyboard(filterDialogEl, document.getElementById('apply-filter'));
+
+    // Navigate home when filter dialog is dismissed (X, Cancel, ESC)
+    // but not when filter was applied successfully
+    filterDialogEl.addEventListener('hidden.bs.modal', () => {
+        if (!filterApplied) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(filterDialogEl);
     
     const filterTypeSelect = document.getElementById('filter-type');
@@ -237,6 +248,7 @@ async function applyFilter() {
     const latestOnly = document.getElementById('show-latest-only').checked;
     
     // Close dialog
+    filterApplied = true;
     const modal = bootstrap.Modal.getInstance(document.getElementById('filter-dialog'));
     document.activeElement?.blur();
     modal.hide();

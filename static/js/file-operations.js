@@ -193,6 +193,10 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         <div class="modal fade" id="auth-modal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${i18nStrings.upload_download.upload_auth_title}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
                     <div class="modal-body">
                         <p>${i18nStrings.upload_download.upload_auth_message}</p>
                         <div class="mb-3">
@@ -268,6 +272,7 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
     
     // Handle login button click
     loginBtn.addEventListener('click', async () => {
+        loginOkClicked = true;
         const observerKK = observerSelect.value;
         const password = passwordInput.value;
         
@@ -287,6 +292,12 @@ async function showAuthenticationModal(onSuccess, cloudServerUrl) {
         }, 300);
     });
     
+    let loginOkClicked = false;
+    document.getElementById('auth-modal').addEventListener('hidden.bs.modal', () => {
+        if (!loginOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
     setupModalCleanup(document.getElementById('auth-modal'));
     
     modal.show();

@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await window.waitForI18n();
 
     let currentStatsData = null; // Store current stats data for save/print
+    let filterApplied = false; // Flag to distinguish Apply from Cancel/X/ESC
 
     // Elements
     const filterDialog = document.getElementById('filter-dialog');
@@ -107,7 +108,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             const data = await response.json();
 
             
-            // Close filter dialog
+            // Close filter dialog (flag prevents hidden handler from navigating home)
+            filterApplied = true;
             const modal = bootstrap.Modal.getInstance(filterDialog);
             modal.hide();
 
@@ -512,24 +514,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Event handlers
     if (btnCancel) {
         btnCancel.addEventListener('click', () => {
-            window.navigateInternal('/');
+            const m = bootstrap.Modal.getInstance(filterDialog);
+            if (m) m.hide();
         });
     }
     
     if (btnApply) {
         btnApply.addEventListener('click', applyFilter);
     }
-    
-    // ESC key support - close monthly statistics and return to main (page-level)
-    const escKeyHandler = (e) => {
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            window.navigateInternal('/');
-        }
-    };
-    
-    document.removeEventListener('keydown', escKeyHandler);
-    document.addEventListener('keydown', escKeyHandler);
     
     // Setup action button handlers
     function setupActionButtons(resultsModalEl) {
@@ -1221,6 +1213,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Decision #033: setupModalKeyboard for Enter key → Apply button
             setupModalKeyboard(filterDialog, btnApply);
+
+            // Navigate home when filter dialog is dismissed (X, Cancel, ESC)
+            // but not when filter was applied successfully
+            filterDialog.addEventListener('hidden.bs.modal', () => {
+                if (!filterApplied) {
+                    window.navigateInternal('/');
+                }
+            }, { once: true });
 
             // Decision #034: OK disabled until month and year selected
             function updateApplyState() {

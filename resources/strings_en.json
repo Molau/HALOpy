@@ -215,6 +215,7 @@
     "download": "Download"
   },
   "upload_download": {
+      "upload_auth_title": "Login",
       "upload_auth_message": "Please enter your credentials.",
       "upload_auth_username": "Username:",
       "upload_auth_password": "Password:",

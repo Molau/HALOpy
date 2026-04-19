@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await window.waitForI18n();
 
     let currentReportData = null; // Store current report data for save/print
+    let filterApplied = false; // Flag to distinguish Apply from Cancel/X/ESC
 
     // Elements
     const filterDialog = document.getElementById('filter-dialog');
@@ -122,7 +123,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             const data = await response.json();
 
             
-            // Close filter dialog
+            // Close filter dialog (flag prevents hidden handler from navigating home)
+            filterApplied = true;
             const modal = bootstrap.Modal.getInstance(filterDialog);
             modal.hide();
 
@@ -140,7 +142,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Event listeners
     btnCancel.addEventListener('click', () => {
-        window.navigateInternal('/');
+        const m = bootstrap.Modal.getInstance(filterDialog);
+        if (m) m.hide();
     });
 
     btnApply.addEventListener('click', applyFilter);
@@ -166,16 +169,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             applyFilter();
         }
     });
-
-    // ESC key support - close dialog and return to main
-    const escKeyHandler = (e) => {
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            window.navigateInternal('/');
-        }
-    };
-    
-    document.addEventListener('keydown', escKeyHandler);
 
     // kurzausgabe() - uses global function from main.js (H_BEOBNG.PAS lines 200-308)
 
@@ -249,13 +242,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Show modal
         const modal = new bootstrap.Modal(resultsModal, {
-            backdrop: 'static',
-            keyboard: false
+            backdrop: 'static'
         });
         modal.show();
         
         // Decision #033: setupModalKeyboard for Enter key → OK button
         setupModalKeyboard(resultsModal, document.getElementById('btn-report-ok'));
+
+        // Navigate home when results modal is closed (ESC, OK, or X button)
+        resultsModal.addEventListener('hidden.bs.modal', () => {
+            window.navigateInternal('/');
+        }, { once: true });
         
         // Wire up action buttons
         setupActionButtons();
@@ -446,12 +443,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const btnSave = document.getElementById('btn-report-save');
         const resultsModal = document.getElementById('results-modal');
         
-        // OK button - close modal and return to main
+        // OK button - close modal (hidden.bs.modal handler navigates home)
         if (btnOk) {
             btnOk.onclick = () => {
                 const modal = bootstrap.Modal.getInstance(resultsModal);
                 if (modal) modal.hide();
-                window.navigateInternal('/');
             };
         }
         
@@ -612,13 +608,20 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                     // Show filter dialog with explicit backdrop configuration
                     const modal = new bootstrap.Modal(filterDialog, {
-                        backdrop: 'static',
-                        keyboard: false
+                        backdrop: 'static'
                     });
                     modal.show();
                     
                     // Decision #033: setupModalKeyboard for Enter key → Apply button
                     setupModalKeyboard(filterDialog, document.getElementById('btn-apply-filter'));
+
+                    // Navigate home when filter dialog is dismissed (X, Cancel, ESC)
+                    // but not when filter was applied successfully
+                    filterDialog.addEventListener('hidden.bs.modal', () => {
+                        if (!filterApplied) {
+                            window.navigateInternal('/');
+                        }
+                    }, { once: true });
                     
                     // Decision #034: OK disabled until month and year selected
                     function updateApplyState() {

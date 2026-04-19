@@ -152,15 +152,25 @@ async function showModifyObservationsDialog() {
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     
     const btnOk = document.getElementById('btn-modify-ok');
+    let okClicked = false;
     
     // Decision #033: consistent keyboard + cleanup
     setupModalKeyboard(modalEl, btnOk);
+
+    // Navigate home when dismissed (X, Cancel, ESC) but not when OK was clicked
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!okClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     modal.show();
     
     // Handle OK button
     btnOk.addEventListener('click', async () => {
+        okClicked = true;
         const selected = document.querySelector('input[name="modify_type"]:checked');
         const modifyType = selected ? selected.value : 'single';
         modal.hide();
@@ -188,7 +198,7 @@ async function showModifyFilterDialog(modifyType) {
         },
         () => {
             // onCancel callback - user cancelled
-
+            window.navigateInternal('/');
         }
     );
 }

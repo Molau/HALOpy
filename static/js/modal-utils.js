@@ -87,6 +87,14 @@ function setupModalKeyboard(modalEl, confirmBtn) {
     // Listen on document to be resilient when focus temporarily leaves modal
     document.addEventListener('keydown', onKeydown, true);
 
+    // Blur focused element before hide to prevent aria-hidden warning
+    // (Bootstrap sets aria-hidden on the modal while a child still has focus)
+    modalEl.addEventListener('hide.bs.modal', function blurOnHide() {
+        if (modalEl.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    }, { once: true });
+
     // Auto-cleanup when modal is hidden
     modalEl.addEventListener('hidden.bs.modal', function cleanup() {
         document.removeEventListener('keydown', onKeydown, true);

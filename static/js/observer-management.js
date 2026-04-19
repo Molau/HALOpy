@@ -325,9 +325,18 @@ async function showAddObserverDialog(formData = null) {
     
     // Decision #033: Enter key triggers OK, excludes TEXTAREA and SELECT
     setupModalKeyboard(modalEl, document.getElementById('btn-add-observer-ok'));
+
+    // Navigate home when dismissed via X or Cancel (not via OK)
+    let addOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!addOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
     
     // Handle save button
     document.getElementById('btn-add-observer-ok').addEventListener('click', async () => {
+        addOkClicked = true;
         try {
             errEl.style.display = 'none';
             
@@ -499,10 +508,20 @@ async function showDeleteObserverDialog() {
         
         // Decision #033: Keyboard handling + cleanup
         setupModalKeyboard(modalEl, document.getElementById('btn-select-delete-observer-ok'));
+
+        // Navigate home when dismissed via X or Cancel (not via OK)
+        let deleteSelectOkClicked = false;
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            if (!deleteSelectOkClicked) {
+                window.navigateInternal('/');
+            }
+        }, { once: true });
+
         setupModalCleanup(modalEl);
         
         // Handle OK button
         document.getElementById('btn-select-delete-observer-ok').addEventListener('click', async () => {
+            deleteSelectOkClicked = true;
             const selectedKK = document.getElementById('delete-observer-select').value;
             if (!selectedKK) {
                 return;
@@ -605,6 +624,15 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
     
     // Decision #033: Keyboard handling + cleanup (Enter → No = safe, destructive dialog)
     setupModalKeyboard(modalEl, document.getElementById('btn-delete-observer-no'));
+
+    // Navigate home when dismissed via X or No (not via Yes-success)
+    let deleteConfirmOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!deleteConfirmOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     // Handle "No" button - close dialog
@@ -629,8 +657,8 @@ async function showDeleteObserverConfirmDialog(observer, sites) {
             }
             
             // Success
+            deleteConfirmOkClicked = true;
             modal.hide();
-            modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
             
             // Show success message
             showNotification(`<strong>✓</strong> ${i18nStrings.observers.success_deleted}`);
@@ -711,10 +739,20 @@ async function showEditObserverDialog() {
         
         // Decision #033: Keyboard handling + cleanup
         setupModalKeyboard(modalEl, document.getElementById('btn-select-observer-ok'));
+
+        // Navigate home when dismissed via X or Cancel (not via OK)
+        let editSelectOkClicked = false;
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            if (!editSelectOkClicked) {
+                window.navigateInternal('/');
+            }
+        }, { once: true });
+
         setupModalCleanup(modalEl);
         
         // Handle OK button
         document.getElementById('btn-select-observer-ok').addEventListener('click', () => {
+            editSelectOkClicked = true;
             const selectedKK = document.getElementById('observer-select').value;
             if (!selectedKK) {
                 return;
@@ -788,10 +826,20 @@ function showEditTypeDialog(observer) {
     
     // Decision #033: Keyboard handling + cleanup
     setupModalKeyboard(modalEl, document.getElementById('btn-edit-type-ok'));
+
+    // Navigate home when dismissed via X or Cancel (not via OK)
+    let editTypeOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!editTypeOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     // Handle OK button
     document.getElementById('btn-edit-type-ok').addEventListener('click', () => {
+        editTypeOkClicked = true;
         const selectedType = document.querySelector('input[name="editType"]:checked').value;
         document.activeElement?.blur();
         modal.hide();
@@ -854,12 +902,22 @@ function showEditBaseDataDialog(observer) {
     
     // Decision #033: Keyboard handling + cleanup
     setupModalKeyboard(modalEl, document.getElementById('btn-edit-base-ok'));
+
+    // Navigate home when dismissed via X or Cancel (not via OK)
+    let editBaseOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!editBaseOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     const errEl = document.getElementById('edit-base-error');
     
     // Handle save button
     document.getElementById('btn-edit-base-ok').addEventListener('click', async () => {
+        editBaseOkClicked = true;
         try {
             errEl.style.display = 'none';
             
@@ -1175,6 +1233,15 @@ async function showAddSiteDialog(observer) {
     
     // Decision #033: Keyboard handling + cleanup
     setupModalKeyboard(modalEl, document.getElementById('btn-add-site-ok'));
+
+    // Navigate home when dismissed via X or Cancel (not via OK)
+    let addSiteOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!addSiteOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     const btnAddSiteOk = document.getElementById('btn-add-site-ok');
@@ -1195,6 +1262,7 @@ async function showAddSiteDialog(observer) {
     
     // Handle save
     document.getElementById('btn-add-site-ok').addEventListener('click', async () => {
+        addSiteOkClicked = true;
         try {
             errEl.style.display = 'none';
             
@@ -1315,6 +1383,15 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     
     // Decision #033: Keyboard handling + cleanup (Enter → Yes = edit this site)
     setupModalKeyboard(modalEl, document.getElementById('btn-edit-site-yes'));
+
+    // Navigate home when dismissed via X or Cancel
+    let editSiteConfirmOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!editSiteConfirmOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     // Handle "No" button - show next site or close
@@ -1329,6 +1406,7 @@ async function showEditSiteConfirmDialog(observer, sites, currentIndex) {
     
     // Handle "Yes" button - show editable form
     document.getElementById('btn-edit-site-yes').addEventListener('click', () => {
+        editSiteConfirmOkClicked = true;
         modal.hide();
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();
@@ -1376,6 +1454,15 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
     
     // Decision #033: Keyboard handling + cleanup
     setupModalKeyboard(modalEl, document.getElementById('btn-edit-site-ok'));
+
+    // Navigate home when dismissed via X or Cancel
+    let editSiteFormOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!editSiteFormOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     // Store original seit for identifying the record
@@ -1383,6 +1470,7 @@ async function showEditSiteFormDialog(observer, sites, currentIndex) {
     
     // Handle save
     document.getElementById('btn-edit-site-ok').addEventListener('click', async () => {
+        editSiteFormOkClicked = true;
         try {
             errEl.style.display = 'none';
             
@@ -1500,6 +1588,15 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     
     // Decision #033: Keyboard handling + cleanup (Enter → No = safe, destructive dialog)
     setupModalKeyboard(modalEl, document.getElementById('btn-delete-site-no'));
+
+    // Navigate home when dismissed via X or Cancel
+    let deleteSiteOkClicked = false;
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!deleteSiteOkClicked) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
+
     setupModalCleanup(modalEl);
     
     // Handle "No" button - show next site or close
@@ -1514,6 +1611,7 @@ async function showDeleteSiteConfirmDialog(observer, sites, currentIndex = 0) {
     
     // Handle "Yes" button - delete the site
     document.getElementById('btn-delete-site-yes').addEventListener('click', async () => {
+        deleteSiteOkClicked = true;
         try {
             const site = sites[currentIndex];
             const resp = await fetch(`/api/observers/${observer.KK}/sites`, {

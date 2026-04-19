@@ -88,7 +88,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Debug: log the data
 
             
-            // Close filter dialog
+            // Close filter dialog (flag prevents hidden handler from navigating home)
+            filterApplied = true;
             const modal = bootstrap.Modal.getInstance(filterDialog);
             modal.hide();
             
@@ -177,8 +178,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         // Show results modal
         const resultsModal = new bootstrap.Modal(document.getElementById('results-modal'), {
-            backdrop: 'static',
-            keyboard: false
+            backdrop: 'static'
         });
         resultsModal.show();
 
@@ -1111,7 +1111,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Event Handlers
     if (btnCancel) {
         btnCancel.addEventListener('click', () => {
-            window.navigateInternal('/');
+            const m = bootstrap.Modal.getInstance(filterDialog);
+            if (m) m.hide();
         });
     }
     
@@ -1128,16 +1129,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
     
-    // ESC key support - close annual statistics and return to main
-    const escKeyHandler = (e) => {
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            window.navigateInternal('/');
-        }
-    };
-    
-    document.addEventListener('keydown', escKeyHandler);
-    
     // Initialize UI
     populateYears();
     
@@ -1148,14 +1139,22 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     
     // Show filter dialog
+    let filterApplied = false;
     const modal = new bootstrap.Modal(filterDialog, {
-        backdrop: 'static',
-        keyboard: false
+        backdrop: 'static'
     });
     modal.show();
     
     // Decision #033: setupModalKeyboard for Enter key → Apply button
     setupModalKeyboard(filterDialog, btnApply);
+
+    // Navigate home when filter dialog is dismissed (X, Cancel, ESC)
+    // but not when filter was applied successfully
+    filterDialog.addEventListener('hidden.bs.modal', () => {
+        if (!filterApplied) {
+            window.navigateInternal('/');
+        }
+    }, { once: true });
     
     // Decision #034: OK disabled until year selected
     btnApply.disabled = true;

@@ -45,6 +45,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+*.bak
 
 # Project specific
 bin/*.exe
