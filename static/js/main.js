@@ -429,14 +429,20 @@ async function loadObserverCodes() {
     const resp = await fetch('/api/observers/list');
     if (!resp.ok) throw new Error(i18nStrings.messages.observer_list_load_failed);
     const data = await resp.json();
-    const observers = data.observers || [];
+    const observers = (data.observers || []).map((o) => {
+        const rawKk = o.KK ?? o.k ?? o.kk;
+        const kk = rawKk !== undefined && rawKk !== null && rawKk !== ''
+            ? String(rawKk).padStart(2, '0')
+            : '';
+        return {
+            ...o,
+            KK: kk
+        };
+    });
     
     const codeSet = new Set(
         observers
-            .map(o => {
-                const kk = o.KK || o.k || o.kk;
-                return kk ? String(kk).padStart(2, '0') : null;
-            })
+            .map(o => (o.KK ? String(o.KK) : null))
             .filter(Boolean)
     );
     

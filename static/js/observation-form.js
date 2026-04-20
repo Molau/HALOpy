@@ -55,7 +55,10 @@ class ObservationForm {
         try {
             const response = await fetch('/api/config/setting?key=FIXED_OBSERVER');
             const config = await response.json();
-            this.fixedObserver = config.value || '';
+            const fixedValue = config.value;
+            this.fixedObserver = fixedValue !== undefined && fixedValue !== null && fixedValue !== ''
+                ? String(fixedValue).padStart(2, '0')
+                : '';
         } catch (e) {
             // Silently ignore - error can occur when multiple forms are created rapidly
             // This is not a critical error, just means fixed observer won't be enforced
