@@ -45,18 +45,27 @@
 // Create new file
 async function showNewFileDialog() {
     try {
-        // Use File System Access API for native save dialog
-        const fileHandle = await window.showSaveFilePicker({
-            // || is a safeguard for File System API, not an i18n fallback
-            suggestedName: i18nStrings.messages.new_file_default_name || 'neue_datei.csv',
-            types: [{
-                description: 'CSV Files',
-                accept: {'text/csv': ['.csv']}
-            }]
-        });
-        
-        // Get chosen filename from fileHandle
-        const filename = fileHandle.name;
+        const defaultFilename = i18nStrings.messages.new_file_default_name || 'neue_datei.csv';
+        let fileHandle = null;
+        let filename = defaultFilename;
+
+        if (typeof window.showSaveFilePicker === 'function') {
+            try {
+                fileHandle = await window.showSaveFilePicker({
+                    suggestedName: defaultFilename,
+                    types: [{
+                        description: 'CSV Files',
+                        accept: {'text/csv': ['.csv']}
+                    }]
+                });
+                filename = fileHandle.name;
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    return;
+                }
+                throw err;
+            }
+        }
         
         // Tell server to create the new file (writes CSV header, sets up state)
         const resp = await fetch('/api/file/new', {
@@ -72,10 +81,6 @@ async function showNewFileDialog() {
         }
         await finishNewFile(fileHandle, filename);
     } catch (err) {
-        if (err.name === 'AbortError') {
-            // User cancelled the file picker
-            return;
-        }
         showErrorDialog(i18nStrings.common.error + ': ' + err.message);
     } finally {
         clearMenuHighlights();
@@ -85,11 +90,23 @@ async function showNewFileDialog() {
 async function finishNewFile(fileHandle, filename) {
     // Get the server-created file content (header only) and write to local file
     const saveResp = await fetch('/api/file/save', { method: 'POST' });
-    if (saveResp.ok) {
+    if (!saveResp.ok) {
+        const err = await saveResp.json().catch(() => ({ error: 'Unknown error' }));
+        showErrorDialog(i18nStrings.common.error + ': ' + (err.error || 'Unknown error'));
+        return;
+    }
+
+    if (fileHandle) {
         const blob = await saveResp.blob();
         const writable = await fileHandle.createWritable();
         await writable.write(blob);
         await writable.close();
+    } else {
+        const csvContent = await saveResp.text();
+        const saved = await triggerFileSaveDialog(csvContent, filename);
+        if (!saved) {
+            return;
+        }
     }
     
     // Update application state (empty observations list)
@@ -109,9 +126,8 @@ async function saveFile() {
             showErrorDialog(i18nStrings.messages.no_file_loaded);
             return;
         }
-        
-        // Use File System Access API for native save dialog
-        try {
+
+        if (typeof window.showSaveFilePicker === 'function') {
             const fileHandle = await window.showSaveFilePicker({
                 suggestedName: status.filename,
                 types: [{
@@ -150,14 +166,36 @@ async function saveFile() {
                 const result = await response.json();
                 showErrorDialog(i18nStrings.common.error + ': ' + result.error);
             }
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                // User cancelled the file picker
+        } else {
+            const response = await fetch('/api/file/save', {method: 'POST'});
+
+            if (!response.ok) {
+                const result = await response.json();
+                showErrorDialog(i18nStrings.common.error + ': ' + result.error);
                 return;
             }
-            throw err;
+
+            const csvContent = await response.text();
+            const saved = await triggerFileSaveDialog(csvContent, status.filename);
+            if (!saved) {
+                return;
+            }
+
+            await refreshFileStatus();
+            window.haloData.fileName = status.filename;
+
+            await fetch('/api/file/cleanup_autosave', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+
+            showNotification(`<strong>✓</strong> ${escapeHtml(i18nStrings.messages.file_saved.replace('{filename}', status.filename))}`, 'success');
         }
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return;
+        }
         showErrorDialog(i18nStrings.common.error + ': ' + error.message);
     } finally {
         clearMenuHighlights();
