@@ -1,6 +1,7 @@
 """Observer management API endpoints.
 
 Routes: /observers (GET/POST/DELETE), /observers/list, /observers/regions,
+    /observers/name,
         /observers/<kk> (PUT), /observers/<kk>/sites (GET/PUT/DELETE),
         /observers/<kk>/active,
         /observers/upload, /observers/download, /observers/save, /observers/reload
@@ -626,6 +627,102 @@ def get_observers_list() -> Dict[str, Any]:
         result['has_admin'] = 'admin' in registered_usernames
     
     return jsonify(result)
+
+
+@api_blueprint.route('/observers/name', methods=['GET'])
+def resolve_observer_name() -> Dict[str, Any]:
+    """Resolve observer KK to name.
+
+    Query parameters:
+        kk: Required observer code (01-99)
+        jj: Optional year (2-digit or 4-digit) for date-based lookup
+        mm: Optional month (1-12) for date-based lookup
+
+    Returns:
+        {
+          "observer": {
+            "KK": "56",
+            "VName": "Max",
+            "NName": "Mustermann",
+            "full_name": "Max Mustermann",
+            "seit": "01/24"
+          }
+        }
+
+    Notes:
+    - If jj+mm are provided, returns the latest observer record valid at that date.
+    - If jj+mm are omitted, returns the latest known record for that KK.
+    """
+    kk_raw = request.args.get('kk', '').strip()
+    if not kk_raw:
+        return jsonify({'error': 'missing_kk'}), 400
+
+    if not kk_raw.isdigit():
+        return jsonify({'error': 'invalid_kk_format'}), 400
+
+    kk = str(int(kk_raw)).zfill(2)
+
+    jj_raw = request.args.get('jj', '').strip()
+    mm_raw = request.args.get('mm', '').strip()
+    use_date_filter = bool(jj_raw and mm_raw)
+
+    if (jj_raw and not mm_raw) or (mm_raw and not jj_raw):
+        return jsonify({'error': 'jj_mm_must_be_provided_together'}), 400
+
+    try:
+        if is_cloud_mode():
+            if use_date_filter:
+                jj = int(jj_raw)
+                mm = int(mm_raw)
+
+                if mm < 1 or mm > 12:
+                    return jsonify({'error': 'invalid_mm_range'}), 400
+
+                if jj >= 100:
+                    jj = jj % 100
+
+                records = observer_db.load_filtered(kk=kk, jj=jj, mm=mm)
+            else:
+                records = observer_db.load_filtered(kk=kk, latest_only=True)
+        else:
+            observers = current_app.config.get('OBSERVERS', [])
+            records = [obs for obs in observers if str(obs.get('KK', '')).zfill(2) == kk]
+
+            if use_date_filter:
+                jj = int(jj_raw)
+                mm = int(mm_raw)
+
+                if mm < 1 or mm > 12:
+                    return jsonify({'error': 'invalid_mm_range'}), 400
+
+                if jj >= 100:
+                    jj = jj % 100
+
+                if jj < (YEAR_MIN - 1900):
+                    jj += 100
+
+                obs_seit = mm + 13 * jj
+                records = [obs for obs in records if obs.get('seit') and _parse_seit(obs.get('seit', '')) <= obs_seit]
+
+        if not records:
+            return jsonify({'observer': None}), 404
+
+        latest_record = max(records, key=lambda obs: _parse_seit(obs.get('seit', '')))
+        first_name = (latest_record.get('VName') or '').strip()
+        last_name = (latest_record.get('NName') or '').strip()
+        full_name = f"{first_name} {last_name}".strip()
+
+        return jsonify({
+            'observer': {
+                'KK': str(latest_record.get('KK', kk)).zfill(2),
+                'VName': first_name,
+                'NName': last_name,
+                'full_name': full_name,
+                'seit': latest_record.get('seit', '')
+            }
+        })
+    except ValueError:
+        return jsonify({'error': 'invalid_jj_mm_format'}), 400
 
 
 @api_blueprint.route('/observers/regions', methods=['GET'])
