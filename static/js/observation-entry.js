@@ -173,7 +173,7 @@ async function showAddObservationDialogNumeric() {
                     </div>
                     <div class="modal-body py-2">
                         <div id="obs-guide-box" class="border rounded mb-2" style="font-family: var(--bs-font-monospace, monospace); white-space: pre; background: #f8f9fa; padding: 4px 6px; font-size: 14px; color: #000; cursor: text; overflow-x: auto;"><div id="obs-guide-header" style="margin: 0; padding: 0; line-height: 1.4;">${i18nStrings.observations.input_pattern}</div><div id="obs-guide-entered" style="margin: 0; padding: 0; line-height: 1.4;"></div><div id="obs-guide-remarks" style="margin: 0; padding: 0; line-height: 1.4; display: none;"></div><div id="obs-guide-caret" style="color:#0d6efd; margin: 0; padding: 0; line-height: 1.4;"></div></div>
-                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" spellcheck="false" inputmode="text" style="opacity: 0; height: 0; padding: 0; margin: 0; border: none; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
+                        <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" style="opacity: 0; height: 0; padding: 0; margin: 0; border: none; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
                         <div id="obs-code-error" class="text-danger mt-1" style="display:none; font-size: 12px;"></div>
                     </div>
                     <div class="modal-footer py-1">
@@ -202,6 +202,13 @@ async function showAddObservationDialogNumeric() {
 
     const input = document.getElementById('obs-code-input');
     const errEl = document.getElementById('obs-code-error');
+
+    // Mobile keyboards may inject replacement text/autocorrect snippets.
+    // Keep the hidden numeric input strictly literal.
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('spellcheck', 'false');
     let eing = fixedObserver ? String(fixedObserver).padStart(2, '0') : '';  // Pre-fill with fixed observer KK
     
     // If date default is available, append MM and JJ after KK and O (positions 2-3)
@@ -366,8 +373,31 @@ async function showAddObservationDialogNumeric() {
             input.value = eing;
             return;
         }
+
+        // Ignore mobile replacement/composition events (auto-correct/prediction),
+        // otherwise spaces in f/zz can be replaced by unexpected digits.
+        if (e.inputType === 'insertReplacementText' || e.inputType === 'insertCompositionText') {
+            input.value = eing;
+            return;
+        }
         
         const newVal = input.value;
+
+        // Prefer the actual inserted text from InputEvent when available.
+        // This is more robust on mobile than diffing full value snapshots.
+        if (typeof e.data === 'string' && e.data.length > 0) {
+            input.value = eing;
+            for (const ch of e.data) {
+                const syntheticEv = {
+                    key: ch,
+                    preventDefault: () => {},
+                    stopPropagation: () => {}
+                };
+                inputQueue.push(syntheticEv);
+            }
+            processInputQueue();
+            return;
+        }
         
         if (newVal.length > eing.length) {
             // Characters were added - process each new character
