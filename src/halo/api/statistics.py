@@ -533,36 +533,6 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
         lines.append(line)
         lines.append('╚═════╩═══════════════════╩════════════════════════╩════════════════════════╩════╩═════╝')
 
-    # Section: New observers
-    new_obs = data.get('new_observers', [])
-    dep_obs = data.get('departing_observers', [])
-    if new_obs or dep_obs:
-        lines.append('')
-        lines.append('╔' + '═' * 86 + '╗')
-
-    if new_obs:
-        header = i18n.get('monthly_stats.new_observers')
-        padding = max(0, (86 - len(header)) // 2)
-        lines.append('║' + ' ' * padding + header + ' ' * (86 - padding - len(header)) + '║')
-        lines.append('╠' + '═' * 86 + '╣')
-        for obs in new_obs:
-            entry = f"  {obs['kk']}  {obs['name']}  ({obs['hbort']})"
-            lines.append('║' + entry[:86].ljust(86) + '║')
-
-    if dep_obs:
-        if new_obs:
-            lines.append('╠' + '═' * 86 + '╣')
-        header = i18n.get('monthly_stats.departing_observers')
-        padding = max(0, (86 - len(header)) // 2)
-        lines.append('║' + ' ' * padding + header + ' ' * (86 - padding - len(header)) + '║')
-        lines.append('╠' + '═' * 86 + '╣')
-        for obs in dep_obs:
-            entry = f"  {obs['kk']}  {obs['name']}  ({obs['hbort']})"
-            lines.append('║' + entry[:86].ljust(86) + '║')
-
-    if new_obs or dep_obs:
-        lines.append('╚' + '═' * 86 + '╝')
-
     return '\n'.join(lines)
 
 
@@ -719,24 +689,6 @@ def _format_monthly_stats_markdown(data: Dict[str, Any], month_name: str, year: 
         total_rel = data['activity_totals']['relative']
         row += f' {total_rel:.1f} |'
         lines.append(row)
-        lines.append('')
-
-    # Section: New observers
-    new_obs = data.get('new_observers', [])
-    if new_obs:
-        lines.append(f"## {i18n.get('monthly_stats.new_observers')}")
-        lines.append('')
-        for obs in new_obs:
-            lines.append(f"- **{obs['kk']}** {obs['name']} ({obs['hbort']})")
-        lines.append('')
-
-    # Section: Departing observers
-    dep_obs = data.get('departing_observers', [])
-    if dep_obs:
-        lines.append(f"## {i18n.get('monthly_stats.departing_observers')}")
-        lines.append('')
-        for obs in dep_obs:
-            lines.append(f"- **{obs['kk']}** {obs['name']} ({obs['hbort']})")
         lines.append('')
 
     return '\n'.join(lines)
