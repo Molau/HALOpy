@@ -280,20 +280,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         let html = '';
         
         // Table header
-        html += '    ╔' + '═'.repeat(76) + '╗\n';
+        html += '    ╔' + '═'.repeat(79) + '╗\n';
         const headerText = `${i18nStrings.monthly_stats.ee_overview} ${monthName} ${year}`;
-        const headerPadding = Math.max(0, Math.floor((76 - headerText.length) / 2));
-        html += '    ║' + ' '.repeat(headerPadding) + headerText + ' '.repeat(76 - headerPadding - headerText.length) + '║\n';
-        html += '    ╠══╦══════════╦══════════╦══════════╦══════════╦══════════╦════════════╦═════╣\n';
-        html += '    ║EE║ 1   3   5║   7   9  ║11  13  15║  17  19  ║21  23  25║  27  29  31║ ges ║\n';
-        html += '    ║  ║   2   4  ║ 6   8  10║  12  14  ║16  18  20║  22  24  ║26  28  30  ║     ║\n';
-        html += '    ╠══╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣\n';
+        const headerPadding = Math.max(0, Math.floor((79 - headerText.length) / 2));
+        html += '    ║' + ' '.repeat(headerPadding) + headerText + ' '.repeat(79 - headerPadding - headerText.length) + '║\n';
+        html += '    ╠═════╦══════════╦══════════╦══════════╦══════════╦══════════╦════════════╦═════╣\n';
+        html += '    ║ EE  ║ 1   3   5║   7   9  ║11  13  15║  17  19  ║21  23  25║  27  29  31║ ges ║\n';
+        html += '    ║     ║   2   4  ║ 6   8  10║  12  14  ║16  18  20║  22  24  ║26  28  30  ║     ║\n';
+        html += '    ╠═════╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣\n';
         
         // Data rows
         let rowCount = 0;
         for (const eeRow of eeData) {
-            const ee = eeRow.ee.toString().padStart(2, '0');
-            html += '    ║' + ee + '║';
+            const ee = eeRow.ee_label || eeRow.ee.toString().padStart(2, '0');
+            html += '    ║' + ee.padEnd(5, ' ') + '║';
             
             // Days 1-31 in groups of 5
             for (let day = 1; day <= 31; day++) {
@@ -321,13 +321,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             const isBeforeGroup567 = currentEE === 5 || currentEE === 6;
             
             if (!isLast && !isBeforeGroup567) {
-                html += '    ╠══╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣\n';
+                html += '    ╠═════╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣\n';
             }
         }
         
         // Daily totals row
-        html += '    ╠══╩══════════╩══════════╩══════════╩══════════╩══════════╩════════════╩═════╣\n';
-        html += '    ║  ║';
+        html += '    ╠═════╩══════════╩══════════╩══════════╩══════════╩══════════╩════════════╩═════╣\n';
+        html += '    ║  Σ  ║';
         for (let day = 1; day <= 31; day++) {
             const count = dailyTotals[day] || 0;
             const cellValue = count > 0 ? count.toString().padStart(2) : '  ';
@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         html += '║';
         html += grandTotal.toString().padStart(4) + ' ║\n';
-        html += '    ╚' + '═'.repeat(76) + '╝\n\n';
+        html += '    ╚' + '═'.repeat(79) + '╝\n\n';
         
         return html;
     }
@@ -1132,7 +1132,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             csv += ',gesamt\n';
             
             for (const eeRow of data.ee_overview) {
-                csv += eeRow.ee.toString().padStart(2, '0');
+                csv += (eeRow.ee_label || eeRow.ee.toString().padStart(2, '0'));
                 
                 for (let day = 1; day <= 31; day++) {
                     const count = eeRow.days[day] || 0;
@@ -1324,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             md += '---:|\n';
             
             for (const eeRow of data.ee_overview) {
-                md += '| ' + eeRow.ee.toString().padStart(2, '0') + ' |';
+                md += '| ' + (eeRow.ee_label || eeRow.ee.toString().padStart(2, '0')) + ' |';
                 for (let day = 1; day <= 31; day++) {
                     const count = eeRow.days[day] || 0;
                     md += ' ' + (count > 0 ? count : '') + ' |';
@@ -1502,7 +1502,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             for (const eeRow of data.ee_overview) {
                 html += '<tr>';
-                html += '<td style="font-weight: bold;">' + eeRow.ee.toString().padStart(2, '0') + '</td>';
+                html += '<td style="font-weight: bold;">' + (eeRow.ee_label || eeRow.ee.toString().padStart(2, '0')) + '</td>';
                 
                 for (let day = 1; day <= 31; day++) {
                     const count = eeRow.days[day] || 0;

@@ -481,6 +481,8 @@
     "ee_overview": "Ergebnisübersicht Sonnenhalos",
     "rare_halos": "Erscheinungen über EE 12",
     "rare_halos_none": "Im {month} keine Erscheinungen über EE 12.",
+    "new_observers": "Neu im Haloprogramm",
+    "departing_observers": "Aus dem Haloprogramm ausgeschieden",
     "activity_title": "Haloaktivität",
     "activity_real": "real",
     "activity_relative": "relativ",

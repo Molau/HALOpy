@@ -361,19 +361,19 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
     
     # Table 2: EE Overview
     if data.get('ee_overview'):
-        lines.append('    ╔' + '═' * 76 + '╗')
+        lines.append('    ╔' + '═' * 79 + '╗')
         header = f"{i18n.get('monthly_stats.ee_overview')} {month_name} {year}"
-        padding = max(0, (76 - len(header)) // 2)
-        lines.append('    ║' + ' ' * padding + header + ' ' * (76 - padding - len(header)) + '║')
-        lines.append('    ╠══╦══════════╦══════════╦══════════╦══════════╦══════════╦════════════╦═════╣')
-        lines.append('    ║EE║ 1   3   5║   7   9  ║11  13  15║  17  19  ║21  23  25║  27  29  31║ ges ║')
-        lines.append('    ║  ║   2   4  ║ 6   8  10║  12  14  ║16  18  20║  22  24  ║26  28  30  ║     ║')
-        lines.append('    ╠══╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣')
+        padding = max(0, (79 - len(header)) // 2)
+        lines.append('    ║' + ' ' * padding + header + ' ' * (79 - padding - len(header)) + '║')
+        lines.append('    ╠═════╦══════════╦══════════╦══════════╦══════════╦══════════╦════════════╦═════╣')
+        lines.append('    ║ EE  ║ 1   3   5║   7   9  ║11  13  15║  17  19  ║21  23  25║  27  29  31║ ges ║')
+        lines.append('    ║     ║   2   4  ║ 6   8  10║  12  14  ║16  18  20║  22  24  ║26  28  30  ║     ║')
+        lines.append('    ╠═════╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣')
         
         row_count = 0
         for ee_row in data['ee_overview']:
-            ee = f"{ee_row['ee']:02d}"
-            line = f'    ║{ee}║'
+            ee = ee_row.get('ee_label', f"{ee_row['ee']:02d}")
+            line = f'    ║{ee.ljust(5)}║'
             
             for day in range(1, 32):
                 count = ee_row['days'].get(str(day), 0)
@@ -392,11 +392,11 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
             is_before_group567 = current_ee == 5 or current_ee == 6
             
             if not is_last and not is_before_group567:
-                lines.append('    ╠══╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣')
+                lines.append('    ╠═════╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣')
         
         # Daily totals row
-        lines.append('    ╠══╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣')
-        line = '    ║Σ ║'
+        lines.append('    ╠═════╬══════════╬══════════╬══════════╬══════════╬══════════╬════════════╬═════╣')
+        line = '    ║  Σ  ║'
         for day in range(1, 32):
             count = data['daily_totals'].get(str(day), 0)
             cell = f'{count:2d}' if count > 0 else '  '
@@ -406,7 +406,7 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
         line += '║'
         line += f"{data['grand_total']:4d} ║"
         lines.append(line)
-        lines.append('    ╚══╩══════════╩══════════╩══════════╩══════════╩══════════╩════════════╩═════╝')
+        lines.append('    ╚═════╩══════════╩══════════╩══════════╩══════════╩══════════╩════════════╩═════╝')
         lines.append('')
     
     # Table 3: Rare Halos
@@ -532,7 +532,37 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
         line += f'{total_rel:5.1f}║'
         lines.append(line)
         lines.append('╚═════╩═══════════════════╩════════════════════════╩════════════════════════╩════╩═════╝')
-    
+
+    # Section: New observers
+    new_obs = data.get('new_observers', [])
+    dep_obs = data.get('departing_observers', [])
+    if new_obs or dep_obs:
+        lines.append('')
+        lines.append('╔' + '═' * 86 + '╗')
+
+    if new_obs:
+        header = i18n.get('monthly_stats.new_observers')
+        padding = max(0, (86 - len(header)) // 2)
+        lines.append('║' + ' ' * padding + header + ' ' * (86 - padding - len(header)) + '║')
+        lines.append('╠' + '═' * 86 + '╣')
+        for obs in new_obs:
+            entry = f"  {obs['kk']}  {obs['name']}  ({obs['hbort']})"
+            lines.append('║' + entry[:86].ljust(86) + '║')
+
+    if dep_obs:
+        if new_obs:
+            lines.append('╠' + '═' * 86 + '╣')
+        header = i18n.get('monthly_stats.departing_observers')
+        padding = max(0, (86 - len(header)) // 2)
+        lines.append('║' + ' ' * padding + header + ' ' * (86 - padding - len(header)) + '║')
+        lines.append('╠' + '═' * 86 + '╣')
+        for obs in dep_obs:
+            entry = f"  {obs['kk']}  {obs['name']}  ({obs['hbort']})"
+            lines.append('║' + entry[:86].ljust(86) + '║')
+
+    if new_obs or dep_obs:
+        lines.append('╚' + '═' * 86 + '╝')
+
     return '\n'.join(lines)
 
 
@@ -614,7 +644,7 @@ def _format_monthly_stats_markdown(data: Dict[str, Any], month_name: str, year: 
         
         # Data rows
         for ee_row in data['ee_overview']:
-            ee = f"{ee_row['ee']:02d}"
+            ee = ee_row.get('ee_label', f"{ee_row['ee']:02d}")
             row = f'| {ee} |'
             
             for day in range(1, 32):
@@ -690,7 +720,25 @@ def _format_monthly_stats_markdown(data: Dict[str, Any], month_name: str, year: 
         row += f' {total_rel:.1f} |'
         lines.append(row)
         lines.append('')
-    
+
+    # Section: New observers
+    new_obs = data.get('new_observers', [])
+    if new_obs:
+        lines.append(f"## {i18n.get('monthly_stats.new_observers')}")
+        lines.append('')
+        for obs in new_obs:
+            lines.append(f"- **{obs['kk']}** {obs['name']} ({obs['hbort']})")
+        lines.append('')
+
+    # Section: Departing observers
+    dep_obs = data.get('departing_observers', [])
+    if dep_obs:
+        lines.append(f"## {i18n.get('monthly_stats.departing_observers')}")
+        lines.append('')
+        for obs in dep_obs:
+            lines.append(f"- **{obs['kk']}** {obs['name']} ({obs['hbort']})")
+        lines.append('')
+
     return '\n'.join(lines)
 
 
@@ -786,7 +834,40 @@ def get_monthly_stats() -> Dict[str, Any]:
     if active_observers_only:
         active_observers = {kk: rec for kk, rec in active_observers.items()
                            if rec.get('aktiv') in (1, '1')}
-    
+
+    # Step 3: Detect new observers (first ever entry is this month) and
+    # departing observers (latest entry is this month and aktiv == 0).
+    # Works on ALL observer records, not just the filtered active set.
+    kk_all_records: dict = {}
+    for obs_record in observers:
+        kk = obs_record.get('KK', '')
+        seit_str = obs_record.get('seit', '')
+        seit = _parse_seit(seit_str) if seit_str else 0
+        if kk not in kk_all_records:
+            kk_all_records[kk] = []
+        kk_all_records[kk].append((seit, obs_record))
+
+    new_observer_list = []
+    departing_observer_list = []
+    for kk, records in kk_all_records.items():
+        records_sorted = sorted(records, key=lambda x: x[0])
+        earliest_seit, _ = records_sorted[0]
+        latest_seit, latest_rec = records_sorted[-1]
+
+        vname = latest_rec.get('VName', '')
+        nname = latest_rec.get('NName', '')
+        name = f"{vname} {nname}".strip()
+        hbort = latest_rec.get('HbOrt', '')
+
+        if earliest_seit == month_year_value:
+            new_observer_list.append({'kk': kk, 'name': name, 'hbort': hbort})
+
+        if latest_seit == month_year_value and latest_rec.get('aktiv') not in (1, '1'):
+            departing_observer_list.append({'kk': kk, 'name': name, 'hbort': hbort})
+
+    new_observer_list.sort(key=lambda x: x['kk'])
+    departing_observer_list.sort(key=lambda x: x['kk'])
+
     # Build observer overview table
     # Structure: observer_data[KK] = {
     #   'days': {1..31: {'solar_ee': set of EE, 'lunar': has_lunar}},
@@ -927,6 +1008,11 @@ def get_monthly_stats() -> Dict[str, Any]:
     # Count how many observers saw each halo type on each day
     # Note: Same observer seeing same EE multiple times on same day counts only once
     ee_overview = {}
+
+    # EE 12 and EE 21 are merged in overview output because both are
+    # often difficult to distinguish in visual observations.
+    def _ee_overview_bucket(ee_value: int) -> int:
+        return 12 if ee_value in (12, 21) else ee_value
     
     for obs in filtered_obs:
         if _int(obs, 'O') != 1:  # Only solar halos (O=1)
@@ -942,14 +1028,15 @@ def get_monthly_stats() -> Dict[str, Any]:
         
         # Resolve combined halo types to individual components
         for individual_ee in resolve_halo_type(ee):
-            if individual_ee not in ee_overview:
-                ee_overview[individual_ee] = {}
-            
-            if tt not in ee_overview[individual_ee]:
-                ee_overview[individual_ee][tt] = set()
-            
+            ee_bucket = _ee_overview_bucket(individual_ee)
+            if ee_bucket not in ee_overview:
+                ee_overview[ee_bucket] = {}
+
+            if tt not in ee_overview[ee_bucket]:
+                ee_overview[ee_bucket][tt] = set()
+
             # Add observer to set (ensures same observer counts only once per day)
-            ee_overview[individual_ee][tt].add(kk)
+            ee_overview[ee_bucket][tt].add(kk)
     
     # Convert sets to counts and calculate totals
     # Filter to only show specific EE types: 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12
@@ -974,6 +1061,7 @@ def get_monthly_stats() -> Dict[str, Any]:
         
         ee_list.append({
             'ee': ee,
+            'ee_label': '12/21' if ee == 12 else f'{ee:02d}',
             'days': days_dict,
             'total': total_count
         })
@@ -1006,7 +1094,9 @@ def get_monthly_stats() -> Dict[str, Any]:
         
         # Resolve combined halo types to check for rare halos
         for individual_ee in resolve_halo_type(_int(obs, 'EE')):
-            if individual_ee > 12:
+            # EE 21 is represented in the merged 12/21 overview row and should
+            # not appear in the "Erscheinungen über EE 12" table.
+            if individual_ee > 12 and individual_ee != 21:
                 # Use GG directly from observation record
                 gg = _int(obs, 'GG')
                 
@@ -1090,7 +1180,9 @@ def get_monthly_stats() -> Dict[str, Any]:
         'winter_halo_day_count': len(winter_halo_days),
         'activity_count': activity_data['active_count'],
         'activity_observation_count': activity_data['observation_count'],
-        'count': len(filtered_obs)
+        'count': len(filtered_obs),
+        'new_observers': new_observer_list,
+        'departing_observers': departing_observer_list,
     }
     
     # Check requested format

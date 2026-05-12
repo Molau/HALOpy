@@ -481,6 +481,8 @@
     "ee_overview": "Solar Halo Overview",
     "rare_halos": "Events above EE 12",
     "rare_halos_none": "In {month} no events above EE 12.",
+    "new_observers": "New to the Halo Programme",
+    "departing_observers": "Left the Halo Programme",
     "activity_title": "Halo Activity",
     "activity_real": "real",
     "activity_relative": "relative",
