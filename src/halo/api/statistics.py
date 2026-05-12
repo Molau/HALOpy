@@ -1042,6 +1042,34 @@ def get_monthly_stats() -> Dict[str, Any]:
     normalized_total_real = activity_data['total_real'] * normalization_factor
     normalized_total_relative = activity_data['total_relative'] * normalization_factor
     
+    # Calculate distinct day counts for intro text generation.
+    # Winter halo days follow HALO data format density codes:
+    # 4 = Reif, 5 = Schneedecke, 6 = Eisnebel/Polarschnee
+    solar_halo_days = set()
+    lunar_halo_days = set()
+    winter_halo_days = set()
+
+    for obs in filtered_obs:
+        kk = str(_int(obs, 'KK')).zfill(2)
+
+        # Keep day counters aligned with monthly-stats scope: only active observers.
+        if kk not in observer_data:
+            continue
+
+        tt = _int(obs, 'TT')
+        if tt <= 0:
+            continue
+
+        o = _int(obs, 'O')
+        d = _int(obs, 'd')
+
+        if o == 1:
+            solar_halo_days.add(tt)
+        if o == 2:
+            lunar_halo_days.add(tt)
+        if d in {4, 5, 6}:
+            winter_halo_days.add(tt)
+
     # Build data structure
     data = {
         'mm': mm_int,
@@ -1057,6 +1085,9 @@ def get_monthly_stats() -> Dict[str, Any]:
             'real': normalized_total_real,
             'relative': normalized_total_relative
         },
+        'solar_halo_day_count': len(solar_halo_days),
+        'lunar_halo_day_count': len(lunar_halo_days),
+        'winter_halo_day_count': len(winter_halo_days),
         'activity_count': activity_data['active_count'],
         'activity_observation_count': activity_data['observation_count'],
         'count': len(filtered_obs)
