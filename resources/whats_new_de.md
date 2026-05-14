@@ -1,3 +1,18 @@
+**Ergänzungen und Änderungen in der Version 3.3**
+
+Version 3.3 führt ein Fotoalbum für Halobeobachtungen ein (nur im Cloud-Modus).
+
+- Fotoalbum: Zu jeder Beobachtung können Fotos hochgeladen, angesehen und gelöscht werden. Bis zu 10 Fotos pro Beobachtung sind möglich. Die Fotos werden in einer Thumbnailleiste unter dem Beobachtungsformular angezeigt; ein integrierter Bildbetrachter ermöglicht das Durchblättern sowie das Herunterladen und Löschen einzelner Aufnahmen.
+- Beim Löschen einer Beobachtung kann optional das zugehörige Fotoalbum mit entfernt werden. Ist die Beobachtung die letzte eines Beobachters an diesem Tag, werden die Fotos automatisch mitgelöscht.
+- Nutzungsrecht: Mit dem Hochladen eines Fotos erteilt der Bildautor dem AKM und seinen Mitgliedern das Recht, das Foto unter Angabe des Bildautors für vereinskonforme Zwecke zu verwenden – beispielsweise in Monatsberichten oder anderen Publikationen des AKM.
+
+**Ergänzungen und Änderungen in der Version 3.2**
+
+Version 3.2 ist die erste öffentliche Gemeinschaftsversion von HALOpy.
+
+- Fotografische Beobachtung: Mit dem Schlüsselelement `#` können rein fotografische Beobachtungen gekennzeichnet werden. Sie erscheinen in der Beobachtungsliste, werden aber bei Statistik und Auswertung automatisch nicht berücksichtigt.
+- UI-Verbesserungen: Die Beobachtungsanzeige unterstützt nun server-seitige Seitennavigation bei großen Datenmengen. Nach dem Löschen oder Ändern einer Beobachtung kann direkt die nächste Operation gestartet werden. Bei der Menueingabe kann die vorige Beobachtung als Vorlage übernommen werden. Im Cloud-Modus werden auf der Anmeldeseite nur Beobachter angezeigt, für die ein Passwort hinterlegt ist. Zusätzlich wurden zahlreiche kleinere Fehler behoben, u. a. bei der Modalnavigation, im mobilen Menü, der Startroutine im lokalen Modus sowie im ZZ-Feld.
+
 **Ergänzungen und Änderungen in der Version 3.1**
 
 Version 3.1 führt die Online-Version von HALOpy ein. Das Programm unterstützt nun zwei Betriebsmodi:

@@ -24,6 +24,16 @@ HALOpy provides **MCP-ready API endpoints** for generating statistics charts pro
 
 Returns PNG images ready for AI assistants, reporting tools, and automation. See [MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md) for details.
 
+### Photo Gallery (Cloud Mode)
+
+In cloud mode, each observation can have an associated photo gallery:
+
+- Upload a limited number of photos per observation (JPEG, PNG, WEBP)
+- View photos in the integrated image viewer with navigation, download, and delete
+- When deleting an observation, the photo folder can optionally be removed
+
+**Usage rights:** By uploading a photo, the author grants the AKM and its members the right to use the photo with attribution for association-conform purposes – for example in monthly reports or other publications of the AKM.
+
 ### Data
 - `data/` - Observation CSV files (.CSV format)
 - `resources/` - Observer metadata (halobeo.csv)

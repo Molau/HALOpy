@@ -1,3 +1,18 @@
+**Changes and New Features in Program Version 3.3**
+
+Version 3.3 introduces a photo gallery for halo observations (cloud mode only).
+
+- Photo gallery: Photos can be uploaded, viewed, and deleted for each observation. Up to 10 photos per observation are supported. Photos are displayed in a thumbnail bar below the observation form; an integrated image viewer allows browsing, downloading, and deleting individual images.
+- When deleting an observation, the associated photo gallery can optionally be removed as well. If the observation is the last one by an observer on that day, photos are deleted automatically.
+- Usage rights: By uploading a photo, the author grants the AKM and its members the right to use the photo with attribution for internal association-conform purposes – for example in monthly reports or other publications of the AKM.
+
+**Changes and New Features in Program Version 3.2**
+
+Version 3.2 implements different optimizations in HALOpy.
+
+- Photographic observation: The key element `#` marks purely photographic observations. They appear in the observation list but are automatically excluded from statistics and analysis.
+- UI improvements: The observation display now supports server-side pagination for large datasets. After deleting or modifying an observation, the next operation can be started immediately. In menu entry mode, the previous observation can be used as a template. In cloud mode, the login page only shows observers who have a password set. In addition, numerous smaller bugs were fixed, including modal navigation, the mobile menu, local mode startup, and the ZZ field.
+
 **Changes and New Features in Program Version 3.1**
 
 Version 3.1 introduces the online version of HALOpy. The program now supports two operating modes:
