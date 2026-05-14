@@ -611,6 +611,12 @@ class ObservationForm {
             </div>
             <div class="col-12 d-none" id="form-photo-section">
                 <label class="form-label">${i18nStrings.observations.photos_heading}</label>
+                ${(this.mode === 'add' || this.mode === 'edit') ? `
+                <div class="mb-2">
+                    <button type="button" class="btn btn-secondary btn-sm" id="form-photo-upload-btn" disabled>${i18nStrings.observations.photo_upload}</button>
+                    <input type="file" id="form-photo-upload-input" accept="image/*" multiple class="d-none">
+                </div>
+                ` : ''}
                 <div class="obs-photo-strip" id="form-photo-strip"></div>
             </div>
         `;
@@ -1255,6 +1261,8 @@ class ObservationForm {
             remarks: document.getElementById('form-remarks'),
             photoSection: document.getElementById('form-photo-section'),
             photoStrip: document.getElementById('form-photo-strip'),
+            photoUploadBtn: document.getElementById('form-photo-upload-btn'),
+            photoUploadInput: document.getElementById('form-photo-upload-input'),
             // Attribute checkboxes
             attrStar: document.getElementById('form-attr-star'),
             attrPhoto: document.getElementById('form-attr-photo'),
@@ -1274,6 +1282,7 @@ class ObservationForm {
             if (okBtn) {
                 okBtn.disabled = !allFilled;
             }
+            this.updatePhotoUploadButtonState();
         };
         
         // Delegate to class method
@@ -1296,6 +1305,7 @@ class ObservationForm {
         this.fields.kk.addEventListener('change', () => {
             manageFieldDependencies('kk');
             checkRequired();
+            this.updatePhotoUploadButtonState();
         });
         this.fields.g.addEventListener('change', () => {
             manageFieldDependencies('g');
@@ -1304,13 +1314,16 @@ class ObservationForm {
         this.fields.jj.addEventListener('change', () => {
             manageFieldDependencies('jj');
             checkRequired();
+            this.updatePhotoUploadButtonState();
         });
         this.fields.mm.addEventListener('change', () => {
             manageFieldDependencies('mm');
             checkRequired();
+            this.updatePhotoUploadButtonState();
         });
         this.fields.tt.addEventListener('change', () => {
             checkRequired();
+            this.updatePhotoUploadButtonState();
         });
         this.fields.ee.addEventListener('change', () => {
             manageFieldDependencies('ee');
@@ -1531,6 +1544,31 @@ class ObservationForm {
         
         // Initial check of required fields (important for pre-filled forms in add mode)
         checkRequired();
+        this.updatePhotoUploadButtonState();
+    }
+
+    hasPhotoUploadContext() {
+        const kk = parseInt(this.fields?.kk?.value, 10);
+        const jj = parseInt(this.fields?.jj?.value, 10);
+        const mm = parseInt(this.fields?.mm?.value, 10);
+        const tt = parseInt(this.fields?.tt?.value, 10);
+
+        return Number.isInteger(kk)
+            && Number.isInteger(jj)
+            && Number.isInteger(mm)
+            && Number.isInteger(tt)
+            && kk > 0
+            && jj >= YEAR_MIN
+            && mm >= 1 && mm <= 12
+            && tt >= 1 && tt <= 31;
+    }
+
+    updatePhotoUploadButtonState() {
+        const btn = this.fields?.photoUploadBtn;
+        if (!btn) {
+            return;
+        }
+        btn.disabled = !this.hasPhotoUploadContext();
     }
     
     /**
@@ -1664,6 +1702,7 @@ class ObservationForm {
             mm: parseInt(obs.MM, 10),
             tt: parseInt(obs.TT, 10)
         };
+        this.updatePhotoUploadButtonState();
         
         // Parse and set attributes from remarks
         if (obs.remarks) {

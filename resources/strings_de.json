@@ -304,6 +304,13 @@
     "photo_delete_title": "Foto löschen?",
     "photo_delete_message": "Soll dieses Foto gelöscht werden?",
     "photo_delete_error": "Foto konnte nicht gelöscht werden.",
+    "photo_upload": "Fotos hochladen",
+    "photo_upload_select_context": "Bitte zuerst Beobachter, Jahr, Monat und Tag setzen, bevor Fotos hochgeladen werden.",
+    "photo_upload_success": "Fotos wurden erfolgreich hochgeladen.",
+    "photo_upload_error": "Fotos konnten nicht hochgeladen werden.",
+    "photo_upload_too_many_files": "Zu viele Fotos ausgewählt.",
+    "photo_upload_invalid_file_type": "Mindestens eine ausgewählte Datei hat einen nicht unterstützten Dateityp.",
+    "photo_upload_file_too_large": "Mindestens eine ausgewählte Datei überschreitet die maximale Dateigröße.",
     "photo_alt": "Foto {index}",
     "detail_labels": {
       "observer": "Beobachter        : ",

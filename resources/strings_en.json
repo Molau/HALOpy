@@ -304,6 +304,13 @@
     "photo_delete_title": "Delete photo?",
     "photo_delete_message": "Shall this photo be deleted?",
     "photo_delete_error": "Photo could not be deleted.",
+    "photo_upload": "Upload Photos",
+    "photo_upload_select_context": "Please set observer, year, month, and day before uploading photos.",
+    "photo_upload_success": "Photos uploaded successfully.",
+    "photo_upload_error": "Photos could not be uploaded.",
+    "photo_upload_too_many_files": "Too many photos selected.",
+    "photo_upload_invalid_file_type": "One or more selected files have an unsupported file type.",
+    "photo_upload_file_too_large": "One or more selected files exceed the file size limit.",
     "photo_alt": "Photo {index}",
     "detail_labels": {
       "observer": "observer          : ",

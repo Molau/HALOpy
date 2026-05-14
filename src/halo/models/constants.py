@@ -11,6 +11,13 @@ import sys
 # API Configuration
 DEFAULT_OBSERVATION_LIMIT = 200000  # Default maximum observations returned by API
 
+# Observation photo constraints (cloud mode, S3)
+PHOTO_ALLOWED_EXTENSIONS = (
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'
+)
+PHOTO_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file
+PHOTO_MAX_FILES_PER_OBSERVATION = 10
+
 # Password policy (single source of truth for backend + frontend)
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_REQUIRE_CATEGORIES = 3  # At least 3 of 4 categories required

@@ -17,7 +17,12 @@ from flask import jsonify, request, current_app, session, Response
 
 from halo.api import api_blueprint
 from halo.config import is_cloud_mode
-from halo.models.constants import DEFAULT_OBSERVATION_LIMIT
+from halo.models.constants import (
+    DEFAULT_OBSERVATION_LIMIT,
+    PHOTO_ALLOWED_EXTENSIONS,
+    PHOTO_MAX_FILE_SIZE_BYTES,
+    PHOTO_MAX_FILES_PER_OBSERVATION,
+)
 import halo.io.observations as obs_logic
 import halo.io.observations_file as obs_file
 import halo.io.observations_db as obs_db
@@ -25,7 +30,6 @@ from ._helpers import _check_cloud_write_auth, _int, _obs_to_json, _spaeter
 
 
 PHOTO_BUCKET_NAME = os.getenv('HALOPY_PHOTO_BUCKET', 'halophotos')
-PHOTO_ALLOWED_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff')
 
 
 def _get_s3_client():
@@ -816,5 +820,92 @@ def get_observation_photo_file() -> Response:
         content = obj['Body'].read()
         content_type = obj.get('ContentType') or mimetypes.guess_type(key)[0] or 'application/octet-stream'
         return Response(content, mimetype=content_type)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observations/photos/add', methods=['POST'])
+def add_observation_photos() -> Dict[str, Any]:
+    """Upload one or more observation photos to S3 (cloud mode only)."""
+    if not is_cloud_mode():
+        return jsonify({'error': 'cloud_mode_only'}), 403
+
+    kk = _int(request.form, 'kk', -1)
+    jj = _int(request.form, 'jj', -1)
+    mm = _int(request.form, 'mm', -1)
+    tt = _int(request.form, 'tt', -1)
+
+    if kk < 0 or jj < 0 or mm < 0 or tt < 0:
+        return jsonify({'error': 'missing_parameters'}), 400
+
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
+
+    files = request.files.getlist('photos')
+    files = [f for f in files if f and f.filename]
+    if not files:
+        return jsonify({'error': 'missing_files'}), 400
+
+    if len(files) > PHOTO_MAX_FILES_PER_OBSERVATION:
+        return jsonify({'error': 'too_many_files'}), 400
+
+    prefix = _observation_photo_prefix(jj, mm, tt, kk)
+
+    try:
+        s3 = _get_s3_client()
+
+        # Count existing original photos (exclude generated thumbnails)
+        existing_response = s3.list_objects_v2(Bucket=PHOTO_BUCKET_NAME, Prefix=prefix)
+        existing_contents = existing_response.get('Contents', [])
+        existing_original_count = sum(
+            1
+            for item in existing_contents
+            if item.get('Key', '').lower().endswith(PHOTO_ALLOWED_EXTENSIONS)
+            and not _is_thumbnail_key(item.get('Key', ''))
+        )
+
+        if existing_original_count + len(files) > PHOTO_MAX_FILES_PER_OBSERVATION:
+            return jsonify({'error': 'too_many_files'}), 400
+
+        uploaded = []
+        for file_storage in files:
+            original_name = file_storage.filename or ''
+            ext = os.path.splitext(original_name)[1].lower()
+            if ext not in PHOTO_ALLOWED_EXTENSIONS:
+                return jsonify({'error': 'invalid_file_type', 'filename': original_name}), 400
+
+            file_bytes = file_storage.read()
+            if len(file_bytes) > PHOTO_MAX_FILE_SIZE_BYTES:
+                return jsonify({'error': 'file_too_large', 'filename': original_name}), 400
+
+            # Keep user-provided filename but sanitize path separators.
+            safe_name = os.path.basename(original_name).replace('\\', '_').replace('/', '_')
+            object_key = f"{prefix}/{safe_name}"
+            content_type = file_storage.mimetype or mimetypes.guess_type(safe_name)[0] or 'application/octet-stream'
+
+            s3.put_object(
+                Bucket=PHOTO_BUCKET_NAME,
+                Key=object_key,
+                Body=file_bytes,
+                ContentType=content_type,
+            )
+
+            # Try to pre-generate thumbnail immediately for faster gallery load.
+            try:
+                thumb_key = _thumbnail_key_for_photo(object_key)
+                thumb_bytes, thumb_content_type = _generate_thumbnail_bytes(file_bytes, object_key)
+                s3.put_object(
+                    Bucket=PHOTO_BUCKET_NAME,
+                    Key=thumb_key,
+                    Body=thumb_bytes,
+                    ContentType=thumb_content_type,
+                )
+            except Exception:
+                current_app.logger.exception("Thumbnail pre-generation failed for uploaded key=%s", object_key)
+
+            uploaded.append({'key': object_key, 'name': safe_name})
+
+        return jsonify({'success': True, 'uploaded': uploaded, 'count': len(uploaded)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

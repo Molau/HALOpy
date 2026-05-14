@@ -35,7 +35,10 @@ def get_constants():
         ALL_PILLAR_HEIGHT_VALUES,
         PASSWORD_MIN_LENGTH,
         PASSWORD_REQUIRE_CATEGORIES,
-        VALID_HALO_TYPES
+        VALID_HALO_TYPES,
+        PHOTO_ALLOWED_EXTENSIONS,
+        PHOTO_MAX_FILE_SIZE_BYTES,
+        PHOTO_MAX_FILES_PER_OBSERVATION,
     )
     
     return jsonify({
@@ -51,7 +54,12 @@ def get_constants():
         'password_policy': {
             'min_length': PASSWORD_MIN_LENGTH,
             'require_categories': PASSWORD_REQUIRE_CATEGORIES
-        }
+        },
+        'photo_upload': {
+            'allowed_extensions': list(PHOTO_ALLOWED_EXTENSIONS),
+            'max_file_size_bytes': PHOTO_MAX_FILE_SIZE_BYTES,
+            'max_files_per_observation': PHOTO_MAX_FILES_PER_OBSERVATION,
+        },
     })
 
 
