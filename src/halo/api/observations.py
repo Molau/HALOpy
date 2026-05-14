@@ -7,10 +7,12 @@ Copyright (c) 1992-2026 Sirko Molau
 Licensed under MIT License - see LICENSE file for details.
 """
 
+import mimetypes
 import os
+from urllib.parse import quote
 from typing import Dict, Any
 
-from flask import jsonify, request, current_app, session
+from flask import jsonify, request, current_app, session, Response
 
 from halo.api import api_blueprint
 from halo.config import is_cloud_mode
@@ -22,7 +24,6 @@ from ._helpers import _check_cloud_write_auth, _int, _obs_to_json, _spaeter
 
 
 PHOTO_BUCKET_NAME = os.getenv('HALOPY_PHOTO_BUCKET', 'halophotos')
-PHOTO_URL_EXPIRES_SECONDS = int(os.getenv('HALOPY_PHOTO_URL_EXPIRES_SECONDS', '3600'))
 PHOTO_ALLOWED_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff')
 
 
@@ -36,6 +37,20 @@ def _get_s3_client():
 def _observation_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> str:
     """Return object key prefix for an observation photo folder."""
     return f"{jj:04d}/{mm:02d}/{tt:02d}/kk{kk:02d}"
+
+
+def _extract_kk_from_photo_key(key: str):
+    """Extract KK from key path .../kkXX/...; return None if not parseable."""
+    parts = key.split('/')
+    if len(parts) < 4:
+        return None
+    kk_part = parts[3].lower()
+    if not kk_part.startswith('kk') or len(kk_part) < 4:
+        return None
+    try:
+        return int(kk_part[2:4])
+    except ValueError:
+        return None
 
 
 def _check_cloud_photo_read_auth(kk: int):
@@ -627,11 +642,7 @@ def list_observation_photos() -> Dict[str, Any]:
             if not key.lower().endswith(PHOTO_ALLOWED_EXTENSIONS):
                 continue
 
-            url = s3.generate_presigned_url(
-                ClientMethod='get_object',
-                Params={'Bucket': PHOTO_BUCKET_NAME, 'Key': key},
-                ExpiresIn=PHOTO_URL_EXPIRES_SECONDS,
-            )
+            url = f"/api/observations/photos/file?key={quote(key, safe='')}"
             photos.append({
                 'key': key,
                 'name': key.split('/')[-1],
@@ -672,5 +683,33 @@ def delete_observation_photo() -> Dict[str, Any]:
         s3 = _get_s3_client()
         s3.delete_object(Bucket=PHOTO_BUCKET_NAME, Key=key)
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observations/photos/file', methods=['GET'])
+def get_observation_photo_file() -> Response:
+    """Proxy a single observation photo from S3 to the browser (cloud mode only)."""
+    if not is_cloud_mode():
+        return jsonify({'error': 'cloud_mode_only'}), 403
+
+    key = request.args.get('key', '')
+    if not key or key.endswith('/'):
+        return jsonify({'error': 'missing_parameters'}), 400
+
+    kk = _extract_kk_from_photo_key(key)
+    if kk is None:
+        return jsonify({'error': 'invalid_photo_key'}), 400
+
+    auth_error = _check_cloud_photo_read_auth(kk)
+    if auth_error:
+        return auth_error
+
+    try:
+        s3 = _get_s3_client()
+        obj = s3.get_object(Bucket=PHOTO_BUCKET_NAME, Key=key)
+        content = obj['Body'].read()
+        content_type = obj.get('ContentType') or mimetypes.guess_type(key)[0] or 'application/octet-stream'
+        return Response(content, mimetype=content_type)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

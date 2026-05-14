@@ -1777,7 +1777,8 @@ class ObservationForm {
                         <div class="modal-footer py-1">
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-prev">${i18nStrings.common.previous}</button>
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-next">${i18nStrings.common.next}</button>
-                            <button type="button" class="btn btn-danger btn-sm px-3" id="${modalId}-delete">${i18nStrings.observations.photo_delete}</button>
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-download">${i18nStrings.common.download}</button>
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-delete">${i18nStrings.observations.photo_delete}</button>
                             <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
                         </div>
                     </div>
@@ -1791,6 +1792,7 @@ class ObservationForm {
         const imgEl = document.getElementById(`${modalId}-img`);
         const prevBtn = document.getElementById(`${modalId}-prev`);
         const nextBtn = document.getElementById(`${modalId}-next`);
+        const downloadBtn = document.getElementById(`${modalId}-download`);
         const deleteBtn = document.getElementById(`${modalId}-delete`);
         const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
 
@@ -1827,6 +1829,21 @@ class ObservationForm {
                 currentIndex += 1;
                 renderViewer();
             }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const current = this.photoItems[currentIndex];
+            if (!current || !current.url) {
+                return;
+            }
+
+            const a = document.createElement('a');
+            a.href = current.url;
+            a.download = current.name || 'photo';
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
         });
 
         deleteBtn.addEventListener('click', () => {
