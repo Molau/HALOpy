@@ -670,6 +670,8 @@ def list_observation_photos() -> Dict[str, Any]:
     if not is_cloud_mode():
         return jsonify({'error': 'cloud_mode_only'}), 403
 
+    debug_mode = str(request.args.get('debug', '0')).lower() in ('1', 'true', 'yes')
+
     kk = _int(request.args, 'kk', -1)
     jj = _int(request.args, 'jj', -1)
     mm = _int(request.args, 'mm', -1)
@@ -703,8 +705,11 @@ def list_observation_photos() -> Dict[str, Any]:
         ]
 
         photos = []
+        thumbnail_debug = []
         for key in sorted(original_keys, key=lambda p: p.split('/')[-1].lower()):
             thumb_key = _thumbnail_key_for_photo(key)
+            thumb_status = 'existing'
+            thumb_error = None
             if thumb_key not in object_keys:
                 try:
                     source_obj = s3.get_object(Bucket=PHOTO_BUCKET_NAME, Key=key)
@@ -717,8 +722,24 @@ def list_observation_photos() -> Dict[str, Any]:
                         ContentType=thumb_content_type,
                     )
                     object_keys.add(thumb_key)
-                except Exception:
+                    thumb_status = 'created'
+                except Exception as e:
+                    thumb_status = 'fallback_original'
+                    thumb_error = f"{type(e).__name__}: {str(e)}"
+                    current_app.logger.exception(
+                        "Thumbnail generation/upload failed for key=%s thumb_key=%s",
+                        key,
+                        thumb_key,
+                    )
                     thumb_key = key
+
+            if debug_mode:
+                thumbnail_debug.append({
+                    'key': key,
+                    'thumb_key': thumb_key,
+                    'status': thumb_status,
+                    'error': thumb_error,
+                })
 
             thumb_url = f"/api/observations/photos/file?key={quote(thumb_key, safe='')}"
             full_url = f"/api/observations/photos/file?key={quote(key, safe='')}"
@@ -731,7 +752,10 @@ def list_observation_photos() -> Dict[str, Any]:
             })
 
         photos.sort(key=lambda p: p['name'].lower())
-        return jsonify({'photos': photos})
+        result = {'photos': photos}
+        if debug_mode:
+            result['thumbnail_debug'] = thumbnail_debug
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
