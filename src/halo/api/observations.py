@@ -22,6 +22,7 @@ from halo.models.constants import (
     PHOTO_ALLOWED_EXTENSIONS,
     PHOTO_MAX_FILE_SIZE_BYTES,
     PHOTO_MAX_FILES_PER_OBSERVATION,
+    jj_to_full_year,
 )
 import halo.io.observations as obs_logic
 import halo.io.observations_file as obs_file
@@ -125,6 +126,114 @@ def _check_cloud_photo_read_auth(kk: int):
         return jsonify({'error': 'forbidden'}), 403
 
     return None
+
+
+def _normalized_year(value: Any) -> int:
+    """Normalize year value to 4-digit format for day-level comparisons."""
+    try:
+        return jj_to_full_year(int(value))
+    except (TypeError, ValueError):
+        return -1
+
+
+def _day_values_from_obs(obs: Dict[str, Any]):
+    """Extract (kk, jj_full, mm, tt) from an observation-like dict."""
+    try:
+        kk = int(obs.get('KK'))
+        jj = _normalized_year(obs.get('JJ'))
+        mm = int(obs.get('MM'))
+        tt = int(obs.get('TT'))
+    except (TypeError, ValueError):
+        return None
+
+    if kk < 0 or jj < 0 or mm < 1 or mm > 12 or tt < 1 or tt > 31:
+        return None
+
+    return kk, jj, mm, tt
+
+
+def _same_observation_day(obs: Dict[str, Any], kk: int, jj: int, mm: int, tt: int) -> bool:
+    """Return True when observation is for the same observer/day."""
+    day = _day_values_from_obs(obs)
+    if not day:
+        return False
+    return day == (kk, jj, mm, tt)
+
+
+def _delete_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> int:
+    """Delete all photo objects under YYYY/MM/DD/kkXX and return deleted count."""
+    s3 = _get_s3_client()
+    prefix = _observation_photo_prefix(jj, mm, tt, kk)
+    continuation_token = None
+    deleted_count = 0
+
+    while True:
+        kwargs = {'Bucket': PHOTO_BUCKET_NAME, 'Prefix': prefix}
+        if continuation_token:
+            kwargs['ContinuationToken'] = continuation_token
+
+        response = s3.list_objects_v2(**kwargs)
+        keys = [item.get('Key') for item in response.get('Contents', []) if item.get('Key')]
+
+        for i in range(0, len(keys), 1000):
+            batch = keys[i:i + 1000]
+            if not batch:
+                continue
+            s3.delete_objects(
+                Bucket=PHOTO_BUCKET_NAME,
+                Delete={'Objects': [{'Key': key} for key in batch]},
+            )
+            deleted_count += len(batch)
+
+        if not response.get('IsTruncated'):
+            break
+        continuation_token = response.get('NextContinuationToken')
+
+    return deleted_count
+
+
+def _delete_photo_policy(data: Dict[str, Any]):
+    """Return delete policy for photos when deleting one observation."""
+    day_values = _day_values_from_obs(data)
+    if not day_values:
+        return {'target_exists': False, 'remaining_same_day': 0, 'force_delete_photos': False}
+
+    kk, jj_full, mm, tt = day_values
+
+    if is_cloud_mode():
+        day_observations = obs_db.load_filtered(kk=kk, jj=jj_full, mm=mm, tt=tt)
+    else:
+        day_observations = [
+            obs for obs in (current_app.config.get('OBSERVATIONS') or [])
+            if _same_observation_day(obs, kk, jj_full, mm, tt)
+        ]
+
+    target_key = obs_logic.make_observation_key(data)
+    target_exists = any(obs_logic.make_observation_key(obs) == target_key for obs in day_observations)
+    remaining_same_day = max(len(day_observations) - (1 if target_exists else 0), 0)
+
+    return {
+        'target_exists': target_exists,
+        'remaining_same_day': remaining_same_day,
+        'force_delete_photos': target_exists and remaining_same_day == 0,
+    }
+
+
+@api_blueprint.route('/observations/delete/photo-policy', methods=['POST'])
+def get_delete_photo_policy() -> Dict[str, Any]:
+    """Return whether photo deletion must be forced for this observation delete."""
+    data = request.get_json() or {}
+
+    # Cloud Mode: Authorization check - only own KK or admin
+    auth_error = _check_cloud_write_auth(data.get('KK'))
+    if auth_error:
+        return auth_error
+
+    try:
+        policy = _delete_photo_policy(data)
+        return jsonify(policy)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 
 @api_blueprint.route('/observations', methods=['GET'])
@@ -371,6 +480,11 @@ def delete_observation() -> Dict[str, Any]:
         return auth_error
 
     try:
+        delete_photos_requested = bool(data.get('delete_photos', False))
+        policy = _delete_photo_policy(data)
+        delete_photos = delete_photos_requested or policy.get('force_delete_photos', False)
+        photo_delete_count = 0
+
         if is_cloud_mode():
             # Cloud Mode: Delete from database (Layer 3b)
             # Convert 4-digit JJ to 2-digit for DB matching
@@ -382,13 +496,22 @@ def delete_observation() -> Dict[str, Any]:
                 data.get('ZS'), data.get('ZM'), data.get('EE')
             )
             success = obs_db.delete_one(key)
+
+            if success and delete_photos:
+                day_values = _day_values_from_obs(data)
+                if day_values:
+                    kk, jj_full, mm, tt = day_values
+                    photo_delete_count = _delete_photo_prefix(jj_full, mm, tt, kk)
             
             # Get count directly from database (no caching)
             count = obs_db.count()
             return jsonify({
                 'success': True,
                 'deleted': success,
-                'count': count
+                'count': count,
+                'photos_deleted': photo_delete_count,
+                'delete_photos': bool(success and delete_photos),
+                'force_delete_photos': bool(policy.get('force_delete_photos', False)),
             })
         else:
             # Local Mode: Delete from in-memory list
@@ -406,9 +529,23 @@ def delete_observation() -> Dict[str, Any]:
                 observations.pop(original_obs)
                 current_app.config['OBSERVATIONS'] = observations
                 current_app.config['DIRTY'] = True
-                return jsonify({'success': True, 'deleted': True, 'count': len(observations)})
+                return jsonify({
+                    'success': True,
+                    'deleted': True,
+                    'count': len(observations),
+                    'photos_deleted': 0,
+                    'delete_photos': False,
+                    'force_delete_photos': bool(policy.get('force_delete_photos', False)),
+                })
             else:
-                return jsonify({'success': False, 'deleted': False, 'count': len(observations)})
+                return jsonify({
+                    'success': False,
+                    'deleted': False,
+                    'count': len(observations),
+                    'photos_deleted': 0,
+                    'delete_photos': False,
+                    'force_delete_photos': bool(policy.get('force_delete_photos', False)),
+                })
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 

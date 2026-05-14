@@ -1733,24 +1733,38 @@ class ObservationForm {
             return;
         }
 
-        this.fields.photoStrip.innerHTML = this.photoItems.map((photo, index) => {
-            const altTemplate = i18nStrings.observations.photo_alt;
-            const alt = altTemplate.replace('{index}', String(index + 1));
-            return `
-                <button type="button" class="obs-photo-thumb-btn" data-photo-index="${index}" aria-label="${escapeHtml(alt)}">
-                    <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(alt)}" class="obs-photo-thumb-img">
-                </button>
-            `;
-        }).join('');
+        if (this.mode === 'delete') {
+            this.fields.photoStrip.innerHTML = this.photoItems.map((photo, index) => {
+                const altTemplate = i18nStrings.observations.photo_alt;
+                const alt = altTemplate.replace('{index}', String(index + 1));
+                return `
+                    <span class="obs-photo-thumb-btn" aria-label="${escapeHtml(alt)}">
+                        <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(alt)}" class="obs-photo-thumb-img">
+                    </span>
+                `;
+            }).join('');
+        } else {
+            this.fields.photoStrip.innerHTML = this.photoItems.map((photo, index) => {
+                const altTemplate = i18nStrings.observations.photo_alt;
+                const alt = altTemplate.replace('{index}', String(index + 1));
+                return `
+                    <button type="button" class="obs-photo-thumb-btn" data-photo-index="${index}" aria-label="${escapeHtml(alt)}">
+                        <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(alt)}" class="obs-photo-thumb-img">
+                    </button>
+                `;
+            }).join('');
+        }
 
         this.fields.photoSection.classList.remove('d-none');
 
-        this.fields.photoStrip.querySelectorAll('.obs-photo-thumb-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.getAttribute('data-photo-index') || '0', 10);
-                this.openPhotoViewer(idx);
+        if (this.mode !== 'delete') {
+            this.fields.photoStrip.querySelectorAll('.obs-photo-thumb-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.getAttribute('data-photo-index') || '0', 10);
+                    this.openPhotoViewer(idx);
+                });
             });
-        });
+        }
     }
 
     async loadObservationPhotos(observation) {
@@ -1817,7 +1831,7 @@ class ObservationForm {
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-prev">${i18nStrings.common.previous}</button>
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-next">${i18nStrings.common.next}</button>
                             <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-download">${i18nStrings.common.download}</button>
-                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-delete">${i18nStrings.observations.photo_delete}</button>
+                            ${this.mode !== 'view' ? `<button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-delete">${i18nStrings.observations.photo_delete}</button>` : ''}
                             <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
                         </div>
                     </div>
@@ -1886,52 +1900,54 @@ class ObservationForm {
             a.remove();
         });
 
-        deleteBtn.addEventListener('click', () => {
-            showConfirmDialog(
-                i18nStrings.observations.photo_delete_title,
-                i18nStrings.observations.photo_delete_message,
-                async () => {
-                    try {
-                        const current = this.photoItems[currentIndex];
-                        if (!current || !this.photoContext) {
-                            return;
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                showConfirmDialog(
+                    i18nStrings.observations.photo_delete_title,
+                    i18nStrings.observations.photo_delete_message,
+                    async () => {
+                        try {
+                            const current = this.photoItems[currentIndex];
+                            if (!current || !this.photoContext) {
+                                return;
+                            }
+
+                            const response = await fetch('/api/observations/photos/delete', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    key: current.key,
+                                    kk: this.photoContext.kk,
+                                    jj: this.photoContext.jj,
+                                    mm: this.photoContext.mm,
+                                    tt: this.photoContext.tt
+                                })
+                            });
+
+                            if (!response.ok) {
+                                throw new Error('photo_delete_failed');
+                            }
+
+                            this.photoItems.splice(currentIndex, 1);
+                            if (this.photoItems.length === 0) {
+                                this.clearPhotoGallery();
+                                modal.hide();
+                                return;
+                            }
+
+                            if (currentIndex >= this.photoItems.length) {
+                                currentIndex = this.photoItems.length - 1;
+                            }
+
+                            this.renderPhotoGallery();
+                            renderViewer();
+                        } catch (error) {
+                            showErrorDialog(i18nStrings.observations.photo_delete_error);
                         }
-
-                        const response = await fetch('/api/observations/photos/delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                key: current.key,
-                                kk: this.photoContext.kk,
-                                jj: this.photoContext.jj,
-                                mm: this.photoContext.mm,
-                                tt: this.photoContext.tt
-                            })
-                        });
-
-                        if (!response.ok) {
-                            throw new Error('photo_delete_failed');
-                        }
-
-                        this.photoItems.splice(currentIndex, 1);
-                        if (this.photoItems.length === 0) {
-                            this.clearPhotoGallery();
-                            modal.hide();
-                            return;
-                        }
-
-                        if (currentIndex >= this.photoItems.length) {
-                            currentIndex = this.photoItems.length - 1;
-                        }
-
-                        this.renderPhotoGallery();
-                        renderViewer();
-                    } catch (error) {
-                        showErrorDialog(i18nStrings.observations.photo_delete_error);
                     }
-                }
-            );
-        });
+                );
+            });
+        }
 
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.remove();
