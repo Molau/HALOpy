@@ -160,6 +160,47 @@ def _same_observation_day(obs: Dict[str, Any], kk: int, jj: int, mm: int, tt: in
     return day == (kk, jj, mm, tt)
 
 
+def _prefix_has_payload_objects(s3, prefix: str) -> bool:
+    """Return True if prefix contains objects other than optional folder markers."""
+    continuation_token = None
+    marker_keys = {prefix, f"{prefix}/"}
+
+    while True:
+        kwargs = {'Bucket': PHOTO_BUCKET_NAME, 'Prefix': prefix, 'MaxKeys': 1000}
+        if continuation_token:
+            kwargs['ContinuationToken'] = continuation_token
+
+        response = s3.list_objects_v2(**kwargs)
+        for item in response.get('Contents', []):
+            key = item.get('Key')
+            if key and key not in marker_keys:
+                return True
+
+        if not response.get('IsTruncated'):
+            return False
+        continuation_token = response.get('NextContinuationToken')
+
+
+def _delete_prefix_markers(s3, prefix: str):
+    """Delete folder marker keys for a prefix (idempotent)."""
+    s3.delete_objects(
+        Bucket=PHOTO_BUCKET_NAME,
+        Delete={'Objects': [{'Key': prefix}, {'Key': f"{prefix}/"}]},
+    )
+
+
+def _cleanup_empty_parent_prefixes(s3, jj: int, mm: int, tt: int):
+    """Remove empty day/month/year markers after kk-prefix deletion."""
+    day_prefix = f"{jj:04d}/{mm:02d}/{tt:02d}"
+    month_prefix = f"{jj:04d}/{mm:02d}"
+    year_prefix = f"{jj:04d}"
+
+    for prefix in [day_prefix, month_prefix, year_prefix]:
+        if _prefix_has_payload_objects(s3, prefix):
+            break
+        _delete_prefix_markers(s3, prefix)
+
+
 def _delete_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> int:
     """Delete all photo objects under YYYY/MM/DD/kkXX and return deleted count."""
     s3 = _get_s3_client()
@@ -188,6 +229,8 @@ def _delete_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> int:
         if not response.get('IsTruncated'):
             break
         continuation_token = response.get('NextContinuationToken')
+
+    _cleanup_empty_parent_prefixes(s3, jj, mm, tt)
 
     return deleted_count
 

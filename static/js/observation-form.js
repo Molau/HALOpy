@@ -21,6 +21,8 @@ class ObservationForm {
         this.photoItems = [];
         this.photoContext = null;
         this.photoRequestToken = 0;
+        this.pendingUploadedPhotos = [];
+        this.lastAutoPhotoContextKey = null;
         // Field constraints: Store current valid value ranges for dependent fields
         this.fieldConstraints = {
             d: [],      // Valid values for cirrus density
@@ -111,6 +113,8 @@ class ObservationForm {
         this.saved = false; // Reset for reuse
         this.skipped = false; // Reset for reuse
         this.destroyed = false; // Reset for reuse (may have been set by previous hidden.bs.modal)
+        this.pendingUploadedPhotos = [];
+        this.lastAutoPhotoContextKey = null;
         
         this.createModalHTML();
         this.setupEventListeners();
@@ -181,6 +185,8 @@ class ObservationForm {
                 this.manageFieldDependencies('mm');
                 // EE-Trigger: sets HO, HU, sectors
                 this.manageFieldDependencies('ee');
+                this.updatePhotoUploadButtonState();
+                this.updateAutoPhotoPreview();
             }, 0);
         }
         
@@ -1304,6 +1310,7 @@ class ObservationForm {
             manageFieldDependencies('kk');
             checkRequired();
             this.updatePhotoUploadButtonState();
+            this.updateAutoPhotoPreview();
         });
         this.fields.g.addEventListener('change', () => {
             manageFieldDependencies('g');
@@ -1313,15 +1320,18 @@ class ObservationForm {
             manageFieldDependencies('jj');
             checkRequired();
             this.updatePhotoUploadButtonState();
+            this.updateAutoPhotoPreview();
         });
         this.fields.mm.addEventListener('change', () => {
             manageFieldDependencies('mm');
             checkRequired();
             this.updatePhotoUploadButtonState();
+            this.updateAutoPhotoPreview();
         });
         this.fields.tt.addEventListener('change', () => {
             checkRequired();
             this.updatePhotoUploadButtonState();
+            this.updateAutoPhotoPreview();
         });
         this.fields.ee.addEventListener('change', () => {
             manageFieldDependencies('ee');
@@ -1515,6 +1525,8 @@ class ObservationForm {
                     if (this.onSave) {
                         await this.onSave(obs);
                     }
+
+                    this.pendingUploadedPhotos = [];
                     
                     // Sync haloData to sessionStorage after save
                     if (window.saveHaloDataToSession) {
@@ -1555,7 +1567,13 @@ class ObservationForm {
                         window.haloData.isDirty = false;
                         sessionStorage.setItem('haloData', JSON.stringify(window.haloData));
                     }
-                    window.navigateInternal('/');
+                    if (this.mode === 'add') {
+                        this.cleanupUnsavedUploadedPhotos().finally(() => {
+                            window.navigateInternal('/');
+                        });
+                    } else {
+                        window.navigateInternal('/');
+                    }
                 }
             }
             this.destroyed = true; // Mark as destroyed to prevent async operations
@@ -1622,16 +1640,89 @@ class ObservationForm {
         return i18nStrings.observations.photo_upload_error;
     }
 
+    getCurrentPhotoContext() {
+        if (!this.hasPhotoUploadContext()) {
+            return null;
+        }
+
+        return {
+            kk: parseInt(this.fields.kk.value, 10),
+            jj: parseInt(this.fields.jj.value, 10),
+            mm: parseInt(this.fields.mm.value, 10),
+            tt: parseInt(this.fields.tt.value, 10)
+        };
+    }
+
+    updateAutoPhotoPreview() {
+        if (this.mode !== 'add') {
+            return;
+        }
+
+        const context = this.getCurrentPhotoContext();
+        if (!context) {
+            this.lastAutoPhotoContextKey = null;
+            this.clearPhotoGallery();
+            return;
+        }
+
+        const contextKey = `${context.kk}-${context.jj}-${context.mm}-${context.tt}`;
+        if (contextKey === this.lastAutoPhotoContextKey) {
+            return;
+        }
+
+        this.lastAutoPhotoContextKey = contextKey;
+        this.loadObservationPhotos({
+            KK: context.kk,
+            JJ: context.jj,
+            MM: context.mm,
+            TT: context.tt
+        });
+    }
+
+    async cleanupUnsavedUploadedPhotos() {
+        if (this.mode !== 'add' || this.saved || this.pendingUploadedPhotos.length === 0) {
+            return;
+        }
+
+        const pending = [...this.pendingUploadedPhotos];
+        this.pendingUploadedPhotos = [];
+
+        for (const item of pending) {
+            try {
+                await fetch('/api/observations/photos/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        key: item.key,
+                        kk: item.kk,
+                        jj: item.jj,
+                        mm: item.mm,
+                        tt: item.tt
+                    }),
+                    keepalive: true
+                });
+            } catch (e) {
+                // Best effort cleanup on cancel.
+            }
+        }
+    }
+
     async uploadObservationPhotos(files) {
         if (!this.hasPhotoUploadContext()) {
             showErrorDialog(i18nStrings.observations.photo_upload_select_context);
             return;
         }
 
-        const kk = parseInt(this.fields.kk.value, 10);
-        const jj = parseInt(this.fields.jj.value, 10);
-        const mm = parseInt(this.fields.mm.value, 10);
-        const tt = parseInt(this.fields.tt.value, 10);
+        const context = this.getCurrentPhotoContext();
+        if (!context) {
+            showErrorDialog(i18nStrings.observations.photo_upload_select_context);
+            return;
+        }
+
+        const kk = context.kk;
+        const jj = context.jj;
+        const mm = context.mm;
+        const tt = context.tt;
 
         const formData = new FormData();
         formData.append('kk', String(kk));
@@ -1644,6 +1735,11 @@ class ObservationForm {
         if (uploadBtn) {
             uploadBtn.disabled = true;
         }
+
+        const spinner = showInfoModal(
+            i18nStrings.upload_download.upload_title,
+            i18nStrings.upload_download.upload_progress
+        );
 
         try {
             const response = await fetch('/api/observations/photos/add', {
@@ -1662,11 +1758,31 @@ class ObservationForm {
                 return;
             }
 
+            const uploaded = Array.isArray(payload?.uploaded) ? payload.uploaded : [];
+            if (this.mode === 'add' && uploaded.length > 0) {
+                uploaded.forEach(item => {
+                    if (!item?.key) {
+                        return;
+                    }
+                    this.pendingUploadedPhotos.push({
+                        key: item.key,
+                        kk,
+                        jj,
+                        mm,
+                        tt
+                    });
+                });
+            }
+
             showNotification(i18nStrings.observations.photo_upload_success);
             await this.loadObservationPhotos({ KK: kk, JJ: jj, MM: mm, TT: tt });
         } catch (e) {
             showErrorDialog(i18nStrings.observations.photo_upload_error);
         } finally {
+            if (spinner?.modal) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl.remove(), 300);
+            }
             this.updatePhotoUploadButtonState();
         }
     }
