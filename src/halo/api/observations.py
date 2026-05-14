@@ -7,6 +7,7 @@ Copyright (c) 1992-2026 Sirko Molau
 Licensed under MIT License - see LICENSE file for details.
 """
 
+import os
 from typing import Dict, Any
 
 from flask import jsonify, request, current_app, session
@@ -18,6 +19,38 @@ import halo.io.observations as obs_logic
 import halo.io.observations_file as obs_file
 import halo.io.observations_db as obs_db
 from ._helpers import _check_cloud_write_auth, _int, _obs_to_json, _spaeter
+
+
+PHOTO_BUCKET_NAME = os.getenv('HALOPY_PHOTO_BUCKET', 'halophotos')
+PHOTO_URL_EXPIRES_SECONDS = int(os.getenv('HALOPY_PHOTO_URL_EXPIRES_SECONDS', '3600'))
+PHOTO_ALLOWED_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff')
+
+
+def _get_s3_client():
+    """Create an S3 client using the active AWS credentials (EC2 role in cloud mode)."""
+    # Inline import keeps local installations without boto3 working.
+    import boto3  # type: ignore
+    return boto3.client('s3')
+
+
+def _observation_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> str:
+    """Return object key prefix for an observation photo folder."""
+    return f"{jj:04d}/{mm:02d}/{tt:02d}/{kk:02d}"
+
+
+def _check_cloud_photo_read_auth(kk: int):
+    """Restrict cloud-mode photo access to own observer (unless admin)."""
+    if not is_cloud_mode():
+        return None
+
+    fixed_observer = session.get('observer_kk')
+    if fixed_observer is None:
+        return None
+
+    if str(kk).zfill(2) != str(fixed_observer).zfill(2):
+        return jsonify({'error': 'forbidden'}), 403
+
+    return None
 
 
 @api_blueprint.route('/observations', methods=['GET'])
@@ -557,5 +590,87 @@ def filter_observations() -> Dict[str, Any]:
             'deleted_count': deleted_count
         })
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observations/photos', methods=['GET'])
+def list_observation_photos() -> Dict[str, Any]:
+    """List observation photos from S3 for a single day and observer."""
+    if not is_cloud_mode():
+        return jsonify({'error': 'cloud_mode_only'}), 403
+
+    kk = _int(request.args, 'kk', -1)
+    jj = _int(request.args, 'jj', -1)
+    mm = _int(request.args, 'mm', -1)
+    tt = _int(request.args, 'tt', -1)
+
+    if kk < 0 or jj < 0 or mm < 0 or tt < 0:
+        return jsonify({'error': 'missing_parameters'}), 400
+
+    auth_error = _check_cloud_photo_read_auth(kk)
+    if auth_error:
+        return auth_error
+
+    try:
+        s3 = _get_s3_client()
+        prefix = _observation_photo_prefix(jj, mm, tt, kk)
+
+        response = s3.list_objects_v2(Bucket=PHOTO_BUCKET_NAME, Prefix=prefix)
+        contents = response.get('Contents', [])
+
+        photos = []
+        for item in contents:
+            key = item.get('Key', '')
+            if not key or key.endswith('/'):
+                continue
+            if not key.lower().endswith(PHOTO_ALLOWED_EXTENSIONS):
+                continue
+
+            url = s3.generate_presigned_url(
+                ClientMethod='get_object',
+                Params={'Bucket': PHOTO_BUCKET_NAME, 'Key': key},
+                ExpiresIn=PHOTO_URL_EXPIRES_SECONDS,
+            )
+            photos.append({
+                'key': key,
+                'name': key.split('/')[-1],
+                'url': url,
+            })
+
+        photos.sort(key=lambda p: p['name'].lower())
+        return jsonify({'photos': photos})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observations/photos/delete', methods=['POST'])
+def delete_observation_photo() -> Dict[str, Any]:
+    """Delete one observation photo from S3."""
+    if not is_cloud_mode():
+        return jsonify({'error': 'cloud_mode_only'}), 403
+
+    data = request.get_json() or {}
+    key = data.get('key', '')
+    kk = _int(data, 'kk', -1)
+    jj = _int(data, 'jj', -1)
+    mm = _int(data, 'mm', -1)
+    tt = _int(data, 'tt', -1)
+
+    if not key or kk < 0 or jj < 0 or mm < 0 or tt < 0:
+        return jsonify({'error': 'missing_parameters'}), 400
+
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
+
+    required_prefix = _observation_photo_prefix(jj, mm, tt, kk)
+    if not key.startswith(required_prefix):
+        return jsonify({'error': 'invalid_photo_key'}), 400
+
+    try:
+        s3 = _get_s3_client()
+        s3.delete_object(Bucket=PHOTO_BUCKET_NAME, Key=key)
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

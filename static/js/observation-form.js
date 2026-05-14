@@ -18,6 +18,9 @@ class ObservationForm {
         this.skipped = false;
         this.destroyed = false; // Track if form has been destroyed
         this.prefillObservation = null; // Optional: pre-fill fields from a previous observation (add mode)
+        this.photoItems = [];
+        this.photoContext = null;
+        this.photoRequestToken = 0;
         // Field constraints: Store current valid value ranges for dependent fields
         this.fieldConstraints = {
             d: [],      // Valid values for cirrus density
@@ -114,6 +117,7 @@ class ObservationForm {
         
         if ((mode === 'edit' || mode === 'delete' || mode === 'view') && observation) {
             this.populateFields(observation);
+            this.loadObservationPhotos(observation);
             // In edit/delete/view mode: Don't apply dependencies - just display the existing values
             setTimeout(() => {
                 // ONLY disable all fields in edit/delete/view mode - user must click "Yes" to edit
@@ -231,6 +235,7 @@ class ObservationForm {
         }
 
         this.populateFields(observation);
+        this.loadObservationPhotos(observation);
         this.disableAllFields();
 
         const errEl = document.getElementById('obs-form-error');
@@ -603,6 +608,10 @@ class ObservationForm {
             <div class="col-12">
                 <label class="form-label">${i18nStrings.fields.remarks}</label>
                 <input type="text" class="form-control form-control-sm" id="form-remarks" maxlength="60">
+            </div>
+            <div class="col-12 d-none" id="form-photo-section">
+                <label class="form-label">${i18nStrings.observations.photos_heading}</label>
+                <div class="obs-photo-strip" id="form-photo-strip"></div>
             </div>
         `;
     }
@@ -1244,6 +1253,8 @@ class ObservationForm {
             hu: document.getElementById('form-hu'),
             sectors: document.getElementById('form-sectors'),
             remarks: document.getElementById('form-remarks'),
+            photoSection: document.getElementById('form-photo-section'),
+            photoStrip: document.getElementById('form-photo-strip'),
             // Attribute checkboxes
             attrStar: document.getElementById('form-attr-star'),
             attrPhoto: document.getElementById('form-attr-photo'),
@@ -1647,6 +1658,12 @@ class ObservationForm {
         this.fields.hu.value = obs.HU !== -1 && obs.HU !== 0 && obs.HU !== null ? obs.HU : (obs.HU === 0 ? '0' : '-1');
         this.fields.sectors.value = obs.sectors || '';
         this.fields.remarks.value = obs.remarks || '';
+        this.photoContext = {
+            kk: parseInt(obs.KK, 10),
+            jj: parseInt(obs.JJ, 10),
+            mm: parseInt(obs.MM, 10),
+            tt: parseInt(obs.TT, 10)
+        };
         
         // Parse and set attributes from remarks
         if (obs.remarks) {
@@ -1655,6 +1672,217 @@ class ObservationForm {
         
         // Field values are populated from observation
         // Constraints/dependencies are applied by manageFieldDependencies() after this method returns
+    }
+
+    clearPhotoGallery() {
+        this.photoItems = [];
+        if (this.fields.photoStrip) {
+            this.fields.photoStrip.innerHTML = '';
+        }
+        if (this.fields.photoSection) {
+            this.fields.photoSection.classList.add('d-none');
+        }
+    }
+
+    renderPhotoGallery() {
+        if (!this.fields.photoSection || !this.fields.photoStrip) {
+            return;
+        }
+
+        if (!Array.isArray(this.photoItems) || this.photoItems.length === 0) {
+            this.clearPhotoGallery();
+            return;
+        }
+
+        this.fields.photoStrip.innerHTML = this.photoItems.map((photo, index) => {
+            const altTemplate = i18nStrings.observations.photo_alt;
+            const alt = altTemplate.replace('{index}', String(index + 1));
+            return `
+                <button type="button" class="obs-photo-thumb-btn" data-photo-index="${index}" aria-label="${escapeHtml(alt)}">
+                    <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(alt)}" class="obs-photo-thumb-img">
+                </button>
+            `;
+        }).join('');
+
+        this.fields.photoSection.classList.remove('d-none');
+
+        this.fields.photoStrip.querySelectorAll('.obs-photo-thumb-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.getAttribute('data-photo-index') || '0', 10);
+                this.openPhotoViewer(idx);
+            });
+        });
+    }
+
+    async loadObservationPhotos(observation) {
+        const kk = parseInt(observation?.KK, 10);
+        const jj = parseInt(observation?.JJ, 10);
+        const mm = parseInt(observation?.MM, 10);
+        const tt = parseInt(observation?.TT, 10);
+
+        if (!Number.isInteger(kk) || !Number.isInteger(jj) || !Number.isInteger(mm) || !Number.isInteger(tt)) {
+            this.clearPhotoGallery();
+            return;
+        }
+
+        this.photoContext = { kk, jj, mm, tt };
+        const requestToken = ++this.photoRequestToken;
+
+        try {
+            const params = new URLSearchParams({
+                kk: String(kk),
+                jj: String(jj),
+                mm: String(mm),
+                tt: String(tt)
+            });
+
+            const response = await fetch(`/api/observations/photos?${params.toString()}`);
+            if (!response.ok) {
+                throw new Error('photo_list_failed');
+            }
+
+            const data = await response.json();
+            if (this.destroyed || requestToken !== this.photoRequestToken) {
+                return;
+            }
+
+            this.photoItems = Array.isArray(data.photos) ? data.photos : [];
+            this.renderPhotoGallery();
+        } catch (error) {
+            if (!this.destroyed && requestToken === this.photoRequestToken) {
+                this.clearPhotoGallery();
+            }
+        }
+    }
+
+    openPhotoViewer(startIndex = 0) {
+        if (!Array.isArray(this.photoItems) || this.photoItems.length === 0) {
+            return;
+        }
+
+        const safeStart = Math.max(0, Math.min(startIndex, this.photoItems.length - 1));
+        const modalId = `observation-photo-modal-${Date.now()}`;
+
+        const modalHtml = `
+            <div class="modal fade" id="${modalId}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header py-1">
+                            <h6 class="modal-title" id="${modalId}-title"></h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body py-2 text-center">
+                            <img id="${modalId}-img" class="obs-photo-viewer-img" src="" alt="">
+                        </div>
+                        <div class="modal-footer py-1">
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-prev">${i18nStrings.common.previous}</button>
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-next">${i18nStrings.common.next}</button>
+                            <button type="button" class="btn btn-danger btn-sm px-3" id="${modalId}-delete">${i18nStrings.observations.photo_delete}</button>
+                            <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById(modalId);
+        const titleEl = document.getElementById(`${modalId}-title`);
+        const imgEl = document.getElementById(`${modalId}-img`);
+        const prevBtn = document.getElementById(`${modalId}-prev`);
+        const nextBtn = document.getElementById(`${modalId}-next`);
+        const deleteBtn = document.getElementById(`${modalId}-delete`);
+        const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+
+        let currentIndex = safeStart;
+
+        const renderViewer = () => {
+            const current = this.photoItems[currentIndex];
+            if (!current) {
+                modal.hide();
+                return;
+            }
+
+            const titleTemplate = i18nStrings.observations.photo_viewer_title;
+            titleEl.textContent = titleTemplate
+                .replace('{current}', String(currentIndex + 1))
+                .replace('{total}', String(this.photoItems.length));
+
+            imgEl.src = current.url;
+            imgEl.alt = current.name || '';
+
+            prevBtn.disabled = currentIndex <= 0;
+            nextBtn.disabled = currentIndex >= this.photoItems.length - 1;
+        };
+
+        prevBtn.addEventListener('click', () => {
+            if (currentIndex > 0) {
+                currentIndex -= 1;
+                renderViewer();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (currentIndex < this.photoItems.length - 1) {
+                currentIndex += 1;
+                renderViewer();
+            }
+        });
+
+        deleteBtn.addEventListener('click', () => {
+            showConfirmDialog(
+                i18nStrings.observations.photo_delete_title,
+                i18nStrings.observations.photo_delete_message,
+                async () => {
+                    try {
+                        const current = this.photoItems[currentIndex];
+                        if (!current || !this.photoContext) {
+                            return;
+                        }
+
+                        const response = await fetch('/api/observations/photos/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                key: current.key,
+                                kk: this.photoContext.kk,
+                                jj: this.photoContext.jj,
+                                mm: this.photoContext.mm,
+                                tt: this.photoContext.tt
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('photo_delete_failed');
+                        }
+
+                        this.photoItems.splice(currentIndex, 1);
+                        if (this.photoItems.length === 0) {
+                            this.clearPhotoGallery();
+                            modal.hide();
+                            return;
+                        }
+
+                        if (currentIndex >= this.photoItems.length) {
+                            currentIndex = this.photoItems.length - 1;
+                        }
+
+                        this.renderPhotoGallery();
+                        renderViewer();
+                    } catch (error) {
+                        showErrorDialog(i18nStrings.observations.photo_delete_error);
+                    }
+                }
+            );
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            modalEl.remove();
+        }, { once: true });
+
+        modal.show();
+        setupModalKeyboard(modalEl, nextBtn);
+        renderViewer();
     }
     
     getFormData() {
