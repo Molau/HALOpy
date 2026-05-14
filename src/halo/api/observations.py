@@ -35,7 +35,7 @@ def _get_s3_client():
 
 def _observation_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> str:
     """Return object key prefix for an observation photo folder."""
-    return f"{jj:04d}/{mm:02d}/{tt:02d}/{kk:02d}"
+    return f"{jj:04d}/{mm:02d}/{tt:02d}/kk{kk:02d}"
 
 
 def _check_cloud_photo_read_auth(kk: int):

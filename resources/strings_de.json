@@ -291,7 +291,7 @@
     "delete_another_message": "Möchten Sie eine weitere Beobachtung löschen?",
     "attributes_label": "Besondere Attribute",
     "attribute_star": "* (Teil eines Halophänomens)",
-    "attribute_photo": "# (fotografische Beobachtung)",
+    "attribute_photo": "# (nur fotografische Beobachtung)",
     "attribute_ka": "kA (kein Anfang)",
     "attribute_ke": "kE (kein Ende)",
     "attribute_ub": "UB (Unterbrechung der Beobachtung)",
