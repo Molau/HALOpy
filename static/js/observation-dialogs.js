@@ -585,13 +585,26 @@ async function showGroupModifyDialogMenu(filteredObs) {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     const modalEl = document.getElementById('modify-group-modal');
     const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
-    modal.show();
     
     const okBtn = document.getElementById('btn-modify-group-ok');
+    let okClicked = false;
     setupModalKeyboard(modalEl, okBtn);
+
+    // Cancel/Close should return to main and clear active menu highlight.
+    modalEl.addEventListener('hidden.bs.modal', () => {
+        if (!okClicked) {
+            clearMenuHighlights();
+            window.navigateInternal('/');
+            return;
+        }
+        modalEl.remove();
+    });
+
+    modal.show();
     
     // Handle OK button
     okBtn.addEventListener('click', async () => {
+        okClicked = true;
         // Collect all filled fields
         const updates = {};
         
@@ -633,8 +646,6 @@ async function showGroupModifyDialogMenu(filteredObs) {
         // Process bulk update
         await processBulkUpdate(filteredObs, updates);
     });
-    
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 }
 
 async function processBulkUpdate(filteredObs, updates) {
@@ -772,6 +783,7 @@ async function showDeleteSingleObservations(filterState) {
 
             if (showWarnings) {
                 let deletePhotosForced = false;
+                let hasPhotos = false;
                 try {
                     const policyResp = await fetch('/api/observations/delete/photo-policy', {
                         method: 'POST',
@@ -781,6 +793,7 @@ async function showDeleteSingleObservations(filterState) {
                     if (policyResp.ok) {
                         const policyData = await policyResp.json();
                         deletePhotosForced = !!policyData.force_delete_photos;
+                        hasPhotos = !!policyData.has_photos;
                     }
                 } catch (e) {}
 
@@ -790,15 +803,16 @@ async function showDeleteSingleObservations(filterState) {
                 const yesId = confirmId + '-yes';
                 const checkId = confirmId + '-check';
                 const photoCheckId = confirmId + '-photo-check';
+                const photoCheckHtml = hasPhotos ? `
+                           <div class="form-check mt-2">
+                               <input class="form-check-input" type="checkbox" id="${photoCheckId}" ${deletePhotosForced ? 'checked disabled' : ''}>
+                               <label class="form-check-label" for="${photoCheckId}">${deletePhotosForced ? i18nStrings.observations.delete_include_photos_forced : i18nStrings.observations.delete_include_photos}</label>
+                           </div>` : '';
                 const footer = createModalButton(i18nStrings.common.no, 'primary', { id: noId, dismiss: true }) +
                                createModalButton(i18nStrings.common.yes, 'secondary', { id: yesId });
                 const { modal: confirmModal, modalEl: confirmEl } = showSimpleModal({
                     title: i18nStrings.common.warning,
-                    body: `<p>${i18nStrings.observations.delete_confirm_warning}</p>
-                           <div class="form-check mt-2">
-                               <input class="form-check-input" type="checkbox" id="${photoCheckId}" ${deletePhotosForced ? 'checked disabled' : ''}>
-                               <label class="form-check-label" for="${photoCheckId}">${deletePhotosForced ? i18nStrings.observations.delete_include_photos_forced : i18nStrings.observations.delete_include_photos}</label>
-                           </div>
+                    body: `<p>${i18nStrings.observations.delete_confirm_warning}</p>${photoCheckHtml}
                            <div class="form-check mt-2">
                                <input class="form-check-input" type="checkbox" id="${checkId}">
                                <label class="form-check-label" for="${checkId}">${i18nStrings.common.dont_warn_again}</label>
@@ -808,7 +822,7 @@ async function showDeleteSingleObservations(filterState) {
                 let confirmed = false;
                 let deletePhotos = deletePhotosForced;
                 const dontWarnCheckbox = document.getElementById(checkId);
-                const deletePhotosCheckbox = document.getElementById(photoCheckId);
+                const deletePhotosCheckbox = hasPhotos ? document.getElementById(photoCheckId) : null;
                 document.getElementById(yesId).addEventListener('click', () => {
                     if (deletePhotosCheckbox) {
                         deletePhotos = deletePhotosCheckbox.checked;

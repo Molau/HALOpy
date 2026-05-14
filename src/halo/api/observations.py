@@ -28,6 +28,7 @@ import halo.io.observations as obs_logic
 import halo.io.observations_file as obs_file
 import halo.io.observations_db as obs_db
 from ._helpers import _check_cloud_write_auth, _int, _obs_to_json, _spaeter
+from .analysis import _calculate_observation_solar_altitude
 
 
 PHOTO_BUCKET_NAME = os.getenv('HALOPY_PHOTO_BUCKET', 'halophotos')
@@ -255,10 +256,24 @@ def _delete_photo_policy(data: Dict[str, Any]):
     target_exists = any(obs_logic.make_observation_key(obs) == target_key for obs in day_observations)
     remaining_same_day = max(len(day_observations) - (1 if target_exists else 0), 0)
 
+    has_photos = False
+    if is_cloud_mode() and target_exists:
+        try:
+            s3 = _get_s3_client()
+            prefix = _observation_photo_prefix(jj_full, mm, tt, kk)
+            resp = s3.list_objects_v2(Bucket=PHOTO_BUCKET_NAME, Prefix=prefix, MaxKeys=10)
+            has_photos = any(
+                not _is_thumbnail_key(obj['Key'])
+                for obj in resp.get('Contents', [])
+            )
+        except Exception:
+            pass
+
     return {
         'target_exists': target_exists,
         'remaining_same_day': remaining_same_day,
         'force_delete_photos': target_exists and remaining_same_day == 0,
+        'has_photos': has_photos,
     }
 
 
