@@ -90,7 +90,8 @@
     "pagination_prev": "Previous Page",
     "pagination_next": "Next Page",
     "pagination_last": "Last Page",
-    "database": "Database"
+    "database": "Database",
+    "download": "Download"
   },
   "messages": {
     "loading": "Loading data...",

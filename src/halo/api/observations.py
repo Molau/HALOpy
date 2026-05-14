@@ -9,6 +9,7 @@ Licensed under MIT License - see LICENSE file for details.
 
 import mimetypes
 import os
+from io import BytesIO
 from urllib.parse import quote
 from typing import Dict, Any
 
@@ -51,6 +52,60 @@ def _extract_kk_from_photo_key(key: str):
         return int(kk_part[2:4])
     except ValueError:
         return None
+
+
+def _thumbnail_key_for_photo(key: str) -> str:
+    """Return thumbnail key using *_tn.<ext> naming in the same folder."""
+    if '/' in key:
+        folder, filename = key.rsplit('/', 1)
+    else:
+        folder, filename = '', key
+
+    stem, ext = os.path.splitext(filename)
+    thumb_name = f"{stem}_tn{ext}"
+    return f"{folder}/{thumb_name}" if folder else thumb_name
+
+
+def _is_thumbnail_key(key: str) -> bool:
+    """Return True when object key uses *_tn.<ext> naming."""
+    filename = key.rsplit('/', 1)[-1]
+    stem, _ = os.path.splitext(filename)
+    return stem.lower().endswith('_tn')
+
+
+def _generate_thumbnail_bytes(image_bytes: bytes, source_key: str):
+    """Generate thumbnail bytes and content type for an image object."""
+    from PIL import Image  # type: ignore
+
+    ext = os.path.splitext(source_key)[1].lower()
+    format_map = {
+        '.jpg': 'JPEG',
+        '.jpeg': 'JPEG',
+        '.png': 'PNG',
+        '.gif': 'GIF',
+        '.webp': 'WEBP',
+        '.bmp': 'BMP',
+        '.tif': 'TIFF',
+        '.tiff': 'TIFF',
+    }
+    out_format = format_map.get(ext, 'JPEG')
+
+    with Image.open(BytesIO(image_bytes)) as img:
+        resampling = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+        img.thumbnail((320, 240), resampling)
+
+        if out_format == 'JPEG' and img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+
+        out = BytesIO()
+        save_kwargs = {'format': out_format}
+        if out_format == 'JPEG':
+            save_kwargs['quality'] = 82
+            save_kwargs['optimize'] = True
+        img.save(out, **save_kwargs)
+
+    content_type = mimetypes.guess_type(f"x{ext}")[0] or 'image/jpeg'
+    return out.getvalue(), content_type
 
 
 def _check_cloud_photo_read_auth(kk: int):
@@ -634,19 +689,45 @@ def list_observation_photos() -> Dict[str, Any]:
         response = s3.list_objects_v2(Bucket=PHOTO_BUCKET_NAME, Prefix=prefix)
         contents = response.get('Contents', [])
 
-        photos = []
-        for item in contents:
-            key = item.get('Key', '')
-            if not key or key.endswith('/'):
-                continue
-            if not key.lower().endswith(PHOTO_ALLOWED_EXTENSIONS):
-                continue
+        object_keys = {
+            item.get('Key', '')
+            for item in contents
+            if item.get('Key', '')
+        }
 
-            url = f"/api/observations/photos/file?key={quote(key, safe='')}"
+        original_keys = [
+            key for key in object_keys
+            if not key.endswith('/')
+            and key.lower().endswith(PHOTO_ALLOWED_EXTENSIONS)
+            and not _is_thumbnail_key(key)
+        ]
+
+        photos = []
+        for key in sorted(original_keys, key=lambda p: p.split('/')[-1].lower()):
+            thumb_key = _thumbnail_key_for_photo(key)
+            if thumb_key not in object_keys:
+                try:
+                    source_obj = s3.get_object(Bucket=PHOTO_BUCKET_NAME, Key=key)
+                    source_bytes = source_obj['Body'].read()
+                    thumb_bytes, thumb_content_type = _generate_thumbnail_bytes(source_bytes, key)
+                    s3.put_object(
+                        Bucket=PHOTO_BUCKET_NAME,
+                        Key=thumb_key,
+                        Body=thumb_bytes,
+                        ContentType=thumb_content_type,
+                    )
+                    object_keys.add(thumb_key)
+                except Exception:
+                    thumb_key = key
+
+            thumb_url = f"/api/observations/photos/file?key={quote(thumb_key, safe='')}"
+            full_url = f"/api/observations/photos/file?key={quote(key, safe='')}"
             photos.append({
                 'key': key,
+                'thumb_key': thumb_key,
                 'name': key.split('/')[-1],
-                'url': url,
+                'url': thumb_url,
+                'full_url': full_url,
             })
 
         photos.sort(key=lambda p: p['name'].lower())

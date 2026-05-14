@@ -1810,7 +1810,7 @@ class ObservationForm {
                 .replace('{current}', String(currentIndex + 1))
                 .replace('{total}', String(this.photoItems.length));
 
-            imgEl.src = current.url;
+            imgEl.src = current.full_url || current.url;
             imgEl.alt = current.name || '';
 
             prevBtn.disabled = currentIndex <= 0;
@@ -1833,12 +1833,13 @@ class ObservationForm {
 
         downloadBtn.addEventListener('click', () => {
             const current = this.photoItems[currentIndex];
-            if (!current || !current.url) {
+            const downloadUrl = current?.full_url || current?.url;
+            if (!current || !downloadUrl) {
                 return;
             }
 
             const a = document.createElement('a');
-            a.href = current.url;
+            a.href = downloadUrl;
             a.download = current.name || 'photo';
             a.rel = 'noopener';
             document.body.appendChild(a);
