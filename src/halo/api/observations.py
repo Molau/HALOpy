@@ -927,8 +927,18 @@ def delete_observation_photo() -> Dict[str, Any]:
 
     try:
         s3 = _get_s3_client()
-        s3.delete_object(Bucket=PHOTO_BUCKET_NAME, Key=key)
-        return jsonify({'success': True})
+        keys_to_delete = [key]
+        if not _is_thumbnail_key(key):
+            thumb_key = _thumbnail_key_for_photo(key)
+            if thumb_key != key:
+                keys_to_delete.append(thumb_key)
+
+        # Batch delete is idempotent and succeeds even if some keys do not exist.
+        s3.delete_objects(
+            Bucket=PHOTO_BUCKET_NAME,
+            Delete={'Objects': [{'Key': k} for k in keys_to_delete]},
+        )
+        return jsonify({'success': True, 'deleted_keys': keys_to_delete})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

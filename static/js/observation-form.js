@@ -344,6 +344,8 @@ class ObservationForm {
                                 <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-prev" ${this.currentNum === 1 ? 'disabled' : ''}>${i18nStrings.common.previous}</button>
                                 <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-form-next" ${this.currentNum === this.totalNum ? 'disabled' : ''}>${i18nStrings.common.next}</button>
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-yes">${i18nStrings.common.yes}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-photo-upload" style="display:none;" disabled>${i18nStrings.observations.photo_upload}</button>
+                                <input type="file" id="obs-photo-upload-input" accept="image/*" multiple class="d-none">
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" style="display:none;" disabled>${i18nStrings.common.ok}</button>
                             ` : ''}
                             ${this.mode === 'delete' ? `
@@ -355,6 +357,8 @@ class ObservationForm {
                             ` : ''}
                             ${this.mode === 'add' ? `
                                 <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                                <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-obs-photo-upload" disabled>${i18nStrings.observations.photo_upload}</button>
+                                <input type="file" id="obs-photo-upload-input" accept="image/*" multiple class="d-none">
                                 <button type="button" class="btn btn-primary btn-sm px-3" id="btn-obs-form-ok" disabled>${i18nStrings.common.ok}</button>
                             ` : ''}
                         </div>
@@ -611,12 +615,6 @@ class ObservationForm {
             </div>
             <div class="col-12 d-none" id="form-photo-section">
                 <label class="form-label">${i18nStrings.observations.photos_heading}</label>
-                ${(this.mode === 'add' || this.mode === 'edit') ? `
-                <div class="mb-2">
-                    <button type="button" class="btn btn-secondary btn-sm" id="form-photo-upload-btn" disabled>${i18nStrings.observations.photo_upload}</button>
-                    <input type="file" id="form-photo-upload-input" accept="image/*" multiple class="d-none">
-                </div>
-                ` : ''}
                 <div class="obs-photo-strip" id="form-photo-strip"></div>
             </div>
         `;
@@ -1261,8 +1259,8 @@ class ObservationForm {
             remarks: document.getElementById('form-remarks'),
             photoSection: document.getElementById('form-photo-section'),
             photoStrip: document.getElementById('form-photo-strip'),
-            photoUploadBtn: document.getElementById('form-photo-upload-btn'),
-            photoUploadInput: document.getElementById('form-photo-upload-input'),
+            photoUploadBtn: document.getElementById('btn-obs-photo-upload'),
+            photoUploadInput: document.getElementById('obs-photo-upload-input'),
             // Attribute checkboxes
             attrStar: document.getElementById('form-attr-star'),
             attrPhoto: document.getElementById('form-attr-photo'),
@@ -1336,6 +1334,26 @@ class ObservationForm {
         this.fields.v.addEventListener('change', () => {
             manageFieldDependencies('v');
         });
+
+        if (this.fields.photoUploadBtn && this.fields.photoUploadInput) {
+            this.fields.photoUploadBtn.addEventListener('click', () => {
+                if (!this.hasPhotoUploadContext()) {
+                    showErrorDialog(i18nStrings.observations.photo_upload_select_context);
+                    return;
+                }
+                this.fields.photoUploadInput.click();
+            });
+
+            this.fields.photoUploadInput.addEventListener('change', async () => {
+                const selectedFiles = Array.from(this.fields.photoUploadInput.files || []);
+                if (selectedFiles.length === 0) {
+                    return;
+                }
+
+                await this.uploadObservationPhotos(selectedFiles);
+                this.fields.photoUploadInput.value = '';
+            });
+        }
         
         // Sectors field: validate sector notation on change
         this.fields.sectors.addEventListener('change', () => {
@@ -1419,6 +1437,8 @@ class ObservationForm {
                         okBtn.className = 'btn btn-primary btn-sm px-3';
                         checkRequired();
                     }
+                    this.updatePhotoUploadUi();
+                    this.renderPhotoGallery();
                 }
             });
         }
@@ -1544,6 +1564,7 @@ class ObservationForm {
         
         // Initial check of required fields (important for pre-filled forms in add mode)
         checkRequired();
+        this.updatePhotoUploadUi();
         this.updatePhotoUploadButtonState();
     }
 
@@ -1569,6 +1590,85 @@ class ObservationForm {
             return;
         }
         btn.disabled = !this.hasPhotoUploadContext();
+    }
+
+    updatePhotoUploadUi() {
+        const btn = this.fields?.photoUploadBtn;
+        if (!btn) {
+            return;
+        }
+
+        if (this.mode === 'add') {
+            btn.style.display = '';
+        } else if (this.mode === 'edit') {
+            btn.style.display = this.isEditingMode ? '' : 'none';
+        } else {
+            btn.style.display = 'none';
+        }
+
+        this.updatePhotoUploadButtonState();
+    }
+
+    mapPhotoUploadError(errorCode) {
+        if (errorCode === 'too_many_files') {
+            return i18nStrings.observations.photo_upload_too_many_files;
+        }
+        if (errorCode === 'invalid_file_type') {
+            return i18nStrings.observations.photo_upload_invalid_file_type;
+        }
+        if (errorCode === 'file_too_large') {
+            return i18nStrings.observations.photo_upload_file_too_large;
+        }
+        return i18nStrings.observations.photo_upload_error;
+    }
+
+    async uploadObservationPhotos(files) {
+        if (!this.hasPhotoUploadContext()) {
+            showErrorDialog(i18nStrings.observations.photo_upload_select_context);
+            return;
+        }
+
+        const kk = parseInt(this.fields.kk.value, 10);
+        const jj = parseInt(this.fields.jj.value, 10);
+        const mm = parseInt(this.fields.mm.value, 10);
+        const tt = parseInt(this.fields.tt.value, 10);
+
+        const formData = new FormData();
+        formData.append('kk', String(kk));
+        formData.append('jj', String(jj));
+        formData.append('mm', String(mm));
+        formData.append('tt', String(tt));
+        files.forEach(file => formData.append('photos', file));
+
+        const uploadBtn = this.fields.photoUploadBtn;
+        if (uploadBtn) {
+            uploadBtn.disabled = true;
+        }
+
+        try {
+            const response = await fetch('/api/observations/photos/add', {
+                method: 'POST',
+                body: formData,
+            });
+
+            let payload = {};
+            try {
+                payload = await response.json();
+            } catch (e) {}
+
+            if (!response.ok) {
+                const msg = this.mapPhotoUploadError(payload?.error);
+                showErrorDialog(msg);
+                return;
+            }
+
+            showNotification(i18nStrings.observations.photo_upload_success);
+            await this.loadObservationPhotos({ KK: kk, JJ: jj, MM: mm, TT: tt });
+        } catch (e) {
+            showErrorDialog(i18nStrings.observations.photo_upload_error);
+        } finally {
+            this.updatePhotoUploadButtonState();
+        }
     }
     
     /**
@@ -1702,6 +1802,7 @@ class ObservationForm {
             mm: parseInt(obs.MM, 10),
             tt: parseInt(obs.TT, 10)
         };
+        this.updatePhotoUploadUi();
         this.updatePhotoUploadButtonState();
         
         // Parse and set attributes from remarks
@@ -1733,7 +1834,9 @@ class ObservationForm {
             return;
         }
 
-        if (this.mode === 'delete') {
+        const galleryReadOnly = this.mode === 'delete' || (this.mode === 'edit' && !this.isEditingMode);
+
+        if (galleryReadOnly) {
             this.fields.photoStrip.innerHTML = this.photoItems.map((photo, index) => {
                 const altTemplate = i18nStrings.observations.photo_alt;
                 const alt = altTemplate.replace('{index}', String(index + 1));
@@ -1757,7 +1860,7 @@ class ObservationForm {
 
         this.fields.photoSection.classList.remove('d-none');
 
-        if (this.mode !== 'delete') {
+        if (!galleryReadOnly) {
             this.fields.photoStrip.querySelectorAll('.obs-photo-thumb-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const idx = parseInt(btn.getAttribute('data-photo-index') || '0', 10);
