@@ -38,68 +38,6 @@
 //   setupModalKeyboard, setupModalCleanup (modal-utils.js)
 // ============================================================================
 
-
-// Ask if user wants to perform another operation (modify/delete).
-// Default button is Yes (primary) since the user still needs to select the observation.
-function showAnotherOperationDialog(title, message) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const modalHtml = `
-            <div class="modal fade" id="another-operation-modal" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header py-2">
-                            <h6 class="modal-title mb-0">${title}</h6>
-                        </div>
-                        <div class="modal-body py-3">
-                            <p class="mb-0">${message}</p>
-                        </div>
-                        <div class="modal-footer py-2">
-                            <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-another-no">${i18nStrings.common.no}</button>
-                            <button type="button" class="btn btn-primary btn-sm px-3" id="btn-another-yes">${i18nStrings.common.yes}</button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            const modalEl = document.getElementById('another-operation-modal');
-            const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
-
-            let resolved = false;
-
-            const btnYes = modalEl.querySelector('#btn-another-yes');
-
-            btnYes.addEventListener('click', () => {
-                if (!resolved) {
-                    resolved = true;
-                    modal.hide();
-                    resolve(true);
-                }
-            });
-
-            modalEl.querySelector('#btn-another-no').addEventListener('click', () => {
-                if (!resolved) {
-                    resolved = true;
-                    modal.hide();
-                    resolve(false);
-                }
-            });
-
-            modalEl.addEventListener('hidden.bs.modal', () => {
-                if (!resolved) {
-                    resolved = true;
-                    resolve(false);
-                }
-                modalEl.remove();
-            });
-
-            modal.show();
-            setupModalKeyboard(modalEl, btnYes);
-        }, 300);
-    });
-}
-
 // Show Modify Observations dialog
 async function showModifyObservationsDialog() {
     // Check if data is loaded on the server
@@ -231,6 +169,10 @@ async function showModifySingleObservations(filterState) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(obs)
                 });
+
+                if (!deleteResp.ok) {
+                    throw new Error('Failed to delete original observation');
+                }
                 
                 // Now POST the modified observation
                 const resp = await fetch('/api/observations', {
@@ -255,20 +197,13 @@ async function showModifySingleObservations(filterState) {
                 
                 const successMsg = i18nStrings.messages.observation_modified;
                 showNotification('<strong>✓</strong> ' + successMsg);
-                
-                // After form closes, ask if user wants to modify another observation
+
+                filteredObs.splice(currentIndex, 1);
                 form.modalElement.addEventListener('hidden.bs.modal', async () => {
-                    const another = await showAnotherOperationDialog(
-                        i18nStrings.observations.modify_another_title,
-                        i18nStrings.observations.modify_another_message
-                    );
-                    if (another) {
-                        showModifyObservationsDialog();
-                    } else {
-                        window.navigateInternal('/');
-                    }
+                    showObservationAt(currentIndex);
                 }, { once: true });
             } catch (e) {showErrorDialog(i18nStrings.common.error + ': ' + e.message);
+                throw e;
             }
     };
 
@@ -292,8 +227,11 @@ async function showModifySingleObservations(filterState) {
         }
         if (index >= filteredObs.length) {
             // All observations processed - return to main menu
-            form.navigating = true;
-            form.hideModal();
+            if (isFormShown && form.modalElement && document.body.contains(form.modalElement) && !form.destroyed) {
+                form.navigating = true;
+                form.hideModal();
+                return;
+            }
             window.navigateInternal('/');
             return;
         }
@@ -301,7 +239,7 @@ async function showModifySingleObservations(filterState) {
         currentIndex = index;
         const obs = filteredObs[currentIndex];
 
-        if (!isFormShown) {
+        if (!isFormShown || form.destroyed || !form.modalElement || !document.body.contains(form.modalElement)) {
             form.show('edit', obs, onSave, onCancel, currentIndex + 1, filteredObs.length, null, onNext, onPrev, onCancel);
             isFormShown = true;
         } else {
@@ -762,15 +700,18 @@ async function showDeleteSingleObservations(filterState) {
 
     const showNextObservation = async () => {
         if (currentIndex >= filteredObs.length) {
-            form.navigating = true;
-            form.hideModal();
+            if (isFormShown && form.modalElement && document.body.contains(form.modalElement) && !form.destroyed) {
+                form.navigating = true;
+                form.hideModal();
+                return;
+            }
             window.navigateInternal('/');
             return;
         }
 
         const obs = filteredObs[currentIndex];
 
-        if (!isFormShown) {
+        if (!isFormShown || form.destroyed || !form.modalElement || !document.body.contains(form.modalElement)) {
             form.show('delete', obs, null, null, currentIndex + 1, filteredObs.length, i18nStrings.observations.delete_question, async () => {
             // Yes -> check SHOW_WARNINGS before deleting
             let deletePayload = { ...obs, delete_photos: false };
@@ -872,21 +813,13 @@ async function showDeleteSingleObservations(filterState) {
                 
                 // Prevent form's hidden handler from calling cancel
                 form.saved = true;
-                
-                // After form closes, ask if user wants to delete another observation
+
+                filteredObs.splice(currentIndex, 1);
                 form.modalElement.addEventListener('hidden.bs.modal', async () => {
-                    const another = await showAnotherOperationDialog(
-                        i18nStrings.observations.delete_another_title,
-                        i18nStrings.observations.delete_another_message
-                    );
-                    if (another) {
-                        showDeleteObservationsDialog();
-                    } else {
-                        window.navigateInternal('/');
-                    }
+                    showNextObservation();
                 }, { once: true });
             } catch (e) {showErrorDialog((i18nStrings.common.error) + ': ' + e.message);
-                window.navigateInternal('/');
+                throw e;
             }
         }, () => {
             // No -> skip to next observation
