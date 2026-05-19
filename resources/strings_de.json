@@ -314,6 +314,9 @@
     "photo_upload_invalid_file_type": "Mindestens eine ausgewählte Datei hat einen nicht unterstützten Dateityp.",
     "photo_upload_file_too_large": "Mindestens eine ausgewählte Datei überschreitet die maximale Dateigröße.",
     "photo_alt": "Foto {index}",
+    "photo_caption_label": "Bildunterschrift",
+    "photo_caption_placeholder": "Optionale Bildunterschrift",
+    "photo_caption_save_error": "Bildunterschrift konnte nicht gespeichert werden.",
     "detail_labels": {
       "observer": "Beobachter        : ",
       "date": "Datum             : ",

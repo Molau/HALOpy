@@ -8,7 +8,7 @@ Version 3.3 führt ein Fotoalbum für Halobeobachtungen ein (nur im Cloud-Modus)
 
 **Ergänzungen und Änderungen in der Version 3.2**
 
-Version 3.2 ist die erste öffentliche Gemeinschaftsversion von HALOpy.
+Version 3.2 bringt verschiedene Optimierungen von HALOpy mit sich.
 
 - Fotografische Beobachtung: Mit dem Schlüsselelement `#` können rein fotografische Beobachtungen gekennzeichnet werden. Sie erscheinen in der Beobachtungsliste, werden aber bei Statistik und Auswertung automatisch nicht berücksichtigt.
 - UI-Verbesserungen: Die Beobachtungsanzeige unterstützt nun server-seitige Seitennavigation bei großen Datenmengen. Nach dem Löschen oder Ändern einer Beobachtung kann direkt die nächste Operation gestartet werden. Bei der Menueingabe kann die vorige Beobachtung als Vorlage übernommen werden. Im Cloud-Modus werden auf der Anmeldeseite nur Beobachter angezeigt, für die ein Passwort hinterlegt ist. Zusätzlich wurden zahlreiche kleinere Fehler behoben, u. a. bei der Modalnavigation, im mobilen Menü, der Startroutine im lokalen Modus sowie im ZZ-Feld.

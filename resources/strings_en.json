@@ -314,6 +314,9 @@
     "photo_upload_invalid_file_type": "One or more selected files have an unsupported file type.",
     "photo_upload_file_too_large": "One or more selected files exceed the file size limit.",
     "photo_alt": "Photo {index}",
+    "photo_caption_label": "Caption",
+    "photo_caption_placeholder": "Optional caption",
+    "photo_caption_save_error": "Caption could not be saved.",
     "detail_labels": {
       "observer": "observer          : ",
       "date": "date              : ",

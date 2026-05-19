@@ -32,6 +32,7 @@ from .analysis import _calculate_observation_solar_altitude
 
 
 PHOTO_BUCKET_NAME = os.getenv('HALOPY_PHOTO_BUCKET', 'halophotos')
+PHOTO_CAPTION_FILENAME = 'caption.txt'
 
 
 def _get_s3_client():
@@ -72,11 +73,83 @@ def _thumbnail_key_for_photo(key: str) -> str:
     return f"{folder}/{thumb_name}" if folder else thumb_name
 
 
+def _caption_key_for_prefix(prefix: str) -> str:
+    """Return caption text key for an observation photo folder."""
+    return f"{prefix}/{PHOTO_CAPTION_FILENAME}"
+
+
+def _is_original_photo_key(key: str) -> bool:
+    """Return True when key is a non-thumbnail original image file."""
+    return (
+        bool(key)
+        and not key.endswith('/')
+        and key.lower().endswith(PHOTO_ALLOWED_EXTENSIONS)
+        and not _is_thumbnail_key(key)
+    )
+
+
 def _is_thumbnail_key(key: str) -> bool:
     """Return True when object key uses *_tn.<ext> naming."""
     filename = key.rsplit('/', 1)[-1]
     stem, _ = os.path.splitext(filename)
     return stem.lower().endswith('_tn')
+
+
+def _read_photo_caption_text(s3, prefix: str) -> str:
+    """Return caption text for a photo folder or empty string when missing."""
+    caption_key = _caption_key_for_prefix(prefix)
+    try:
+        obj = s3.get_object(Bucket=PHOTO_BUCKET_NAME, Key=caption_key)
+    except Exception as e:
+        error_code = getattr(e, 'response', {}).get('Error', {}).get('Code')
+        if error_code in ('NoSuchKey', '404'):
+            return ''
+        raise
+
+    body = obj.get('Body')
+    if not body:
+        return ''
+    return body.read().decode('utf-8')
+
+
+def _write_photo_caption_text(s3, prefix: str, caption: str):
+    """Store caption.txt for a photo folder, or delete it when empty."""
+    caption_key = _caption_key_for_prefix(prefix)
+    normalized_caption = (caption or '').replace('\r\n', '\n').replace('\r', '\n')
+
+    if not normalized_caption.strip():
+        s3.delete_object(Bucket=PHOTO_BUCKET_NAME, Key=caption_key)
+        return
+
+    s3.put_object(
+        Bucket=PHOTO_BUCKET_NAME,
+        Key=caption_key,
+        Body=normalized_caption.encode('utf-8'),
+        ContentType='text/plain; charset=utf-8',
+    )
+
+
+def _list_prefix_object_keys(s3, prefix: str):
+    """Return all object keys below a prefix."""
+    continuation_token = None
+    keys = []
+
+    while True:
+        kwargs = {'Bucket': PHOTO_BUCKET_NAME, 'Prefix': prefix, 'MaxKeys': 1000}
+        if continuation_token:
+            kwargs['ContinuationToken'] = continuation_token
+
+        response = s3.list_objects_v2(**kwargs)
+        keys.extend(item.get('Key') for item in response.get('Contents', []) if item.get('Key'))
+
+        if not response.get('IsTruncated'):
+            return keys
+        continuation_token = response.get('NextContinuationToken')
+
+
+def _has_original_photos(s3, prefix: str) -> bool:
+    """Return True when a prefix still contains at least one original photo."""
+    return any(_is_original_photo_key(key) for key in _list_prefix_object_keys(s3, prefix))
 
 
 def _generate_thumbnail_bytes(image_bytes: bytes, source_key: str):
@@ -263,7 +336,7 @@ def _delete_photo_policy(data: Dict[str, Any]):
             prefix = _observation_photo_prefix(jj_full, mm, tt, kk)
             resp = s3.list_objects_v2(Bucket=PHOTO_BUCKET_NAME, Prefix=prefix, MaxKeys=10)
             has_photos = any(
-                not _is_thumbnail_key(obj['Key'])
+                _is_original_photo_key(obj['Key'])
                 for obj in resp.get('Contents', [])
             )
         except Exception:
@@ -898,10 +971,10 @@ def list_observation_photos() -> Dict[str, Any]:
 
         original_keys = [
             key for key in object_keys
-            if not key.endswith('/')
-            and key.lower().endswith(PHOTO_ALLOWED_EXTENSIONS)
-            and not _is_thumbnail_key(key)
+            if _is_original_photo_key(key)
         ]
+
+        caption = _read_photo_caption_text(s3, prefix)
 
         photos = []
         thumbnail_debug = []
@@ -951,10 +1024,47 @@ def list_observation_photos() -> Dict[str, Any]:
             })
 
         photos.sort(key=lambda p: p['name'].lower())
-        result = {'photos': photos}
+        result = {'photos': photos, 'caption': caption}
         if debug_mode:
             result['thumbnail_debug'] = thumbnail_debug
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observations/photos/caption', methods=['PUT'])
+def save_observation_photo_caption() -> Dict[str, Any]:
+    """Create, update, or remove caption.txt for an observation photo folder."""
+    if not is_cloud_mode():
+        return jsonify({'error': 'cloud_mode_only'}), 403
+
+    data = request.get_json() or {}
+    kk = _int(data, 'kk', -1)
+    jj = _int(data, 'jj', -1)
+    mm = _int(data, 'mm', -1)
+    tt = _int(data, 'tt', -1)
+    caption = data.get('caption', '')
+
+    if kk < 0 or jj < 0 or mm < 0 or tt < 0:
+        return jsonify({'error': 'missing_parameters'}), 400
+
+    if not isinstance(caption, str):
+        return jsonify({'error': 'invalid_caption'}), 400
+
+    auth_error = _check_cloud_write_auth(kk)
+    if auth_error:
+        return auth_error
+
+    prefix = _observation_photo_prefix(jj, mm, tt, kk)
+
+    try:
+        s3 = _get_s3_client()
+        has_photos = _has_original_photos(s3, prefix)
+        if not has_photos and caption.strip():
+            return jsonify({'error': 'no_photos'}), 400
+
+        _write_photo_caption_text(s3, prefix, caption)
+        return jsonify({'success': True, 'caption': caption if has_photos else ''})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -985,6 +1095,7 @@ def delete_observation_photo() -> Dict[str, Any]:
 
     try:
         s3 = _get_s3_client()
+        prefix = _observation_photo_prefix(jj, mm, tt, kk)
         keys_to_delete = [key]
         if not _is_thumbnail_key(key):
             thumb_key = _thumbnail_key_for_photo(key)
@@ -996,7 +1107,17 @@ def delete_observation_photo() -> Dict[str, Any]:
             Bucket=PHOTO_BUCKET_NAME,
             Delete={'Objects': [{'Key': k} for k in keys_to_delete]},
         )
-        return jsonify({'success': True, 'deleted_keys': keys_to_delete})
+
+        caption_deleted = False
+        if not _has_original_photos(s3, prefix):
+            s3.delete_object(Bucket=PHOTO_BUCKET_NAME, Key=_caption_key_for_prefix(prefix))
+            caption_deleted = True
+
+        return jsonify({
+            'success': True,
+            'deleted_keys': keys_to_delete,
+            'caption_deleted': caption_deleted,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

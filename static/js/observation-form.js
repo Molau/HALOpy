@@ -23,6 +23,10 @@ class ObservationForm {
         this.photoRequestToken = 0;
         this.pendingUploadedPhotos = [];
         this.lastAutoPhotoContextKey = null;
+        this.photoCaptionText = '';
+        this.photoCaptionDirty = false;
+        this.photoCaptionLoading = false;
+        this.photoCaptionSavePromise = null;
         // Field constraints: Store current valid value ranges for dependent fields
         this.fieldConstraints = {
             d: [],      // Valid values for cirrus density
@@ -622,6 +626,10 @@ class ObservationForm {
             <div class="col-12 d-none" id="form-photo-section">
                 <label class="form-label">${i18nStrings.observations.photos_heading}</label>
                 <div class="obs-photo-strip" id="form-photo-strip"></div>
+            </div>
+            <div class="col-12 d-none" id="form-photo-caption-section">
+                <label class="form-label" for="form-photo-caption">${i18nStrings.observations.photo_caption_label}</label>
+                <textarea class="form-control form-control-sm" id="form-photo-caption" rows="3" placeholder="${escapeHtml(i18nStrings.observations.photo_caption_placeholder)}"></textarea>
             </div>
         `;
     }
@@ -1265,6 +1273,8 @@ class ObservationForm {
             remarks: document.getElementById('form-remarks'),
             photoSection: document.getElementById('form-photo-section'),
             photoStrip: document.getElementById('form-photo-strip'),
+            photoCaptionSection: document.getElementById('form-photo-caption-section'),
+            photoCaption: document.getElementById('form-photo-caption'),
             photoUploadBtn: document.getElementById('btn-obs-photo-upload'),
             photoUploadInput: document.getElementById('obs-photo-upload-input'),
             // Attribute checkboxes
@@ -1362,6 +1372,27 @@ class ObservationForm {
 
                 await this.uploadObservationPhotos(selectedFiles);
                 this.fields.photoUploadInput.value = '';
+            });
+        }
+
+        if (this.fields.photoCaption) {
+            this.fields.photoCaption.addEventListener('input', () => {
+                if (this.photoCaptionLoading || !this.canEditPhotoCaption()) {
+                    return;
+                }
+                this.photoCaptionDirty = true;
+            });
+
+            this.fields.photoCaption.addEventListener('blur', async () => {
+                if (!this.photoCaptionDirty || !this.canEditPhotoCaption()) {
+                    return;
+                }
+
+                try {
+                    await this.persistPhotoCaption();
+                } catch (e) {
+                    showErrorDialog(i18nStrings.observations.photo_caption_save_error);
+                }
             });
         }
         
@@ -1520,6 +1551,7 @@ class ObservationForm {
         if (okBtn) {
             okBtn.addEventListener('click', async () => {
                 try {
+                    await this.flushPhotoCaptionSave();
                     const obs = this.getFormData();
                     
                     if (this.onSave) {
@@ -1527,6 +1559,7 @@ class ObservationForm {
                     }
 
                     this.pendingUploadedPhotos = [];
+                    this.updatePhotoCaptionUi();
                     
                     // Sync haloData to sessionStorage after save
                     if (window.saveHaloDataToSession) {
@@ -1583,7 +1616,12 @@ class ObservationForm {
         // Initial check of required fields (important for pre-filled forms in add mode)
         checkRequired();
         this.updatePhotoUploadUi();
+        this.updatePhotoCaptionUi();
         this.updatePhotoUploadButtonState();
+    }
+
+    canEditPhotoCaption() {
+        return this.mode === 'add' || (this.mode === 'edit' && this.isEditingMode);
     }
 
     hasPhotoUploadContext() {
@@ -1625,6 +1663,99 @@ class ObservationForm {
         }
 
         this.updatePhotoUploadButtonState();
+    }
+
+    updatePhotoCaptionUi() {
+        const section = this.fields?.photoCaptionSection;
+        const textarea = this.fields?.photoCaption;
+        if (!section || !textarea) {
+            return;
+        }
+
+        const hasPhotos = Array.isArray(this.photoItems) && this.photoItems.length > 0;
+        if (!hasPhotos) {
+            section.classList.add('d-none');
+            textarea.disabled = true;
+            textarea.readOnly = true;
+            return;
+        }
+
+        section.classList.remove('d-none');
+        textarea.disabled = false;
+        textarea.readOnly = !this.canEditPhotoCaption();
+    }
+
+    setPhotoCaptionValue(caption) {
+        const textarea = this.fields?.photoCaption;
+        this.photoCaptionLoading = true;
+        this.photoCaptionText = caption || '';
+        this.photoCaptionDirty = false;
+        if (textarea) {
+            textarea.value = this.photoCaptionText;
+        }
+        this.photoCaptionLoading = false;
+        this.updatePhotoCaptionUi();
+    }
+
+    async persistPhotoCaption() {
+        if (!this.photoCaptionDirty) {
+            if (this.photoCaptionSavePromise) {
+                await this.photoCaptionSavePromise;
+            }
+            return;
+        }
+
+        if (!this.canEditPhotoCaption()) {
+            return;
+        }
+
+        if (!this.photoContext || !Array.isArray(this.photoItems) || this.photoItems.length === 0) {
+            this.photoCaptionDirty = false;
+            return;
+        }
+
+        const textarea = this.fields?.photoCaption;
+        const caption = textarea ? textarea.value : '';
+        const savePromise = fetch('/api/observations/photos/caption', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                kk: this.photoContext.kk,
+                jj: this.photoContext.jj,
+                mm: this.photoContext.mm,
+                tt: this.photoContext.tt,
+                caption,
+            })
+        }).then(async response => {
+            let payload = {};
+            try {
+                payload = await response.json();
+            } catch (e) {}
+
+            if (!response.ok) {
+                throw new Error(payload?.error || 'photo_caption_save_failed');
+            }
+
+            this.setPhotoCaptionValue(typeof payload?.caption === 'string' ? payload.caption : caption);
+        }).finally(() => {
+            if (this.photoCaptionSavePromise === savePromise) {
+                this.photoCaptionSavePromise = null;
+            }
+        });
+
+        this.photoCaptionSavePromise = savePromise;
+        await savePromise;
+    }
+
+    async flushPhotoCaptionSave() {
+        if (this.photoCaptionDirty) {
+            await this.persistPhotoCaption();
+            return;
+        }
+
+        if (this.photoCaptionSavePromise) {
+            await this.photoCaptionSavePromise;
+        }
     }
 
     mapPhotoUploadError(errorCode) {
@@ -1938,6 +2069,7 @@ class ObservationForm {
         if (this.fields.photoSection) {
             this.fields.photoSection.classList.add('d-none');
         }
+        this.setPhotoCaptionValue('');
     }
 
     renderPhotoGallery() {
@@ -1975,6 +2107,7 @@ class ObservationForm {
         }
 
         this.fields.photoSection.classList.remove('d-none');
+        this.updatePhotoCaptionUi();
 
         if (!galleryReadOnly) {
             this.fields.photoStrip.querySelectorAll('.obs-photo-thumb-btn').forEach(btn => {
@@ -2019,6 +2152,7 @@ class ObservationForm {
             }
 
             this.photoItems = Array.isArray(data.photos) ? data.photos : [];
+            this.setPhotoCaptionValue(typeof data.caption === 'string' ? data.caption : '');
             this.renderPhotoGallery();
         } catch (error) {
             if (!this.destroyed && requestToken === this.photoRequestToken) {

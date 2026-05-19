@@ -185,11 +185,11 @@ In cloud mode, a 'Logout' button is available in the navigation bar. It ends the
 
 In cloud mode, photos can be uploaded and managed for each observation. The thumbnail bar appears below the observation form as soon as photos are available or the photo view is active.
 
-  * 'Upload Photos': Use the button in the form footer to upload one or more image files (JPEG, PNG, WEBP). Up to 10 photos per observation are supported. The upload button is only available when observer, year, month, and day are set.
+  * 'Upload Photos': Use the button in the form footer to upload one or more image files (JPEG, PNG, WEBP). Only a limited number of photos per observation is supported. The upload button is only available when observer, year, month, and day are set.
   * Photo viewer: Clicking a thumbnail opens the integrated image viewer. Use the arrow buttons to navigate between photos, or download or delete an individual photo.
   * Deletion: When deleting an observation, if photos exist, you are asked whether the photo album should also be removed. If the observation is the last one by an observer on that day, the photos are deleted automatically.
 
-**Usage rights:** By uploading a photo, the author grants the AKM and its members the right to use the photo with attribution for internal association purposes – for example in monthly reports or other publications of the Halo Observation Section (Sektion Halobeobachtung im AKM).
+**Usage rights:** By uploading a photo, the author grants the AKM and its members the right to use the photo with attribution for association-conform purposes – for example in monthly reports or other publications of the AKM.
 
 ## 5. Notes
 
