@@ -27,6 +27,7 @@ from halo.models.constants import (
 import halo.io.observations as obs_logic
 import halo.io.observations_file as obs_file
 import halo.io.observations_db as obs_db
+import halo.io.observers_db as observers_db
 from ._helpers import _check_cloud_write_auth, _int, _obs_to_json, _spaeter
 from .analysis import _calculate_observation_solar_altitude
 
@@ -273,6 +274,16 @@ def _cleanup_empty_parent_prefixes(s3, jj: int, mm: int, tt: int):
         if _prefix_has_payload_objects(s3, prefix):
             break
         _delete_prefix_markers(s3, prefix)
+
+
+def _cleanup_empty_photo_prefix(s3, jj: int, mm: int, tt: int, kk: int):
+    """Remove empty kk-prefix marker and then clean up empty parent prefixes."""
+    prefix = _observation_photo_prefix(jj, mm, tt, kk)
+    if _prefix_has_payload_objects(s3, prefix):
+        return
+
+    _delete_prefix_markers(s3, prefix)
+    _cleanup_empty_parent_prefixes(s3, jj, mm, tt)
 
 
 def _delete_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> int:
@@ -1064,6 +1075,8 @@ def save_observation_photo_caption() -> Dict[str, Any]:
             return jsonify({'error': 'no_photos'}), 400
 
         _write_photo_caption_text(s3, prefix, caption)
+        if not has_photos:
+            _cleanup_empty_photo_prefix(s3, jj, mm, tt, kk)
         return jsonify({'success': True, 'caption': caption if has_photos else ''})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1112,6 +1125,7 @@ def delete_observation_photo() -> Dict[str, Any]:
         if not _has_original_photos(s3, prefix):
             s3.delete_object(Bucket=PHOTO_BUCKET_NAME, Key=_caption_key_for_prefix(prefix))
             caption_deleted = True
+            _cleanup_empty_photo_prefix(s3, jj, mm, tt, kk)
 
         return jsonify({
             'success': True,
@@ -1233,5 +1247,185 @@ def add_observation_photos() -> Dict[str, Any]:
             uploaded.append({'key': object_key, 'name': safe_name})
 
         return jsonify({'success': True, 'uploaded': uploaded, 'count': len(uploaded)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observations/photos/monthly-captions', methods=['GET'])
+def list_monthly_photo_captions() -> Dict[str, Any]:
+    """List photo folders with captions for a given year/month (admin only).
+
+    Intended for HALOassist monthly report generation. Returns only folders
+    where caption.txt exists with non-empty content, enriched with observer
+    metadata and observation area (GG) from the database.
+
+    Query parameters:
+        jj: 4-digit year
+        mm: month (1-12)
+
+    Response:
+        {
+            "jj": 2025, "mm": 1, "count": 2,
+            "entries": [
+                {
+                    "jj": 2025, "mm": 1, "tt": 15, "kk": 44,
+                    "observer_name": "Max Mustermann",
+                    "observer_hbort": "Seysdorf",
+                    "gg": 5,
+                    "caption": "Großer 22°-Ring ...",
+                    "photo_count": 3,
+                    "photos": [
+                        {"key": "...", "name": "img1.jpg",
+                         "url": "/api/observations/photos/file?key=..."}
+                    ]
+                }
+            ]
+        }
+    """
+    if not is_cloud_mode():
+        return jsonify({'error': 'cloud_mode_only'}), 403
+
+    if not session.get('authenticated', False):
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    if not session.get('is_admin', False):
+        return jsonify({'error': 'admin_required'}), 403
+
+    jj = _int(request.args, 'jj', -1)
+    mm = _int(request.args, 'mm', -1)
+
+    if jj < 1 or mm < 1 or mm > 12:
+        return jsonify({'error': 'missing_parameters'}), 400
+
+    try:
+        s3 = _get_s3_client()
+        month_prefix = f"{jj:04d}/{mm:02d}/"
+
+        all_keys = _list_prefix_object_keys(s3, month_prefix)
+
+        # Group all keys by YYYY/MM/DD/kkXX folder (first 4 path segments).
+        folder_keys: dict = {}
+        for key in all_keys:
+            parts = key.split('/')
+            if len(parts) >= 4:
+                folder = '/'.join(parts[:4])
+                folder_keys.setdefault(folder, []).append(key)
+
+        # Collect unique KK values from folders that have a caption key present.
+        unique_kks: set = set()
+        for folder, keys in folder_keys.items():
+            if f"{folder}/{PHOTO_CAPTION_FILENAME}" in set(keys):
+                parts = folder.split('/')
+                if len(parts) >= 4:
+                    kk_part = parts[3].lower()
+                    if kk_part.startswith('kk') and len(kk_part) >= 4:
+                        try:
+                            unique_kks.add(int(kk_part[2:4]))
+                        except ValueError:
+                            pass
+
+        # Load and cache observer info for each unique KK in this month.
+        obs_year_full = jj_to_full_year(jj)
+        month_year_comparable = obs_year_full * 100 + mm
+        observer_info: dict = {}  # kk -> {'name': str, 'hbort': str}
+
+        for kk_val in unique_kks:
+            candidates = []
+            for rec in observers_db.load_filtered(kk=kk_val):
+                try:
+                    seit_str = rec.get('seit', '')
+                    seit_mm_str, seit_yy_str = seit_str.split('/')
+                    seit_year_full = jj_to_full_year(int(seit_yy_str))
+                    rec_comparable = seit_year_full * 100 + int(seit_mm_str)
+                    if rec_comparable <= month_year_comparable:
+                        candidates.append((rec_comparable, rec))
+                except (ValueError, AttributeError, IndexError):
+                    pass
+            if candidates:
+                candidates.sort(key=lambda x: x[0], reverse=True)
+                best = candidates[0][1]
+                vname = best.get('VName', '')
+                nname = best.get('NName', '')
+                observer_info[kk_val] = {
+                    'name': f"{vname} {nname}".strip(),
+                    'hbort': best.get('HbOrt', ''),
+                }
+
+        # Build entries for folders that have a non-empty caption.
+        entries = []
+        for folder, keys in sorted(folder_keys.items()):
+            key_set = set(keys)
+            caption_key = f"{folder}/{PHOTO_CAPTION_FILENAME}"
+            if caption_key not in key_set:
+                continue
+
+            caption = _read_photo_caption_text(s3, folder)
+            if not caption.strip():
+                continue
+
+            # Parse folder segments: YYYY/MM/DD/kkXX
+            parts = folder.split('/')
+            try:
+                folder_jj = int(parts[0])
+                folder_mm = int(parts[1])
+                folder_tt = int(parts[2])
+                kk_str = parts[3].lower()
+                folder_kk = int(kk_str[2:4]) if kk_str.startswith('kk') else -1
+            except (ValueError, IndexError):
+                continue
+
+            # Observer metadata from cache.
+            info = observer_info.get(folder_kk, {})
+            observer_name = info.get('name', '')
+            observer_hbort = info.get('hbort', '')
+
+            # Resolve GG from observation records for this day/observer.
+            # Return the value only when all observations agree on a single GG.
+            gg: Any = None
+            try:
+                day_obs = obs_db.load_filtered(kk=folder_kk, jj=folder_jj, mm=folder_mm, tt=folder_tt)
+                gg_values = {
+                    int(o.get('GG', 0) or 0)
+                    for o in day_obs
+                    if o.get('GG') not in (None, '', '0', 0)
+                }
+                if len(gg_values) == 1:
+                    gg = next(iter(gg_values))
+            except Exception:
+                pass
+
+            # Original photos (no thumbnails).
+            original_keys = sorted(
+                [k for k in keys if _is_original_photo_key(k)],
+                key=lambda p: p.split('/')[-1].lower(),
+            )
+            photos = [
+                {
+                    'key': k,
+                    'name': k.split('/')[-1],
+                    'url': f"/api/observations/photos/file?key={quote(k, safe='')}",
+                }
+                for k in original_keys
+            ]
+
+            entries.append({
+                'jj': folder_jj,
+                'mm': folder_mm,
+                'tt': folder_tt,
+                'kk': folder_kk,
+                'observer_name': observer_name,
+                'observer_hbort': observer_hbort,
+                'gg': gg,
+                'caption': caption,
+                'photo_count': len(photos),
+                'photos': photos,
+            })
+
+        return jsonify({
+            'jj': jj,
+            'mm': mm,
+            'count': len(entries),
+            'entries': entries,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

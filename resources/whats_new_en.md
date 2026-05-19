@@ -3,6 +3,7 @@
 Version 3.3 introduces a photo gallery for halo observations (cloud mode only).
 
 - Photo gallery: Photos can be uploaded, viewed, and deleted for each observation. Up to 10 photos per observation are supported. Photos are displayed in a thumbnail bar below the observation form; an integrated image viewer allows browsing, downloading, and deleting individual images.
+- An optional caption can be entered for the photos and edited later.
 - When deleting an observation, the associated photo gallery can optionally be removed as well. If the observation is the last one by an observer on that day, photos are deleted automatically.
 - Usage rights: By uploading a photo, the author grants the AKM and its members the right to use the photo with attribution for internal association-conform purposes – for example in monthly reports or other publications of the AKM.
 

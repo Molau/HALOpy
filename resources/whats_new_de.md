@@ -3,6 +3,7 @@
 Version 3.3 führt ein Fotoalbum für Halobeobachtungen ein (nur im Cloud-Modus).
 
 - Fotoalbum: Zu jeder Beobachtung können Fotos hochgeladen, angesehen und gelöscht werden. Bis zu 10 Fotos pro Beobachtung sind möglich. Die Fotos werden in einer Thumbnailleiste unter dem Beobachtungsformular angezeigt; ein integrierter Bildbetrachter ermöglicht das Durchblättern sowie das Herunterladen und Löschen einzelner Aufnahmen.
+- Zu den Fotos kann optional eine Bildunterschrift erfasst und später geändert werden.
 - Beim Löschen einer Beobachtung kann optional das zugehörige Fotoalbum mit entfernt werden. Ist die Beobachtung die letzte eines Beobachters an diesem Tag, werden die Fotos automatisch mitgelöscht.
 - Nutzungsrecht: Mit dem Hochladen eines Fotos erteilt der Bildautor dem AKM und seinen Mitgliedern das Recht, das Foto unter Angabe des Bildautors für vereinskonforme Zwecke zu verwenden – beispielsweise in Monatsberichten oder anderen Publikationen des AKM.
 

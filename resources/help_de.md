@@ -186,6 +186,7 @@ Im Cloud-Modus steht in der Navigationsleiste der Button 'Abmelden' zur Verfügu
 Im Cloud-Modus können zu jeder Beobachtung Fotos hochgeladen und verwaltet werden. Die Thumbnailleiste erscheint unterhalb des Beobachtungsformulars, sobald Fotos vorliegen oder die Fotoansicht aktiv ist.
 
   * 'Fotos hochladen': Über den Button in der Fußzeile des Formulars können eine oder mehrere Bilddateien (JPEG, PNG, WEBP) hochgeladen werden. Pro Beobachtung sind eine begrenzte Zahl von Fotos möglich. Der Upload-Button ist nur verfügbar, wenn Beobachter, Jahr, Monat und Tag gesetzt sind.
+  * Bildunterschrift: Optional kann zu den hochgeladenen Fotos eine kurze mehrzeilige Bildunterschrift erfasst und später geändert werden.
   * Fotoansicht: Ein Klick auf ein Thumbnail öffnet den integrierten Bildbetrachter. Dort kann zwischen den Fotos navigiert, ein Foto heruntergeladen oder gelöscht werden.
   * Löschen: Beim Löschen einer Beobachtung wird, sofern Fotos vorhanden sind, gefragt, ob das Fotoalbum ebenfalls entfernt werden soll. Ist die Beobachtung die letzte eines Beobachters an diesem Tag, werden die Fotos automatisch mitgelöscht.
 
