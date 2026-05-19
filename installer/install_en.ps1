@@ -28,7 +28,7 @@ if ($IS_64BIT) {
     $ARCHITECTURE = "32-bit"
 }
 
-$HALOPY_REPO_URL = "https://github.com/Molau/Halo/archive/refs/heads/main.zip"
+$HALOPY_REPO_URL = "https://github.com/Molau/HALOpy/archive/refs/heads/main.zip"
 $DEFAULT_INSTALL_DIR = "$env:USERPROFILE\HALOpy"
 
 # Colors for output
@@ -263,7 +263,7 @@ $zipPath = Join-Path $INSTALL_DIR "halopy.zip"
 $extractPath = "$env:TEMP\halopy-extract"
 
 Write-Step "Checking HALOpy package from GitHub..."
-Write-Host "  Repository: https://github.com/Molau/Halo"
+Write-Host "  Repository: https://github.com/Molau/HALOpy"
 
 $remoteSize = $null
 try {
@@ -296,7 +296,7 @@ if (-not $useCachedZip) {
     }
     catch {
         Write-Error-Message "Failed to download HALOpy: $_"
-        Write-Host "You can manually download from: https://github.com/Molau/Halo/archive/refs/heads/main.zip"
+        Write-Host "You can manually download from: https://github.com/Molau/HALOpy/archive/refs/heads/main.zip"
         exit 1
     }
 }

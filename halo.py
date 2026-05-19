@@ -157,7 +157,7 @@ if __name__ == '__main__':
         else:
             print()
             print("Self-repair failed. Please download the latest version manually from:")
-            print("  https://github.com/Molau/Halo/releases")
+            print("  https://github.com/Molau/HALOpy/releases")
             print()
             input("Press Enter to exit...")
             sys.exit(1)

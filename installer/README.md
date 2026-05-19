@@ -20,8 +20,8 @@ HALOpy includes an automated installer similar to the original HALO program.
 
 1. **Download the installer files**
    - **IMPORTANT**: Use these direct "Raw" download links to avoid file corruption:
-   - **English**: [Download install_en.bat](https://github.com/Molau/Halo/raw/main/installer/install_en.bat) and [Download install_en.ps1](https://github.com/Molau/Halo/raw/main/installer/install_en.ps1)
-   - **Deutsch**: [Download install_de.bat](https://github.com/Molau/Halo/raw/main/installer/install_de.bat) and [Download install_de.ps1](https://github.com/Molau/Halo/raw/main/installer/install_de.ps1)
+   - **English**: [Download install_en.bat](https://github.com/Molau/HALOpy/raw/main/installer/install_en.bat) and [Download install_en.ps1](https://github.com/Molau/HALOpy/raw/main/installer/install_en.ps1)
+   - **Deutsch**: [Download install_de.bat](https://github.com/Molau/HALOpy/raw/main/installer/install_de.bat) and [Download install_de.ps1](https://github.com/Molau/HALOpy/raw/main/installer/install_de.ps1)
    - Right-click each link → Save Link As
    - Save both files to the same location (e.g., Downloads folder)
    - **Do NOT** copy-paste the file content from GitHub's web view - this can corrupt the quotes!
@@ -72,7 +72,7 @@ If you prefer manual installation or the automated installer doesn't work:
    - During installation: Check "Add Python to PATH"
 
 2. **Download HALOpy**
-   - Download ZIP from https://github.com/Molau/Halo/archive/refs/heads/main.zip
+   - Download ZIP from https://github.com/Molau/HALOpy/archive/refs/heads/main.zip
    - Extract to `C:\ASTRO\HALOpy`
 
 3. **Install Dependencies**
@@ -124,7 +124,7 @@ If you prefer manual installation or the automated installer doesn't work:
 
 **Download fails**
 - Check internet connection
-- Try downloading manually from: https://github.com/Molau/Halo/archive/refs/heads/main.zip
+- Try downloading manually from: https://github.com/Molau/HALOpy/archive/refs/heads/main.zip
 - Extract to `C:\ASTRO\HALOpy`
 
 ### Uninstallation
@@ -149,7 +149,7 @@ To remove HALOpy:
 
 If you're developing HALOpy:
 
-1. Clone the repository: `git clone https://github.com/Molau/Halo.git`
+1. Clone the repository: `git clone https://github.com/Molau/HALOpy.git`
 2. Install dependencies manually: `pip install -r requirements.txt`
 3. See main [README.md](../README.md) for development setup
 
