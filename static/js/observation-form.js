@@ -1681,6 +1681,13 @@ class ObservationForm {
         }
 
         section.classList.remove('d-none');
+
+        if (this.mode === 'edit' && !this.isEditingMode) {
+            textarea.disabled = true;
+            textarea.readOnly = true;
+            return;
+        }
+
         textarea.disabled = false;
         textarea.readOnly = !this.canEditPhotoCaption();
     }
