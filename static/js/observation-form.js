@@ -1566,27 +1566,6 @@ class ObservationForm {
                     // does NOT trigger the cancel/navigate-away path.
                     this.saved = true;
 
-                    // Move photos to the correct prefix if date/KK changed since upload.
-                    if (this.mode === 'add' && this.pendingUploadedPhotos.length > 0) {
-                        const _pfx = (kk, jj, mm, tt) =>
-                            `${String(jj).padStart(4,'0')}/${String(mm).padStart(2,'0')}/${String(tt).padStart(2,'0')}/kk${String(kk).padStart(2,'0')}`;
-                        const newPrefix = _pfx(parseInt(obs.KK,10), parseInt(obs.JJ,10), parseInt(obs.MM,10), parseInt(obs.TT,10));
-                        const movedPrefixes = new Set();
-                        for (const item of this.pendingUploadedPhotos) {
-                            const oldPrefix = _pfx(item.kk, item.jj, item.mm, item.tt);
-                            if (oldPrefix !== newPrefix && !movedPrefixes.has(oldPrefix)) {
-                                movedPrefixes.add(oldPrefix);
-                                try {
-                                    await fetch('/api/observations/photos/move-prefix', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ from_prefix: oldPrefix, to_prefix: newPrefix }),
-                                    });
-                                } catch (e) { /* best effort */ }
-                            }
-                        }
-                    }
-
                     this.pendingUploadedPhotos = [];
                     this.updatePhotoCaptionUi();
                     
@@ -1822,7 +1801,7 @@ class ObservationForm {
         };
     }
 
-    updateAutoPhotoPreview() {
+    async updateAutoPhotoPreview() {
         if (this.mode !== 'add') {
             return;
         }
@@ -1837,6 +1816,39 @@ class ObservationForm {
         const contextKey = `${context.kk}-${context.jj}-${context.mm}-${context.tt}`;
         if (contextKey === this.lastAutoPhotoContextKey) {
             return;
+        }
+
+        // Move any pending photos from their old prefix to the new context prefix
+        // so the gallery immediately reflects the correct location.
+        if (this.pendingUploadedPhotos.length > 0) {
+            const _pfx = (kk, jj, mm, tt) =>
+                `${String(jj).padStart(4,'0')}/${String(mm).padStart(2,'0')}/${String(tt).padStart(2,'0')}/kk${String(kk).padStart(2,'0')}`;
+            const newPrefix = _pfx(context.kk, context.jj, context.mm, context.tt);
+            const movedPrefixes = new Set();
+            for (const item of this.pendingUploadedPhotos) {
+                const oldPrefix = _pfx(item.kk, item.jj, item.mm, item.tt);
+                if (oldPrefix !== newPrefix && !movedPrefixes.has(oldPrefix)) {
+                    movedPrefixes.add(oldPrefix);
+                    try {
+                        const resp = await fetch('/api/observations/photos/move-prefix', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ from_prefix: oldPrefix, to_prefix: newPrefix }),
+                        });
+                        if (resp.ok) {
+                            for (const p of this.pendingUploadedPhotos) {
+                                if (_pfx(p.kk, p.jj, p.mm, p.tt) === oldPrefix) {
+                                    p.key = newPrefix + p.key.slice(oldPrefix.length);
+                                    p.kk = context.kk;
+                                    p.jj = context.jj;
+                                    p.mm = context.mm;
+                                    p.tt = context.tt;
+                                }
+                            }
+                        }
+                    } catch (e) { /* best effort */ }
+                }
+            }
         }
 
         this.lastAutoPhotoContextKey = contextKey;
