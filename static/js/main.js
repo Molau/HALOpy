@@ -307,7 +307,6 @@ window.addEventListener('beforeunload', (event) => {
 // Delete any unsaved uploaded photos when the page is unloaded (tab close / refresh / external navigation).
 // keepalive:true in cleanupUnsavedUploadedPhotos() ensures the fetch requests outlive the page.
 window.addEventListener('pagehide', () => {
-    console.log('[pagehide] fired, _pendingAddObsForm=%s', window._pendingAddObsForm ? 'set' : 'null');
     window._pendingAddObsForm?.cleanupUnsavedUploadedPhotos();
 });
 

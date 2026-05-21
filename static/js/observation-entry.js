@@ -37,7 +37,6 @@
 function showAddAnotherObservationDialog(includeLikePrevious = false) {
     return new Promise((resolve) => {
         // Add delay before creating modal to allow previous modal's backdrop to disappear
-        console.log('[showAddAnotherObservationDialog] timeout fired, creating modal...');
         setTimeout(() => {
             const likePreviousButtonHtml = includeLikePrevious
                 ? `<button type="button" class="btn btn-primary btn-sm px-3" id="btn-like-previous">${i18nStrings.observations.add_another_like_previous}</button>`
@@ -99,7 +98,6 @@ function showAddAnotherObservationDialog(includeLikePrevious = false) {
         
         // Cleanup on modal hidden
         modalEl.addEventListener('hidden.bs.modal', () => {
-            console.log('[showAddAnotherObservationDialog] hidden.bs.modal fired, resolved=%s', resolved);
             if (!resolved) {
                 // ESC or backdrop click - treat as No
                 resolved = true;
@@ -108,7 +106,6 @@ function showAddAnotherObservationDialog(includeLikePrevious = false) {
             modalEl.remove();
         });
         
-        console.log('[showAddAnotherObservationDialog] modal.show() called');
         modal.show();
         setupModalKeyboard(modalEl, btnLikePrevious || modalEl.querySelector('#btn-yes'));
         }, 300); // 300ms delay to let previous modal backdrop fully disappear
