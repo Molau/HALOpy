@@ -188,7 +188,23 @@ async function showModifySingleObservations(filterState) {
                 if (!resp.ok) throw new Error('Failed to save modified observation');
                 
                 const result = await resp.json();
-                
+
+                // Move photos if date or observer changed.
+                {
+                    const _pfx = (o) => `${String(o.JJ).padStart(4,'0')}/${String(o.MM).padStart(2,'0')}/${String(o.TT).padStart(2,'0')}/kk${String(o.KK).padStart(2,'0')}`;
+                    const oldPrefix = _pfx(obs);
+                    const newPrefix = _pfx(modifiedObs);
+                    if (oldPrefix !== newPrefix) {
+                        try {
+                            await fetch('/api/observations/photos/move-prefix', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ from_prefix: oldPrefix, to_prefix: newPrefix }),
+                            });
+                        } catch (e) { /* best effort */ }
+                    }
+                }
+
                 // Sync state from server (count, dirty flag, display)
                 await refreshFileStatus();
                 

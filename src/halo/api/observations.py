@@ -320,6 +320,48 @@ def _delete_photo_prefix(jj: int, mm: int, tt: int, kk: int) -> int:
     return deleted_count
 
 
+def _move_photo_prefix(s3, from_prefix: str, to_prefix: str) -> int:
+    """Copy all objects from from_prefix to to_prefix, delete originals, then clean up.
+
+    Moves photos, thumbnails, caption.txt — everything under the prefix.
+    Returns the number of objects moved.
+    """
+    all_keys = _list_prefix_object_keys(s3, from_prefix)
+    if not all_keys:
+        return 0
+
+    for key in all_keys:
+        suffix = key[len(from_prefix):]   # e.g. '/photo.jpg'
+        dest_key = f"{to_prefix}{suffix}"
+        s3.copy_object(
+            Bucket=PHOTO_BUCKET_NAME,
+            CopySource={'Bucket': PHOTO_BUCKET_NAME, 'Key': key},
+            Key=dest_key,
+        )
+
+    # Batch-delete source objects
+    for i in range(0, len(all_keys), 1000):
+        batch = all_keys[i:i + 1000]
+        s3.delete_objects(
+            Bucket=PHOTO_BUCKET_NAME,
+            Delete={'Objects': [{'Key': k} for k in batch]},
+        )
+
+    # Clean up now-empty source prefix
+    parts = from_prefix.rstrip('/').split('/')
+    if len(parts) >= 4:
+        try:
+            from_jj = int(parts[0])
+            from_mm = int(parts[1])
+            from_tt = int(parts[2])
+            _delete_prefix_markers(s3, from_prefix)
+            _cleanup_empty_parent_prefixes(s3, from_jj, from_mm, from_tt)
+        except (ValueError, IndexError):
+            pass
+
+    return len(all_keys)
+
+
 def _delete_photo_policy(data: Dict[str, Any]):
     """Return delete policy for photos when deleting one observation."""
     day_values = _day_values_from_obs(data)
@@ -1132,6 +1174,67 @@ def delete_observation_photo() -> Dict[str, Any]:
             'deleted_keys': keys_to_delete,
             'caption_deleted': caption_deleted,
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_blueprint.route('/observations/photos/move-prefix', methods=['POST'])
+def move_observation_photo_prefix() -> Dict[str, Any]:
+    """Move all photos from one S3 prefix to another (cloud mode only).
+
+    Used when an observation's date or observer (KK) changes, so photos,
+    thumbnails and caption.txt follow the observation to its new S3 location.
+
+    Request body:
+        { "from_prefix": "2026/03/08/kk44", "to_prefix": "2026/03/09/kk44" }
+
+    Response:
+        { "moved": <number of objects moved> }
+    """
+    if not is_cloud_mode():
+        return jsonify({'error': 'cloud_mode_only'}), 403
+
+    if not session.get('authenticated', False):
+        return jsonify({'error': 'not_authenticated'}), 401
+
+    data = request.get_json() or {}
+    from_prefix = (data.get('from_prefix') or '').strip().strip('/')
+    to_prefix = (data.get('to_prefix') or '').strip().strip('/')
+
+    if not from_prefix or not to_prefix:
+        return jsonify({'error': 'missing_parameters'}), 400
+
+    if from_prefix == to_prefix:
+        return jsonify({'moved': 0})
+
+    # Both prefixes must be in YYYY/MM/DD/kkXX format.
+    def _kk_from_prefix(p: str):
+        parts = p.split('/')
+        if len(parts) < 4:
+            return -1
+        kk_str = parts[3].lower()
+        if not kk_str.startswith('kk') or len(kk_str) < 4:
+            return -1
+        try:
+            return int(kk_str[2:4])
+        except ValueError:
+            return -1
+
+    to_kk = _kk_from_prefix(to_prefix)
+    from_kk = _kk_from_prefix(from_prefix)
+
+    if to_kk < 0 or from_kk < 0:
+        return jsonify({'error': 'invalid_prefix'}), 400
+
+    # Auth: user must own the destination KK (or be admin).
+    auth_error = _check_cloud_write_auth(to_kk)
+    if auth_error:
+        return auth_error
+
+    try:
+        s3 = _get_s3_client()
+        moved = _move_photo_prefix(s3, from_prefix, to_prefix)
+        return jsonify({'moved': moved})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -132,6 +132,8 @@ class ObservationForm {
                 this.disableAllFields();
             }, 0);
         } else if (mode === 'add') {
+            // Register globally so pagehide can clean up if the tab is closed mid-entry.
+            window._pendingAddObsForm = this;
             // Pre-fill fields for new observations
             setTimeout(() => {
                 // Pre-fill date fields
@@ -1558,6 +1560,27 @@ class ObservationForm {
                         await this.onSave(obs);
                     }
 
+                    // Move photos to the correct prefix if date/KK changed since upload.
+                    if (this.mode === 'add' && this.pendingUploadedPhotos.length > 0) {
+                        const _pfx = (kk, jj, mm, tt) =>
+                            `${String(jj).padStart(4,'0')}/${String(mm).padStart(2,'0')}/${String(tt).padStart(2,'0')}/kk${String(kk).padStart(2,'0')}`;
+                        const newPrefix = _pfx(parseInt(obs.KK,10), parseInt(obs.JJ,10), parseInt(obs.MM,10), parseInt(obs.TT,10));
+                        const movedPrefixes = new Set();
+                        for (const item of this.pendingUploadedPhotos) {
+                            const oldPrefix = _pfx(item.kk, item.jj, item.mm, item.tt);
+                            if (oldPrefix !== newPrefix && !movedPrefixes.has(oldPrefix)) {
+                                movedPrefixes.add(oldPrefix);
+                                try {
+                                    await fetch('/api/observations/photos/move-prefix', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ from_prefix: oldPrefix, to_prefix: newPrefix }),
+                                    });
+                                } catch (e) { /* best effort */ }
+                            }
+                        }
+                    }
+
                     this.pendingUploadedPhotos = [];
                     this.updatePhotoCaptionUi();
                     
@@ -1610,6 +1633,9 @@ class ObservationForm {
                 }
             }
             this.destroyed = true; // Mark as destroyed to prevent async operations
+            if (window._pendingAddObsForm === this) {
+                window._pendingAddObsForm = null;
+            }
             currentModalElement.remove();
         });
         

@@ -304,6 +304,12 @@ window.addEventListener('beforeunload', (event) => {
     }
 });
 
+// Delete any unsaved uploaded photos when the page is unloaded (tab close / refresh / external navigation).
+// keepalive:true in cleanupUnsavedUploadedPhotos() ensures the fetch requests outlive the page.
+window.addEventListener('pagehide', () => {
+    window._pendingAddObsForm?.cleanupUnsavedUploadedPhotos();
+});
+
 // Intercept clicks on internal links to set navigation flag
 document.addEventListener('click', (event) => {
     const link = event.target.closest('a');
