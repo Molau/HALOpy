@@ -1560,6 +1560,12 @@ class ObservationForm {
                         await this.onSave(obs);
                     }
 
+                    // Mark as saved immediately — onSave succeeded.
+                    // Must be set BEFORE any further async work so that hidden.bs.modal
+                    // (which may fire while we're still awaiting) sees saved=true and
+                    // does NOT trigger the cancel/navigate-away path.
+                    this.saved = true;
+
                     // Move photos to the correct prefix if date/KK changed since upload.
                     if (this.mode === 'add' && this.pendingUploadedPhotos.length > 0) {
                         const _pfx = (kk, jj, mm, tt) =>
@@ -1589,7 +1595,6 @@ class ObservationForm {
                         window.saveHaloDataToSession();
                     }
                     
-                    this.saved = true;
                     this.hideModal();
                 } catch (e) {
                     errEl.textContent = e.message;
