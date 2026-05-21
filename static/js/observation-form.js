@@ -1601,6 +1601,8 @@ class ObservationForm {
         // Clean up on modal hidden
         const currentModalElement = this.modalElement; // Capture reference for closure
         this.modalElement.addEventListener('hidden.bs.modal', () => {
+            console.log('[ObsForm hidden.bs.modal] saved=%s skipped=%s navigating=%s noButtonPressed=%s mode=%s',
+                this.saved, this.skipped, this.navigating, this.noButtonPressed, this.mode);
             // If show() was called again, this.modalElement points to the NEW modal.
             // In that case, skip cleanup to avoid interfering with the new modal.
             if (this.modalElement !== currentModalElement) {
@@ -1624,10 +1626,12 @@ class ObservationForm {
                         sessionStorage.setItem('haloData', JSON.stringify(window.haloData));
                     }
                     if (this.mode === 'add') {
+                        console.log('[ObsForm hidden.bs.modal] → cancel path: cleanupUnsavedUploadedPhotos + navigateInternal');
                         this.cleanupUnsavedUploadedPhotos().finally(() => {
                             window.navigateInternal('/');
                         });
                     } else {
+                        console.log('[ObsForm hidden.bs.modal] → cancel path: navigateInternal');
                         window.navigateInternal('/');
                     }
                 }
@@ -1844,6 +1848,7 @@ class ObservationForm {
     }
 
     async cleanupUnsavedUploadedPhotos() {
+        console.log('[cleanupUnsavedUploadedPhotos] mode=%s saved=%s pending=%d', this.mode, this.saved, this.pendingUploadedPhotos.length);
         if (this.mode !== 'add' || this.saved || this.pendingUploadedPhotos.length === 0) {
             return;
         }
