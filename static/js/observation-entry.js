@@ -410,6 +410,7 @@ async function showAddObservationDialogNumeric() {
                 setTimeout(() => spinner.modalEl?.remove(), 300);
             }
             updateNumericPhotoButtonState();
+            ensureNumericInputFocus();
         }
     }
 
