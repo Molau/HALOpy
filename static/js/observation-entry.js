@@ -175,9 +175,19 @@ async function showAddObservationDialogNumeric() {
                         <div id="obs-guide-box" class="border rounded mb-2" style="font-family: var(--bs-font-monospace, monospace); white-space: pre; background: #f8f9fa; padding: 4px 6px; font-size: 14px; color: #000; cursor: text; overflow-x: auto;"><div id="obs-guide-header" style="margin: 0; padding: 0; line-height: 1.4;">${i18nStrings.observations.input_pattern}</div><div id="obs-guide-entered" style="margin: 0; padding: 0; line-height: 1.4;"></div><div id="obs-guide-remarks" style="margin: 0; padding: 0; line-height: 1.4; display: none;"></div><div id="obs-guide-caret" style="color:#0d6efd; margin: 0; padding: 0; line-height: 1.4;"></div></div>
                         <input id="obs-code-input" class="form-control form-control-sm py-1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" style="opacity: 0; height: 0; padding: 0; margin: 0; border: none; font-family: var(--bs-font-monospace, monospace); font-size: 14px;" size="110" placeholder="KKOJJMMTTgZZZZdDDNCcEEHFVfzzGG...">
                         <div id="obs-code-error" class="text-danger mt-1" style="display:none; font-size: 12px;"></div>
+                        <div id="obs-numeric-photo-section" class="d-none mt-2">
+                            <label class="form-label">${i18nStrings.observations.photos_heading}</label>
+                            <div class="obs-photo-strip" id="obs-numeric-photo-strip"></div>
+                        </div>
+                        <div id="obs-numeric-photo-caption-section" class="d-none mt-2">
+                            <label class="form-label" for="obs-numeric-photo-caption">${i18nStrings.observations.photo_caption_label}</label>
+                            <textarea class="form-control form-control-sm" id="obs-numeric-photo-caption" rows="2" placeholder="${escapeHtml(i18nStrings.observations.photo_caption_placeholder)}" disabled></textarea>
+                        </div>
                     </div>
                     <div class="modal-footer py-1">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                        <button type="button" class="btn btn-secondary btn-sm px-3" id="btn-numeric-photo-upload" disabled>${i18nStrings.observations.photo_upload}</button>
+                        <input type="file" id="obs-numeric-photo-upload-input" accept="image/*" multiple class="d-none">
                         <button type="button" class="btn btn-primary btn-sm px-3" id="btn-add-obs-ok">${i18nStrings.common.ok}</button>
                     </div>
                 </div>
@@ -202,6 +212,372 @@ async function showAddObservationDialogNumeric() {
 
     const input = document.getElementById('obs-code-input');
     const errEl = document.getElementById('obs-code-error');
+
+    // ── Photo upload state (numeric dialog) ──────────────────────────────────
+    const photoSectionEl = document.getElementById('obs-numeric-photo-section');
+    const photoStripEl = document.getElementById('obs-numeric-photo-strip');
+    const photoCaptionSectionEl = document.getElementById('obs-numeric-photo-caption-section');
+    const photoCaptionEl = document.getElementById('obs-numeric-photo-caption');
+    const photoUploadBtn = document.getElementById('btn-numeric-photo-upload');
+    const photoUploadInput = document.getElementById('obs-numeric-photo-upload-input');
+
+    let numericPhotoItems = [];
+    let numericPendingPhotos = [];      // { key, kk, jj, mm, tt }
+    let numericPhotoCaptionDirty = false;
+    let numericPhotoCaptionLoading = false;
+    let numericPhotoCaptionSavePromise = null;
+    let numericLastPhotoContextKey = null;
+    let numericPhotoRequestToken = 0;
+
+    // Returns the photo context (kk/jj/mm/tt) when all four are present in eing,
+    // i.e. when eing.length >= 9 (positions 0-8 = KK OO JJ MM TT).
+    function getNumericPhotoContext() {
+        if (eing.length < 9) return null;
+        const kk = parseInt(eing.slice(0, 2), 10);
+        const jj2 = parseInt(eing.slice(3, 5), 10); // 2-digit year
+        const mm = parseInt(eing.slice(5, 7), 10);
+        const tt = parseInt(eing.slice(7, 9), 10);
+        if (!Number.isInteger(kk) || kk < 1) return null;
+        if (!Number.isInteger(jj2) || jj2 < 0) return null;
+        if (!Number.isInteger(mm) || mm < 1 || mm > 12) return null;
+        if (!Number.isInteger(tt) || tt < 1 || tt > 31) return null;
+        // Convert 2-digit year to 4-digit (same logic as parseNumericObservation)
+        const jj4 = jj2 >= 86 ? 1900 + jj2 : 2000 + jj2;
+        return { kk, jj: jj4, mm, tt };
+    }
+
+    function updateNumericPhotoButtonState() {
+        if (!photoUploadBtn) return;
+        photoUploadBtn.disabled = (getNumericPhotoContext() === null);
+    }
+
+    function renderNumericPhotoGallery() {
+        if (!photoSectionEl || !photoStripEl) return;
+        if (!Array.isArray(numericPhotoItems) || numericPhotoItems.length === 0) {
+            photoSectionEl.classList.add('d-none');
+            photoStripEl.innerHTML = '';
+            updateNumericPhotoCaptionUi();
+            return;
+        }
+        photoSectionEl.classList.remove('d-none');
+        photoStripEl.innerHTML = numericPhotoItems.map((photo, index) => {
+            const altTemplate = i18nStrings.observations.photo_alt;
+            const alt = altTemplate.replace('{index}', String(index + 1));
+            return `<button type="button" class="obs-photo-thumb-btn" data-photo-index="${index}" aria-label="${escapeHtml(alt)}">
+                        <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(alt)}" class="obs-photo-thumb-img">
+                    </button>`;
+        }).join('');
+        // Click thumbnail → open viewer via ObservationForm viewer (standalone)
+        photoStripEl.querySelectorAll('.obs-photo-thumb-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                openNumericPhotoViewer(parseInt(btn.dataset.photoIndex, 10));
+            });
+        });
+        updateNumericPhotoCaptionUi();
+    }
+
+    function updateNumericPhotoCaptionUi() {
+        if (!photoCaptionSectionEl || !photoCaptionEl) return;
+        const hasPhotos = Array.isArray(numericPhotoItems) && numericPhotoItems.length > 0;
+        if (!hasPhotos) {
+            photoCaptionSectionEl.classList.add('d-none');
+            photoCaptionEl.disabled = true;
+            return;
+        }
+        photoCaptionSectionEl.classList.remove('d-none');
+        photoCaptionEl.disabled = false;
+    }
+
+    function setNumericPhotoCaptionValue(caption) {
+        numericPhotoCaptionLoading = true;
+        numericPhotoCaptionDirty = false;
+        if (photoCaptionEl) photoCaptionEl.value = caption || '';
+        numericPhotoCaptionLoading = false;
+        updateNumericPhotoCaptionUi();
+    }
+
+    async function loadNumericPhotos(kk, jj, mm, tt) {
+        const requestToken = ++numericPhotoRequestToken;
+        try {
+            const params = new URLSearchParams({
+                kk: String(kk), jj: String(jj), mm: String(mm), tt: String(tt)
+            });
+            const response = await fetch(`/api/observations/photos?${params.toString()}`);
+            if (!response.ok) throw new Error('photo_list_failed');
+            const data = await response.json();
+            if (requestToken !== numericPhotoRequestToken) return; // stale
+            numericPhotoItems = Array.isArray(data.photos) ? data.photos : [];
+            setNumericPhotoCaptionValue(typeof data.caption === 'string' ? data.caption : '');
+            renderNumericPhotoGallery();
+        } catch (e) {
+            if (requestToken === numericPhotoRequestToken) {
+                numericPhotoItems = [];
+                renderNumericPhotoGallery();
+            }
+        }
+    }
+
+    async function updateNumericAutoPhotoPreview() {
+        const ctx = getNumericPhotoContext();
+        if (!ctx) {
+            numericLastPhotoContextKey = null;
+            numericPhotoItems = [];
+            renderNumericPhotoGallery();
+            return;
+        }
+        const ctxKey = `${ctx.kk}-${ctx.jj}-${ctx.mm}-${ctx.tt}`;
+        if (ctxKey === numericLastPhotoContextKey) return;
+
+        // Move any pending photos from old prefix to new prefix
+        if (numericPendingPhotos.length > 0) {
+            const pfx = (c) => `${String(c.jj).padStart(4,'0')}/${String(c.mm).padStart(2,'0')}/${String(c.tt).padStart(2,'0')}/kk${String(c.kk).padStart(2,'0')}`;
+            const newPrefix = pfx(ctx);
+            const movedPrefixes = new Set();
+            for (const item of numericPendingPhotos) {
+                const oldPrefix = pfx(item);
+                if (oldPrefix !== newPrefix && !movedPrefixes.has(oldPrefix)) {
+                    movedPrefixes.add(oldPrefix);
+                    try {
+                        const resp = await fetch('/api/observations/photos/move-prefix', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ from_prefix: oldPrefix, to_prefix: newPrefix }),
+                        });
+                        if (resp.ok) {
+                            for (const p of numericPendingPhotos) {
+                                if (pfx(p) === oldPrefix) {
+                                    p.key = newPrefix + p.key.slice(oldPrefix.length);
+                                    p.kk = ctx.kk; p.jj = ctx.jj; p.mm = ctx.mm; p.tt = ctx.tt;
+                                }
+                            }
+                        }
+                    } catch (e) { /* best effort */ }
+                }
+            }
+        }
+
+        numericLastPhotoContextKey = ctxKey;
+        await loadNumericPhotos(ctx.kk, ctx.jj, ctx.mm, ctx.tt);
+    }
+
+    async function uploadNumericPhotos(files) {
+        const ctx = getNumericPhotoContext();
+        if (!ctx) {
+            showErrorDialog(i18nStrings.observations.photo_upload_select_context);
+            return;
+        }
+        const { kk, jj, mm, tt } = ctx;
+        const formData = new FormData();
+        formData.append('kk', String(kk));
+        formData.append('jj', String(jj));
+        formData.append('mm', String(mm));
+        formData.append('tt', String(tt));
+        files.forEach(f => formData.append('photos', f));
+
+        if (photoUploadBtn) photoUploadBtn.disabled = true;
+        const spinner = showInfoModal(
+            i18nStrings.upload_download.upload_title,
+            i18nStrings.upload_download.upload_progress
+        );
+        try {
+            const response = await fetch('/api/observations/photos/add', {
+                method: 'POST',
+                body: formData,
+            });
+            let payload = {};
+            try { payload = await response.json(); } catch (e) {}
+            if (!response.ok) {
+                const errMap = {
+                    too_many_files: i18nStrings.observations.photo_upload_too_many_files,
+                    invalid_file_type: i18nStrings.observations.photo_upload_invalid_file_type,
+                    file_too_large: i18nStrings.observations.photo_upload_file_too_large,
+                };
+                showErrorDialog(errMap[payload?.error] || i18nStrings.observations.photo_upload_error);
+                return;
+            }
+            const uploaded = Array.isArray(payload?.uploaded) ? payload.uploaded : [];
+            uploaded.forEach(item => {
+                if (item?.key) numericPendingPhotos.push({ key: item.key, kk, jj, mm, tt });
+            });
+            showNotification(i18nStrings.observations.photo_upload_success);
+            await loadNumericPhotos(kk, jj, mm, tt);
+        } catch (e) {
+            showErrorDialog(i18nStrings.observations.photo_upload_error);
+        } finally {
+            if (spinner?.modal) {
+                spinner.modal.hide();
+                setTimeout(() => spinner.modalEl?.remove(), 300);
+            }
+            updateNumericPhotoButtonState();
+        }
+    }
+
+    async function persistNumericPhotoCaption() {
+        if (!numericPhotoCaptionDirty) {
+            if (numericPhotoCaptionSavePromise) await numericPhotoCaptionSavePromise;
+            return;
+        }
+        const ctx = getNumericPhotoContext();
+        if (!ctx || !Array.isArray(numericPhotoItems) || numericPhotoItems.length === 0) {
+            numericPhotoCaptionDirty = false;
+            return;
+        }
+        const caption = photoCaptionEl ? photoCaptionEl.value : '';
+        const savePromise = fetch('/api/observations/photos/caption', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kk: ctx.kk, jj: ctx.jj, mm: ctx.mm, tt: ctx.tt, caption }),
+        }).then(async response => {
+            let payload = {};
+            try { payload = await response.json(); } catch (e) {}
+            if (!response.ok) throw new Error(payload?.error || 'photo_caption_save_failed');
+            setNumericPhotoCaptionValue(typeof payload?.caption === 'string' ? payload.caption : caption);
+        }).finally(() => {
+            if (numericPhotoCaptionSavePromise === savePromise) numericPhotoCaptionSavePromise = null;
+        });
+        numericPhotoCaptionSavePromise = savePromise;
+        await savePromise;
+    }
+
+    async function flushNumericPhotoCaptionSave() {
+        if (numericPhotoCaptionDirty) {
+            await persistNumericPhotoCaption();
+            return;
+        }
+        if (numericPhotoCaptionSavePromise) await numericPhotoCaptionSavePromise;
+    }
+
+    async function cleanupNumericUnsavedPhotos() {
+        if (numericPendingPhotos.length === 0) return;
+        const pending = [...numericPendingPhotos];
+        numericPendingPhotos = [];
+        for (const item of pending) {
+            try {
+                await fetch('/api/observations/photos/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: item.key, kk: item.kk, jj: item.jj, mm: item.mm, tt: item.tt }),
+                    keepalive: true
+                });
+            } catch (e) { /* best effort */ }
+        }
+    }
+
+    function openNumericPhotoViewer(startIndex = 0) {
+        if (!Array.isArray(numericPhotoItems) || numericPhotoItems.length === 0) return;
+        const safeStart = Math.max(0, Math.min(startIndex, numericPhotoItems.length - 1));
+        const modalId = `numeric-photo-modal-${Date.now()}`;
+        const modalHtml = `
+            <div class="modal fade" id="${modalId}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header py-1">
+                            <h6 class="modal-title" id="${modalId}-title"></h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body py-2 text-center">
+                            <img id="${modalId}-img" class="obs-photo-viewer-img" src="" alt="">
+                        </div>
+                        <div class="modal-footer py-1">
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-prev">${i18nStrings.common.previous}</button>
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-next">${i18nStrings.common.next}</button>
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-download">${i18nStrings.common.download}</button>
+                            <button type="button" class="btn btn-secondary btn-sm px-3" id="${modalId}-delete">${i18nStrings.observations.photo_delete}</button>
+                            <button type="button" class="btn btn-primary btn-sm px-3" data-bs-dismiss="modal">${i18nStrings.common.cancel}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const viewerEl = document.getElementById(modalId);
+        const titleEl = document.getElementById(`${modalId}-title`);
+        const imgEl = document.getElementById(`${modalId}-img`);
+        const prevBtn = document.getElementById(`${modalId}-prev`);
+        const nextBtn = document.getElementById(`${modalId}-next`);
+        const downloadBtn = document.getElementById(`${modalId}-download`);
+        const deleteBtn = document.getElementById(`${modalId}-delete`);
+        const viewerModal = new bootstrap.Modal(viewerEl, { backdrop: 'static' });
+        let currentIndex = safeStart;
+
+        const renderViewer = () => {
+            const current = numericPhotoItems[currentIndex];
+            if (!current) { viewerModal.hide(); return; }
+            const titleTpl = i18nStrings.observations.photo_viewer_title;
+            titleEl.textContent = titleTpl
+                .replace('{current}', String(currentIndex + 1))
+                .replace('{total}', String(numericPhotoItems.length));
+            imgEl.src = current.full_url || current.url;
+            imgEl.alt = current.name || '';
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === numericPhotoItems.length - 1;
+        };
+        prevBtn.addEventListener('click', () => { if (currentIndex > 0) { currentIndex--; renderViewer(); } });
+        nextBtn.addEventListener('click', () => { if (currentIndex < numericPhotoItems.length - 1) { currentIndex++; renderViewer(); } });
+        downloadBtn.addEventListener('click', () => {
+            const current = numericPhotoItems[currentIndex];
+            if (current) {
+                const a = document.createElement('a');
+                a.href = current.full_url || current.url;
+                a.download = current.name || 'photo';
+                a.click();
+            }
+        });
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                const current = numericPhotoItems[currentIndex];
+                if (!current) return;
+                const ctx = getNumericPhotoContext();
+                if (!ctx) return;
+                try {
+                    const resp = await fetch('/api/observations/photos/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: current.key, kk: ctx.kk, jj: ctx.jj, mm: ctx.mm, tt: ctx.tt }),
+                    });
+                    if (!resp.ok) { showErrorDialog(i18nStrings.observations.photo_upload_error); return; }
+                    // Remove from pending list too
+                    const idx = numericPendingPhotos.findIndex(p => p.key === current.key);
+                    if (idx !== -1) numericPendingPhotos.splice(idx, 1);
+                    await loadNumericPhotos(ctx.kk, ctx.jj, ctx.mm, ctx.tt);
+                    if (numericPhotoItems.length === 0) { viewerModal.hide(); return; }
+                    currentIndex = Math.min(currentIndex, numericPhotoItems.length - 1);
+                    renderViewer();
+                } catch (e) {
+                    showErrorDialog(i18nStrings.observations.photo_upload_error);
+                }
+            });
+        }
+        viewerEl.addEventListener('hidden.bs.modal', () => viewerEl.remove());
+        viewerModal.show();
+        renderViewer();
+    }
+
+    // Upload button and file input event handlers
+    photoUploadBtn.addEventListener('click', () => {
+        if (getNumericPhotoContext() === null) {
+            showErrorDialog(i18nStrings.observations.photo_upload_select_context);
+            return;
+        }
+        photoUploadInput.click();
+    });
+    photoUploadInput.addEventListener('change', async () => {
+        const files = Array.from(photoUploadInput.files || []);
+        if (files.length > 0) await uploadNumericPhotos(files);
+        photoUploadInput.value = '';
+    });
+
+    if (photoCaptionEl) {
+        photoCaptionEl.addEventListener('input', () => {
+            if (!numericPhotoCaptionLoading) numericPhotoCaptionDirty = true;
+        });
+        photoCaptionEl.addEventListener('blur', async () => {
+            if (!numericPhotoCaptionDirty) return;
+            try { await persistNumericPhotoCaption(); }
+            catch (e) { showErrorDialog(i18nStrings.observations.photo_caption_save_error); }
+        });
+    }
+    // ── End photo upload state ────────────────────────────────────────────────
+
 
     // Mobile keyboards may inject replacement text/autocorrect snippets.
     // Keep the hidden numeric input strictly literal.
@@ -255,7 +631,7 @@ async function showAddObservationDialogNumeric() {
     // Restore focus when clicking anywhere in the document (handles clicks outside modal)
     const handleDocumentClick = (e) => {
         // Only refocus if the modal is still visible and click wasn't on a button that closes the modal
-        if (document.body.contains(input) && !e.target.closest('.btn-close, #btn-add-obs-ok, #btn-add-obs-cancel')) {
+        if (document.body.contains(input) && !e.target.closest('.btn-close, #btn-add-obs-ok, #btn-add-obs-cancel, #btn-numeric-photo-upload, #obs-numeric-photo-upload-input, .obs-photo-thumb-btn, .obs-photo-viewer-img')) {
             setTimeout(ensureNumericInputFocus, 0);
         }
     };
@@ -338,6 +714,10 @@ async function showAddObservationDialogNumeric() {
         await handleKeydownEvent(ev);
         
         isProcessingInput = false;
+        
+        // Update photo upload button state and auto-preview after each key event
+        updateNumericPhotoButtonState();
+        await updateNumericAutoPhotoPreview();
         
         // Process next item in queue if any
         if (inputQueue.length > 0) {
@@ -1033,6 +1413,9 @@ async function showAddObservationDialogNumeric() {
         }
         isSubmittingObservation = true;
         try {
+            // Flush any pending caption save before submitting
+            await flushNumericPhotoCaptionSave();
+
             const obs = parseNumericObservation(eing);
             if (!obs) {
                 errEl.textContent = i18nStrings.observations.input_incomplete;
@@ -1065,6 +1448,7 @@ async function showAddObservationDialogNumeric() {
             await triggerAutosave();
             
             saveHandled = true; // Mark save as successful
+            numericPendingPhotos = []; // Photos are now tied to the saved observation
             modal.hide();
             
             // Show success notification
@@ -1094,6 +1478,8 @@ async function showAddObservationDialogNumeric() {
     let saveHandled = false;
     modalEl.addEventListener('hidden.bs.modal', () => {
         if (!saveHandled) {
+            // Delete any pending (unsaved) uploaded photos
+            cleanupNumericUnsavedPhotos();
             modalEl.remove();
             clearMenuHighlights();
         }
