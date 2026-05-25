@@ -1008,7 +1008,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (data.observer_overview && data.observer_overview.length > 0) {
             text += renderObserverOverview(data.observer_overview, monthName, year);
         }
-        
+
+        // Observer Directory (after table 1, before table 2)
+        if (data.observer_names && data.observer_names.length > 0) {
+            text += window.renderObserverListPseudo(data.observer_names, i18nStrings);
+        }
+
         // Table 2: EE Overview (reuse rendering function)
         if (data.ee_overview && data.ee_overview.length > 0) {
             text += renderEEOverview(data.ee_overview, data.daily_totals || {}, data.grand_total || 0, monthName, year);
@@ -1312,7 +1317,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             md += '\n_' + i18nStrings.statistics.footnote_ee_days + '_\n\n';
         }
-        
+
+        // Observer Directory (after table 1, before table 2)
+        if (data.observer_names && data.observer_names.length > 0) {
+            md += window.renderObserverListMarkdown(data.observer_names, i18nStrings);
+        }
+
         // Table 2: EE Overview
         if (data.ee_overview && data.ee_overview.length > 0) {
             md += `## ${i18nStrings.monthly_stats.ee_overview} ${monthName} ${year}\n\n`;
@@ -1481,7 +1491,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += '</tfoot>';
             html += '</table>';
         }
-        
+
+        // Observer Directory (after table 1, before table 2)
+        if (data.observer_names && data.observer_names.length > 0) {
+            html += window.renderObserverListHTML(data.observer_names, i18nStrings);
+        }
+
         // Table 2: EE Overview (Ergebnisübersicht Sonnenhalos)
         if (data.ee_overview && data.ee_overview.length > 0) {
             html += '<table class="table table-bordered analysis-table" style="margin-bottom: 30px;">';

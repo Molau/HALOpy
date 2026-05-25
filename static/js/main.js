@@ -1158,6 +1158,148 @@ window.getParameterRange = function(paramCode, observers) {
     }
 };
 
+// Render observer name/site list as pseudographic 2-column table (used in stats save).
+// @param {Array} observerNames - Array of {kk, name, site} objects
+// @param {Object} i18nStrings - i18n strings object
+// @returns {string} pseudographic text block (with trailing newline)
+window.renderObserverListPseudo = function(observerNames, i18nStrings) {
+    if (!observerNames || observerNames.length === 0) return '';
+
+    const COLS = 2;
+    const KK_W = 2;
+    const NAME_W = 35;
+    const INDENT = '    ';
+    const inner = COLS * (KK_W + 1 + NAME_W) + (COLS - 1); // 77
+
+    const title = i18nStrings.statistics.observer_list;
+    const hdr = i18nStrings.statistics.observer_list_header;
+
+    let text = '';
+
+    text += INDENT + '╔' + '═'.repeat(inner) + '╗\n';
+    const pad = Math.max(0, Math.floor((inner - title.length) / 2));
+    text += INDENT + '║' + ' '.repeat(pad) + title + ' '.repeat(inner - pad - title.length) + '║\n';
+    text += INDENT + '╠' + '═'.repeat(KK_W) + '╦' + '═'.repeat(NAME_W) + '╦' + '═'.repeat(KK_W) + '╦' + '═'.repeat(NAME_W) + '╣\n';
+    const hdrCell = (' ' + hdr).padEnd(NAME_W).slice(0, NAME_W);
+    text += INDENT + '║KK║' + hdrCell + '║KK║' + hdrCell + '║\n';
+    text += INDENT + '╠' + '═'.repeat(KK_W) + '╬' + '═'.repeat(NAME_W) + '╬' + '═'.repeat(KK_W) + '╬' + '═'.repeat(NAME_W) + '╣\n';
+
+    const n = observerNames.length;
+    const rowsPerCol = Math.ceil(n / COLS);
+
+    for (let row = 0; row < rowsPerCol; row++) {
+        let line = INDENT + '║';
+        for (let col = 0; col < COLS; col++) {
+            const idx = col * rowsPerCol + row;
+            let kk, cell;
+            if (idx < n) {
+                const obs = observerNames[idx];
+                kk = String(obs.kk).padStart(2, '0');
+                const nameSite = obs.site ? `${obs.name} (${obs.site})` : (obs.name || '');
+                cell = (' ' + nameSite).padEnd(NAME_W).slice(0, NAME_W);
+            } else {
+                kk = '  ';
+                cell = ' '.repeat(NAME_W);
+            }
+            line += kk + '║' + cell + '║';
+        }
+        text += line + '\n';
+    }
+
+    text += INDENT + '╚' + '═'.repeat(KK_W) + '╩' + '═'.repeat(NAME_W) + '╩' + '═'.repeat(KK_W) + '╩' + '═'.repeat(NAME_W) + '╝\n\n';
+
+    return text;
+};
+
+// Render observer name/site list as Markdown 2-column table (used in stats Markdown save).
+// @param {Array} observerNames - Array of {kk, name, site} objects
+// @param {Object} i18nStrings - i18n strings object
+// @returns {string} Markdown table string
+window.renderObserverListMarkdown = function(observerNames, i18nStrings) {
+    if (!observerNames || observerNames.length === 0) return '';
+
+    const COLS = 2;
+    const title = i18nStrings.statistics.observer_list;
+    const hdr = i18nStrings.statistics.observer_list_header;
+
+    let md = `## ${title}\n\n`;
+
+    let headerRow = '|';
+    let sep = '|';
+    for (let i = 0; i < COLS; i++) {
+        headerRow += ` KK | ${hdr} |`;
+        sep += ' ---: | --- |';
+    }
+    md += headerRow + '\n' + sep + '\n';
+
+    const n = observerNames.length;
+    const rowsPerCol = Math.ceil(n / COLS);
+
+    for (let row = 0; row < rowsPerCol; row++) {
+        let rowStr = '|';
+        for (let col = 0; col < COLS; col++) {
+            const idx = col * rowsPerCol + row;
+            if (idx < n) {
+                const obs = observerNames[idx];
+                const kk = String(obs.kk).padStart(2, '0');
+                const nameSite = obs.site ? `${obs.name} (${obs.site})` : (obs.name || '');
+                rowStr += ` ${kk} | ${nameSite} |`;
+            } else {
+                rowStr += '  |  |';
+            }
+        }
+        md += rowStr + '\n';
+    }
+
+    return md + '\n';
+};
+
+// Render observer name/site list as Bootstrap HTML table (used in stats HTML display).
+// @param {Array} observerNames - Array of {kk, name, site} objects
+// @param {Object} i18nStrings - i18n strings object
+// @returns {string} HTML table string
+window.renderObserverListHTML = function(observerNames, i18nStrings) {
+    if (!observerNames || observerNames.length === 0) return '';
+
+    const COLS = 2;
+    const title = i18nStrings.statistics.observer_list;
+    const hdr = i18nStrings.statistics.observer_list_header;
+
+    let html = '<table class="table table-bordered analysis-table" style="margin-bottom: 30px;">';
+    html += '<thead>';
+    html += `<tr><th colspan="${COLS * 2}" style="text-align: center;">${escapeHtml(title)}</th></tr>`;
+    html += '<tr>';
+    for (let i = 0; i < COLS; i++) {
+        html += '<th style="text-align: center; width: 3em;">KK</th>';
+        html += `<th>${escapeHtml(hdr)}</th>`;
+    }
+    html += '</tr>';
+    html += '</thead><tbody>';
+
+    const n = observerNames.length;
+    const rowsPerCol = Math.ceil(n / COLS);
+
+    for (let row = 0; row < rowsPerCol; row++) {
+        html += '<tr>';
+        for (let col = 0; col < COLS; col++) {
+            const idx = col * rowsPerCol + row;
+            if (idx < n) {
+                const obs = observerNames[idx];
+                const kk = String(obs.kk).padStart(2, '0');
+                const nameSite = obs.site ? `${obs.name} (${obs.site})` : (obs.name || '');
+                html += `<td style="text-align: center;">${escapeHtml(kk)}</td>`;
+                html += `<td>${escapeHtml(nameSite)}</td>`;
+            } else {
+                html += '<td></td><td></td>';
+            }
+        }
+        html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    return html;
+};
+
 // Show help
 function showHelp() {
     // Prefer rich markdown help dialog over alerts

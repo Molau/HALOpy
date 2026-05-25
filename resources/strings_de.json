@@ -556,6 +556,8 @@
   },
     "statistics": {
       "footnote_ee_days": "1) = EE (Sonne) &nbsp; 2) = Tage (Sonne) &nbsp; 3) = Tage (Mond) &nbsp; 4) = Tage (gesamt)",
+      "observer_list": "Beobachterverzeichnis",
+      "observer_list_header": "Beobachter (Ort)",
       "table_day": "Tag",
       "table_ee_sun": "EE(Sonne)",
       "table_days_sun": "Tage(Sonne)",

@@ -556,6 +556,8 @@
     },
     "statistics": {
       "footnote_ee_days": "1) = EE (Sun) &nbsp; 2) = Days (Sun) &nbsp; 3) = Days (Moon) &nbsp; 4) = Days (Total)",
+      "observer_list": "Observer Directory",
+      "observer_list_header": "Observer (Site)",
       "table_day": "Day",
       "table_ee_sun": "EE(Sun)",
       "table_days_sun": "Days(Sun)",

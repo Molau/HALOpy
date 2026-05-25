@@ -296,6 +296,93 @@ def get_monthly_report() -> Dict[str, Any]:
 
 
 
+def _format_observer_list_text(observer_names: list, i18n) -> str:
+    """Format observer name/site list as pseudographic 2-column table."""
+    if not observer_names:
+        return ''
+
+    COLS = 2
+    KK_W = 2
+    NAME_W = 35
+    INDENT = '    '
+    inner = COLS * (KK_W + 1 + NAME_W) + (COLS - 1)  # = 77
+
+    lines = []
+    title = i18n.get('statistics.observer_list')
+
+    lines.append(INDENT + '╔' + '═' * inner + '╗')
+    pad = max(0, (inner - len(title)) // 2)
+    lines.append(INDENT + '║' + ' ' * pad + title + ' ' * (inner - pad - len(title)) + '║')
+    lines.append(INDENT + '╠' + '═' * KK_W + '╦' + '═' * NAME_W + '╦' + '═' * KK_W + '╦' + '═' * NAME_W + '╣')
+
+    hdr = i18n.get('statistics.observer_list_header')
+    hdr_cell = (' ' + hdr).ljust(NAME_W)[:NAME_W]
+    lines.append(INDENT + '║KK║' + hdr_cell + '║KK║' + hdr_cell + '║')
+    lines.append(INDENT + '╠' + '═' * KK_W + '╬' + '═' * NAME_W + '╬' + '═' * KK_W + '╬' + '═' * NAME_W + '╣')
+
+    n = len(observer_names)
+    rows = (n + COLS - 1) // COLS
+
+    for row in range(rows):
+        line = INDENT + '║'
+        for col in range(COLS):
+            idx = col * rows + row
+            if idx < n:
+                obs = observer_names[idx]
+                kk = str(obs['kk']).zfill(2)
+                name_site = f"{obs['name']} ({obs['site']})" if obs.get('site') else obs.get('name', '')
+                cell = (' ' + name_site).ljust(NAME_W)[:NAME_W]
+            else:
+                kk = '  '
+                cell = ' ' * NAME_W
+            line += kk + '║' + cell + '║'
+        lines.append(line)
+
+    lines.append(INDENT + '╚' + '═' * KK_W + '╩' + '═' * NAME_W + '╩' + '═' * KK_W + '╩' + '═' * NAME_W + '╝')
+    lines.append('')
+
+    return '\n'.join(lines)
+
+
+def _format_observer_list_markdown(observer_names: list, i18n) -> str:
+    """Format observer name/site list as Markdown 2-column table."""
+    if not observer_names:
+        return ''
+
+    COLS = 2
+    title = i18n.get('statistics.observer_list')
+    hdr = i18n.get('statistics.observer_list_header')
+
+    lines = [f'## {title}', '']
+
+    header = '|'
+    sep = '|'
+    for _ in range(COLS):
+        header += f' KK | {hdr} |'
+        sep += ' ---: | --- |'
+    lines.append(header)
+    lines.append(sep)
+
+    n = len(observer_names)
+    rows = (n + COLS - 1) // COLS
+
+    for row in range(rows):
+        line = '|'
+        for col in range(COLS):
+            idx = col * rows + row
+            if idx < n:
+                obs = observer_names[idx]
+                kk = str(obs['kk']).zfill(2)
+                name_site = f"{obs['name']} ({obs['site']})" if obs.get('site') else obs.get('name', '')
+                line += f' {kk} | {name_site} |'
+            else:
+                line += '  |  |'
+        lines.append(line)
+
+    lines.append('')
+    return '\n'.join(lines)
+
+
 def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str, i18n) -> str:
     """Format monthly statistics as plain text with pseudographic tables."""
     lines = []
@@ -358,7 +445,13 @@ def _format_monthly_stats_text(data: Dict[str, Any], month_name: str, year: str,
         lines.append('║' + footnote_with_indent + padding + '║')
         lines.append('╚' + '═' * 86 + '╝')
         lines.append('')
-    
+
+    # Observer Directory (between table 1 and table 2)
+    if data.get('observer_names'):
+        obs_list_text = _format_observer_list_text(data['observer_names'], i18n)
+        if obs_list_text:
+            lines.append(obs_list_text)
+
     # Table 2: EE Overview
     if data.get('ee_overview'):
         lines.append('    ╔' + '═' * 79 + '╗')
@@ -592,7 +685,13 @@ def _format_monthly_stats_markdown(data: Dict[str, Any], month_name: str, year: 
         lines.append('')
         lines.append(f'_{footnote}_')
         lines.append('')
-    
+
+    # Observer Directory (between table 1 and table 2)
+    if data.get('observer_names'):
+        obs_list_md = _format_observer_list_markdown(data['observer_names'], i18n)
+        if obs_list_md:
+            lines.append(obs_list_md)
+
     # Table 2: EE Overview
     if data.get('ee_overview'):
         lines.append(f"## {i18n.get('monthly_stats.ee_overview')} {month_name} {year}")
@@ -1136,6 +1235,19 @@ def get_monthly_stats() -> Dict[str, Any]:
         'new_observers': new_observer_list,
         'departing_observers': departing_observer_list,
     }
+
+    # Build observer name/site list (sorted by KK) for the observer directory table
+    observer_names = []
+    for item in observer_list:
+        kk = item['kk']
+        obs_rec = active_observers.get(kk, {})
+        vname = obs_rec.get('VName', '')
+        nname = obs_rec.get('NName', '')
+        name = f"{vname} {nname}".strip()
+        site = obs_rec.get('HbOrt', '')
+        observer_names.append({'kk': kk, 'name': name, 'site': site})
+    observer_names.sort(key=lambda x: x['kk'])
+    data['observer_names'] = observer_names
     
     # Check requested format
     output_format = request.args.get('format', 'json').lower()
@@ -1735,9 +1847,15 @@ def _format_annual_stats_text(data: Dict[str, Any], year: str, i18n) -> str:
         
         # Bottom border
         lines.append('╚═══════╩═══════╩═════════╩═══╩══════════════════════════════════════════╝')
-    
+
     lines.append('')
-    
+
+    # Observer Directory (at end)
+    if data.get('observer_names'):
+        obs_list_text = _format_observer_list_text(data['observer_names'], i18n)
+        if obs_list_text:
+            lines.append(obs_list_text)
+
     return '\n'.join(lines)
 
 
@@ -1989,5 +2107,11 @@ def _format_annual_stats_markdown(data: Dict[str, Any], year: str, i18n) -> str:
         phenomena_none = i18n.get('annual_stats.phenomena_none')
         lines.append(phenomena_none)
         lines.append('')
-    
+
+    # Observer Directory (at end)
+    if data.get('observer_names'):
+        obs_list_md = _format_observer_list_markdown(data['observer_names'], i18n)
+        if obs_list_md:
+            lines.append(obs_list_md)
+
     return '\n'.join(lines)

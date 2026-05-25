@@ -1427,7 +1427,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += '<p style="margin: 0;">' + i18nStrings.annual_stats.phenomena_none + '</p>';
             html += '</div>';
         }
-        
+
+        // Observer Directory (at end)
+        if (data.observer_names && data.observer_names.length > 0) {
+            html += window.renderObserverListHTML(data.observer_names, i18nStrings);
+        }
+
         html += '</div>';
         return html;
     }
@@ -1567,7 +1572,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             md += `## ${i18nStrings.annual_stats.phenomena_title}\n\n`;
             md += i18nStrings.annual_stats.phenomena_none + '\n\n';
         }
-        
+
+        // Observer Directory (at end)
+        if (data.observer_names && data.observer_names.length > 0) {
+            md += window.renderObserverListMarkdown(data.observer_names, i18nStrings);
+        }
+
         return md;
     }
 });

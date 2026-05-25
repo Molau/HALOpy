@@ -398,6 +398,22 @@ def get_annual_stats() -> Dict[str, Any]:
         'observer_distribution': observer_distribution,
         'phenomena': phenomena_list
     }
+
+    # Build observer name/site list (sorted by KK) for the observer directory table
+    active_by_kk = {int(k): v for k, v in active_observers.items() if k.isdigit() or (k.lstrip('0') and k.lstrip('0').isdigit())}
+    observer_names = []
+    for obs_dist in observer_distribution:
+        kk_int = obs_dist['kk']
+        obs_rec = active_by_kk.get(kk_int, {})
+        if not obs_rec:
+            # Try string key as fallback
+            obs_rec = active_observers.get(str(kk_int).zfill(2), active_observers.get(str(kk_int), {}))
+        vname = obs_rec.get('VName', '')
+        nname = obs_rec.get('NName', '')
+        name = f"{vname} {nname}".strip()
+        site = obs_rec.get('HbOrt', '')
+        observer_names.append({'kk': kk_int, 'name': name, 'site': site})
+    data['observer_names'] = observer_names
     
     # Check requested format
     output_format = request.args.get('format', 'json').lower()
