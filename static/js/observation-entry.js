@@ -228,6 +228,7 @@ async function showAddObservationDialogNumeric() {
     let numericPhotoCaptionSavePromise = null;
     let numericLastPhotoContextKey = null;
     let numericPhotoRequestToken = 0;
+    let numericCaptionFocusMode = false;  // true while waiting for caption input before final save
 
     // Returns the photo context (kk/jj/mm/tt) when all four are present in eing,
     // i.e. when eing.length >= 9 (positions 0-8 = KK OO JJ MM TT).
@@ -575,6 +576,13 @@ async function showAddObservationDialogNumeric() {
             try { await persistNumericPhotoCaption(); }
             catch (e) { showErrorDialog(i18nStrings.observations.photo_caption_save_error); }
         });
+        // Enter in caption (without Shift) triggers the OK button
+        photoCaptionEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('btn-add-obs-ok').click();
+            }
+        });
     }
     // ── End photo upload state ────────────────────────────────────────────────
 
@@ -595,6 +603,7 @@ async function showAddObservationDialogNumeric() {
     }
 
     const ensureNumericInputFocus = () => {
+        if (numericCaptionFocusMode) return;
         if (document.body.contains(input) && document.activeElement !== input) {
             input.focus();
         }
@@ -1413,6 +1422,16 @@ async function showAddObservationDialogNumeric() {
         }
         isSubmittingObservation = true;
         try {
+            // If photos are attached and we haven't given focus to the caption yet,
+            // redirect focus there so the user can enter/confirm a caption first.
+            if (numericPhotoItems.length > 0 && !numericCaptionFocusMode) {
+                numericCaptionFocusMode = true;
+                isSubmittingObservation = false;
+                photoCaptionEl?.focus();
+                return;
+            }
+            numericCaptionFocusMode = false;
+
             // Flush any pending caption save before submitting
             await flushNumericPhotoCaptionSave();
 
