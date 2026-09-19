@@ -250,7 +250,20 @@ class ObservationForm {
                     setIfPresent(this.fields.mm, p.MM !== undefined ? parseInt(p.MM) : null);
                     setIfPresent(this.fields.tt, p.TT !== undefined ? p.TT : null);
                     setIfPresent(this.fields.g, (p.g !== undefined && p.g !== null) ? p.g : null);
-                    setIfPresent(this.fields.zs, p.ZS !== undefined && p.ZS !== -1 && p.ZS !== null ? p.ZS : null);
+                    // ZS: the stored value is always standard (winter) time. Re-apply the
+                    // DST offset for the copied date so the displayed hour and the
+                    // Sommerzeit checkbox match what would have originally been entered
+                    // (e.g. previous Halo 19:00 MESZ / stored 18:00 -> new Halo also 19:00 MESZ).
+                    if (p.ZS !== undefined && p.ZS !== -1 && p.ZS !== null) {
+                        const pJJ = p.JJ !== undefined ? parseInt(p.JJ) : null;
+                        const pMM = p.MM !== undefined ? parseInt(p.MM) : null;
+                        const pTT = p.TT !== undefined ? parseInt(p.TT) : null;
+                        let zsValue = parseInt(p.ZS);
+                        if (isDstDate(pJJ, pMM, pTT)) {
+                            zsValue = (zsValue + 1) % 24;
+                        }
+                        this.fields.zs.value = zsValue;
+                    }
                     setIfPresent(this.fields.zm, p.ZM !== undefined && p.ZM !== -1 && p.ZM !== null ? p.ZM : null);
                     setIfPresent(this.fields.d, p.d !== undefined && p.d !== null ? p.d : null, '-1');
                     setIfPresent(this.fields.dd, p.DD !== undefined && p.DD !== null ? p.DD : null, '-1');
