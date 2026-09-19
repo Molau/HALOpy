@@ -861,6 +861,8 @@
     "observing_area": "Observing Area",
     "hour": "Hour",
     "minute": "Minute",
+    "summer_time": "DST",
+    "summer_time_tooltip": "Time entered in daylight saving time (DST) - will be corrected by 1 hour to standard time when saved",
     "cirrus_density": "Cirrus Density/Origin",
     "duration": "Duration",
     "cloud_cover": "Cloud Cover",

@@ -861,6 +861,8 @@
     "observing_area": "Beobachtungsort",
     "hour": "Stunde",
     "minute": "Minute",
+    "summer_time": "Sommerzeit",
+    "summer_time_tooltip": "Uhrzeit in Sommerzeit (MESZ) eingegeben - wird beim Speichern automatisch um 1 Stunde auf Winterzeit korrigiert",
     "cirrus_density": "Dichte/Entstehungsort",
     "duration": "Dauer",
     "cloud_cover": "Himmelsbedeckung",

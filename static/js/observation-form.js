@@ -61,6 +61,26 @@ function sectorsSetToString(selected) {
     return groups.join('/');
 }
 
+// Determine whether a given date (EU rule) falls within Central European Summer Time (CEST).
+// DST runs from the last Sunday in March to the last Sunday in October.
+function isDstDate(year, month, day) {
+    if (!year || !month || !day) return false;
+    if (month < 3 || month > 10) return false;
+    if (month > 3 && month < 10) return true;
+
+    // Last Sunday of a given (1-based) month: last day of month minus its weekday offset.
+    const lastSundayOfMonth = (y, m) => {
+        const lastDay = new Date(Date.UTC(y, m, 0));
+        return lastDay.getUTCDate() - lastDay.getUTCDay();
+    };
+
+    if (month === 3) {
+        return day >= lastSundayOfMonth(year, 3);
+    }
+    // month === 10
+    return day < lastSundayOfMonth(year, 10);
+}
+
 class ObservationForm {
     constructor() {
         this.modalElement = null;
@@ -251,6 +271,7 @@ class ObservationForm {
                 this.manageFieldDependencies('ee');
                 this.updatePhotoUploadButtonState();
                 this.updateAutoPhotoPreview();
+                this.updateDstDefault();
             }, 0);
         }
         
@@ -486,7 +507,7 @@ class ObservationForm {
                     ${Array.from({length: 31}, (_, i) => `<option value="${i+1}">${String(i+1).padStart(2, '0')}</option>`).join('')}
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">g - ${this.buildConstraintIndicator(i18nStrings.fields.observing_area, ['KK', 'MM', 'JJ'], 'g')} <span class="text-danger">*</span></label>
                 <select class="form-select form-select-sm" id="form-g" required>
                     <option value="">${i18nStrings.fields.select}</option>
@@ -495,19 +516,35 @@ class ObservationForm {
                     <option value="2">2 - ${i18nStrings.location_types['2']}</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">ZS - ${i18nStrings.fields.hour}</label>
-                <select class="form-select form-select-sm" id="form-zs">
-                    <option value="">--</option>
-                    ${Array.from({length: 24}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">ZM - ${i18nStrings.fields.minute}</label>
-                <select class="form-select form-select-sm" id="form-zm">
-                    <option value="">--</option>
-                    ${Array.from({length: 60}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
-                </select>
+            <div class="col-md-5">
+                <div class="row g-1 align-items-end">
+                    <div class="col-5">
+                        <label class="form-label">ZS - ${i18nStrings.fields.hour}</label>
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label">ZM - ${i18nStrings.fields.minute}</label>
+                    </div>
+                    <div class="col-2 text-center">
+                        <label class="form-label d-block dst-checkbox-label" for="form-dst" title="${i18nStrings.fields.summer_time_tooltip}">${i18nStrings.fields.summer_time}</label>
+                    </div>
+                </div>
+                <div class="row g-1">
+                    <div class="col-5">
+                        <select class="form-select form-select-sm" id="form-zs">
+                            <option value="">--</option>
+                            ${Array.from({length: 24}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-5">
+                        <select class="form-select form-select-sm" id="form-zm">
+                            <option value="">--</option>
+                            ${Array.from({length: 60}, (_, i) => `<option value="${i}">${String(i).padStart(2, '0')}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-2 d-flex align-items-center justify-content-center dst-checkbox-input-wrap">
+                        <input class="form-check-input dst-checkbox-input" type="checkbox" id="form-dst" title="${i18nStrings.fields.summer_time_tooltip}">
+                    </div>
+                </div>
             </div>
             <div class="col-md-4">
                 <label class="form-label">d - ${this.buildConstraintIndicator(i18nStrings.fields.cirrus_density, 'O', 'd')}</label>
@@ -1360,6 +1397,7 @@ class ObservationForm {
             g: document.getElementById('form-g'),
             zs: document.getElementById('form-zs'),
             zm: document.getElementById('form-zm'),
+            dst: document.getElementById('form-dst'),
             d: document.getElementById('form-d'),
             dd: document.getElementById('form-dd'),
             n: document.getElementById('form-n'),
@@ -1436,17 +1474,20 @@ class ObservationForm {
             checkRequired();
             this.updatePhotoUploadButtonState();
             this.updateAutoPhotoPreview();
+            this.updateDstDefault();
         });
         this.fields.mm.addEventListener('change', () => {
             manageFieldDependencies('mm');
             checkRequired();
             this.updatePhotoUploadButtonState();
             this.updateAutoPhotoPreview();
+            this.updateDstDefault();
         });
         this.fields.tt.addEventListener('change', () => {
             checkRequired();
             this.updatePhotoUploadButtonState();
             this.updateAutoPhotoPreview();
+            this.updateDstDefault();
         });
         this.fields.ee.addEventListener('change', () => {
             manageFieldDependencies('ee');
@@ -2211,8 +2252,27 @@ class ObservationForm {
         container.classList.toggle('disabled', !!this.fields.sectors.disabled);
     }
     
+    /**
+     * Auto-set the "Sommerzeit" (DST) checkbox based on the current JJ/MM/TT
+     * date fields, using the EU daylight saving rule. Only used as a smart
+     * default for new observations - the user can always override it.
+     */
+    updateDstDefault() {
+        if (!this.fields.dst) return;
+        const jj = parseInt(this.fields.jj.value);
+        const mm = parseInt(this.fields.mm.value);
+        const tt = parseInt(this.fields.tt.value);
+        if (!jj || !mm || !tt) return;
+        this.fields.dst.checked = isDstDate(jj, mm, tt);
+    }
+    
     populateFields(obs) {
         // Populate all fields with observation data
+        // The stored ZS/ZM is always standard (winter) time, so the DST helper
+        // checkbox is reset to unchecked when loading an existing observation.
+        if (this.fields.dst) {
+            this.fields.dst.checked = false;
+        }
         // Convert KK to 2-digit string with leading zero to match option values
         this.fields.kk.value = obs.KK !== undefined && obs.KK !== null && obs.KK !== '' ? String(obs.KK).padStart(2, '0') : '';
         this.fields.o.value = obs.O || '';
@@ -2530,6 +2590,13 @@ class ObservationForm {
         // Year: dropdown value is 4-digit, use directly
         let jj = parseInt(this.fields.jj.value);
         
+        // ZS: if the "Sommerzeit" (DST) checkbox is checked, the time was entered
+        // in daylight saving time - correct it by 1 hour to standard time for storage.
+        let zs = this.fields.zs.value ? parseInt(this.fields.zs.value) : -1;
+        if (zs >= 0 && this.fields.dst && this.fields.dst.checked) {
+            zs = (zs + 23) % 24;
+        }
+        
         return {
             KK: kk,
             O: parseInt(this.fields.o.value),
@@ -2538,7 +2605,7 @@ class ObservationForm {
             TT: parseInt(this.fields.tt.value),
             g: parseInt(this.fields.g.value),
             GG: parseInt(this.fields.gg.value),
-            ZS: this.fields.zs.value ? parseInt(this.fields.zs.value) : -1,
+            ZS: zs,
             ZM: this.fields.zm.value ? parseInt(this.fields.zm.value) : -1,
             DD: this.fields.dd.value && this.fields.dd.value !== '-1' ? parseInt(this.fields.dd.value) : -1,
             d: this.fields.d.value && this.fields.d.value !== '-1' ? parseInt(this.fields.d.value) : -1,

@@ -357,6 +357,20 @@ footer {
     font-weight: bold;
 }
 
+/* Sommerzeit (DST) checkbox next to ZS/ZM in the Menüeingabe form */
+.dst-checkbox-label {
+    font-size: 0.65rem;
+    line-height: 1.5rem;
+    white-space: normal;
+    cursor: pointer;
+}
+.dst-checkbox-input-wrap {
+    height: calc(1.5em + 0.5rem + 2px); /* matches .form-select-sm height */
+}
+.dst-checkbox-input {
+    margin: 0;
+}
+
 /* Sector circle widget (Menüeingabe - Sektoren) */
 .sector-circle-svg {
     flex-shrink: 0;
