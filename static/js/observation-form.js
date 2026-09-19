@@ -3,6 +3,64 @@
  * Reusable observation form for add and modify operations
  */
 
+// Sector circle: 8 octants (a-h) arranged clockwise starting with 'd' at the top (12 o'clock).
+// Order clockwise from top: d, e, f, g, h, a, b, c.
+const SECTOR_LETTERS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
+// Center angle (degrees, clockwise from top/12 o'clock) for a given octant letter.
+function sectorCenterAngle(letter) {
+    const idx = SECTOR_LETTERS.indexOf(letter);
+    const dIdx = SECTOR_LETTERS.indexOf('d');
+    return (((idx - dIdx) * 45) % 360 + 360) % 360;
+}
+
+// Extract the set of octant letters (a-h) present in a sectors field string.
+function parseSectorLetters(value) {
+    const set = new Set();
+    if (!value) return set;
+    for (const ch of value.toLowerCase()) {
+        if (/[a-h]/.test(ch)) set.add(ch);
+    }
+    return set;
+}
+
+// Build a canonical sectors field string from a set of selected octant letters.
+// Consecutive (clockwise) octants are joined with '-', separate groups with '/'.
+function sectorsSetToString(selected) {
+    if (!selected || selected.size === 0) return '';
+    if (selected.size === 8) return 'a-b-c-d-e-f-g-h';
+
+    // Find a group start: a selected letter whose clockwise predecessor is not selected.
+    let start = 0;
+    for (let i = 0; i < 8; i++) {
+        const cur = SECTOR_LETTERS[i];
+        const prev = SECTOR_LETTERS[(i + 7) % 8];
+        if (selected.has(cur) && !selected.has(prev)) {
+            start = i;
+            break;
+        }
+    }
+
+    const groups = [];
+    const visited = new Set();
+    for (let step = 0; step < 8; step++) {
+        const idx = (start + step) % 8;
+        const letter = SECTOR_LETTERS[idx];
+        if (selected.has(letter) && !visited.has(idx)) {
+            const group = [letter];
+            visited.add(idx);
+            let next = (idx + 1) % 8;
+            while (selected.has(SECTOR_LETTERS[next]) && !visited.has(next)) {
+                group.push(SECTOR_LETTERS[next]);
+                visited.add(next);
+                next = (next + 1) % 8;
+            }
+            groups.push(group.join('-'));
+        }
+    }
+    return groups.join('/');
+}
+
 class ObservationForm {
     constructor() {
         this.modalElement = null;
@@ -584,7 +642,10 @@ class ObservationForm {
             </div>
             <div class="col-12">
                 <label class="form-label">${this.buildConstraintIndicator(i18nStrings.fields.sectors, ['EE', 'V'], 'sectors')}</label>
-                <input type="text" class="form-control form-control-sm" id="form-sectors" maxlength="15">
+                <div class="d-flex align-items-center gap-4 flex-wrap">
+                    <input type="text" class="form-control form-control-sm" id="form-sectors" maxlength="15" style="max-width: 160px;">
+                    ${this.buildSectorCircleMarkup()}
+                </div>
             </div>
             <div class="col-12">
                 <label class="form-label">${i18nStrings.observations.attributes_label}</label>
@@ -690,6 +751,46 @@ class ObservationForm {
         }
         
         return `<span class="constraint-indicator" data-constraint-field="${fieldKey}">${fieldLabel}<span class="tooltip-text">${tooltipText}</span></span>`;
+    }
+
+    /**
+     * Build the SVG markup for the clickable sector circle widget.
+     * The circle is divided into 8 octants (a-h), with 'd' at the top (12 o'clock),
+     * going clockwise: d(top), e, f, g, h(bottom), a, b, c.
+     * Clicking an octant toggles it in the linked #form-sectors text field, and vice versa.
+     */
+    buildSectorCircleMarkup() {
+        const cx = 50, cy = 50, outerR = 36, innerR = 28, labelR = 46;
+        const toRad = (deg) => (deg * Math.PI) / 180;
+        const point = (angleDeg, radius) => ({
+            x: cx + radius * Math.sin(toRad(angleDeg)),
+            y: cy - radius * Math.cos(toRad(angleDeg))
+        });
+
+        const wedges = SECTOR_LETTERS.map(letter => {
+            const centerAngle = sectorCenterAngle(letter);
+            const start = centerAngle - 22.5;
+            const end = centerAngle + 22.5;
+            const outerStart = point(start, outerR);
+            const outerEnd = point(end, outerR);
+            const innerStart = point(start, innerR);
+            const innerEnd = point(end, innerR);
+            const labelPos = point(centerAngle, labelR);
+            // Ring-segment (annulus) path: represents the halo ring itself, not the full sector.
+            const d = `M ${innerStart.x.toFixed(2)},${innerStart.y.toFixed(2)} ` +
+                       `L ${outerStart.x.toFixed(2)},${outerStart.y.toFixed(2)} ` +
+                       `A ${outerR},${outerR} 0 0,1 ${outerEnd.x.toFixed(2)},${outerEnd.y.toFixed(2)} ` +
+                       `L ${innerEnd.x.toFixed(2)},${innerEnd.y.toFixed(2)} ` +
+                       `A ${innerR},${innerR} 0 0,0 ${innerStart.x.toFixed(2)},${innerStart.y.toFixed(2)} Z`;
+            return `<path class="sector-wedge" data-octant="${letter}" d="${d}"></path>` +
+                   `<text class="sector-wedge-label" x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}" data-octant="${letter}">${letter}</text>`;
+        }).join('');
+
+        return `
+            <svg id="form-sectors-circle" class="sector-circle-svg" viewBox="0 0 100 100" width="64" height="64" title="${i18nStrings.fields.sectors}">
+                <circle cx="${cx}" cy="${cy}" r="${innerR - 4}" class="sector-circle-center"></circle>
+                ${wedges}
+            </svg>`;
     }
 
     /**
@@ -1154,6 +1255,8 @@ class ObservationForm {
             
         }
         
+        this.updateSectorCircle();
+        
         // Update all constraint indicators
         this.updateConstraintIndicators();
     }
@@ -1410,7 +1513,14 @@ class ObservationForm {
                     this.fields.sectors.value = result.cleaned;
                 }
             }
+            this.updateSectorCircle();
         });
+        
+        // Sectors field: keep the circle widget in sync while typing
+        this.fields.sectors.addEventListener('input', () => this.updateSectorCircle());
+        
+        // Sector circle widget: clicking an octant toggles it in the text field
+        this.setupSectorCircleEvents();
         
         // Sectors field: Enter key moves to remarks field
         this.fields.sectors.addEventListener('keydown', (e) => {
@@ -1426,8 +1536,10 @@ class ObservationForm {
                     }
                     // Invalid: do nothing - stay in sectors field, value will be cleared on next change event
                 }
+                this.updateSectorCircle();
             }
         });
+
         
         // Note: 8HHHH field management moved to manageFieldDependencies() function
         
@@ -1988,6 +2100,7 @@ class ObservationForm {
                 this.updatePlaceholderText(field);
             }
         });
+        this.updateSectorCircle();
     }
     
     enableAllFields() {
@@ -2056,6 +2169,46 @@ class ObservationForm {
             }
             this.updatePlaceholderText(field);
         });
+        this.updateSectorCircle();
+    }
+    
+    /**
+     * Attach click handlers to the sector circle wedges so clicking an octant
+     * toggles it in the linked #form-sectors text field.
+     */
+    setupSectorCircleEvents() {
+        const container = document.getElementById('form-sectors-circle');
+        if (!container) return;
+        container.querySelectorAll('.sector-wedge').forEach(wedge => {
+            wedge.addEventListener('click', () => {
+                if (this.fields.sectors.disabled) return;
+                const letter = wedge.getAttribute('data-octant');
+                const selected = parseSectorLetters(this.fields.sectors.value);
+                if (selected.has(letter)) {
+                    selected.delete(letter);
+                } else {
+                    selected.add(letter);
+                }
+                this.fields.sectors.value = sectorsSetToString(selected);
+                this.fields.sectors.dispatchEvent(new Event('change'));
+                this.fields.sectors.focus();
+            });
+        });
+    }
+    
+    /**
+     * Sync the sector circle widget's highlighted octants and enabled/disabled
+     * state with the current value of the #form-sectors text field.
+     */
+    updateSectorCircle() {
+        const container = document.getElementById('form-sectors-circle');
+        if (!container || !this.fields.sectors) return;
+        const selected = parseSectorLetters(this.fields.sectors.value);
+        container.querySelectorAll('.sector-wedge').forEach(wedge => {
+            const letter = wedge.getAttribute('data-octant');
+            wedge.classList.toggle('active', selected.has(letter));
+        });
+        container.classList.toggle('disabled', !!this.fields.sectors.disabled);
     }
     
     populateFields(obs) {
@@ -2106,6 +2259,8 @@ class ObservationForm {
         if (obs.remarks) {
             this.parseAttributesFromRemarks(obs.remarks);
         }
+        
+        this.updateSectorCircle();
         
         // Field values are populated from observation
         // Constraints/dependencies are applied by manageFieldDependencies() after this method returns

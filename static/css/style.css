@@ -357,6 +357,68 @@ footer {
     font-weight: bold;
 }
 
+/* Sector circle widget (Menüeingabe - Sektoren) */
+.sector-circle-svg {
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.sector-circle-svg .sector-circle-center {
+    fill: none;
+    stroke: #adb5bd;
+    stroke-width: 1;
+    stroke-dasharray: 2 2;
+}
+
+.sector-circle-svg .sector-wedge {
+    fill: #f8f9fa;
+    stroke: #adb5bd;
+    stroke-width: 1;
+    cursor: pointer;
+    transition: fill 0.15s ease;
+}
+
+.sector-circle-svg .sector-wedge:hover {
+    fill: #cfe2ff;
+}
+
+.sector-circle-svg .sector-wedge.active {
+    fill: #0d6efd;
+    stroke: #0b5ed7;
+}
+
+.sector-circle-svg .sector-wedge.active:hover {
+    fill: #0b5ed7;
+}
+
+.sector-circle-svg .sector-wedge-label {
+    font-size: 8px;
+    fill: #495057;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
+.sector-circle-svg.disabled .sector-wedge {
+    cursor: not-allowed;
+}
+
+.sector-circle-svg.disabled .sector-wedge:not(.active) {
+    fill: #e9ecef;
+}
+
+.sector-circle-svg.disabled .sector-wedge:not(.active):hover {
+    fill: #e9ecef;
+}
+
+.sector-circle-svg.disabled .sector-wedge.active {
+    fill: #6c9fe0;
+}
+
+.sector-circle-svg.disabled .sector-wedge.active:hover {
+    fill: #6c9fe0;
+}
+
 /* Observation photo gallery */
 .obs-photo-strip {
     display: flex;
