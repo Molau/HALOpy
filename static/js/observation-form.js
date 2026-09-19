@@ -95,6 +95,7 @@ class ObservationForm {
         this.saved = false;
         this.skipped = false;
         this.destroyed = false; // Track if form has been destroyed
+        this.dstManuallySet = false; // Track if user manually toggled the DST checkbox
         this.prefillObservation = null; // Optional: pre-fill fields from a previous observation (add mode)
         this.photoItems = [];
         this.photoContext = null;
@@ -259,6 +260,11 @@ class ObservationForm {
                     setIfPresent(this.fields.f, p.f !== undefined && p.f !== null ? p.f : null, '-1');
                     setIfPresent(this.fields.zz, p.zz !== undefined && p.zz !== null ? p.zz : null, '-1');
                     setIfPresent(this.fields.gg, (p.GG !== undefined && p.GG !== null) ? p.GG : null);
+                    // Remarks and derived attribute checkboxes (*, #, kA, kE, UB, UH)
+                    if (p.remarks) {
+                        this.fields.remarks.value = p.remarks;
+                        this.parseAttributesFromRemarks(p.remarks);
+                    }
                 }
                 
                 // Apply initial dependencies for pre-filled values
@@ -1187,8 +1193,9 @@ class ObservationForm {
                 enableAllOptions(ggOpts);
                 this.fields.gg.disabled = false;  // Enable field for manual entry
                 this.updatePlaceholderText(this.fields.gg);
-                // Don't overwrite GG if editing
-                if (!this.originalObservation) {
+                // Don't overwrite GG if editing an existing observation, or if a
+                // value was just pre-filled from "wie vorheriges Halo"
+                if (!this.originalObservation && !this.prefillObservation) {
                     this.fields.gg.value = '';
                 }
                 this.fieldConstraints.GG = null;  // All values allowed
@@ -1489,6 +1496,11 @@ class ObservationForm {
             this.updateAutoPhotoPreview();
             this.updateDstDefault();
         });
+        if (this.fields.dst) {
+            this.fields.dst.addEventListener('change', () => {
+                this.dstManuallySet = true;
+            });
+        }
         this.fields.ee.addEventListener('change', () => {
             manageFieldDependencies('ee');
             checkRequired();
@@ -2254,11 +2266,14 @@ class ObservationForm {
     
     /**
      * Auto-set the "Sommerzeit" (DST) checkbox based on the current JJ/MM/TT
-     * date fields, using the EU daylight saving rule. Only used as a smart
-     * default for new observations - the user can always override it.
+     * date fields, using the EU daylight saving rule. Only applies when
+     * adding a new observation, and only until the user manually toggles
+     * the checkbox themselves - after that their choice is respected.
      */
     updateDstDefault() {
         if (!this.fields.dst) return;
+        if (this.mode !== 'add') return;
+        if (this.dstManuallySet) return;
         const jj = parseInt(this.fields.jj.value);
         const mm = parseInt(this.fields.mm.value);
         const tt = parseInt(this.fields.tt.value);
